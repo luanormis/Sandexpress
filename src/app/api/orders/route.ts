@@ -1,0 +1,116 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+/**
+ * GET /api/orders?vendor_id=xxx&status=received
+ * Lista pedidos de um vendor, filtrável por status.
+ *
+ * POST /api/orders
+ * Cria um novo pedido com itens.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const vendor_id = searchParams.get('vendor_id');
+    const status = searchParams.get('status');
+
+    if (!vendor_id) {
+      return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
+    }
+
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
+    if (isDemo) return NextResponse.json([]);
+
+    let query = supabaseAdmin
+      .from('orders')
+      .select('*, order_items(*, products(name))')
+      .eq('vendor_id', vendor_id)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return NextResponse.json(data || []);
+  } catch (err) {
+    console.error('Orders GET error:', err);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { vendor_id, customer_id, umbrella_id, items, notes } = await req.json();
+
+    if (!vendor_id || !customer_id || !umbrella_id || !items?.length) {
+      return NextResponse.json({ error: 'Dados de pedido incompletos.' }, { status: 400 });
+    }
+
+    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
+    if (isDemo) {
+      return NextResponse.json({
+        id: 'demo-order-' + Date.now(),
+        vendor_id,
+        customer_id,
+        umbrella_id,
+        status: 'received',
+        total: items.reduce((acc: number, i: any) => acc + i.unit_price * i.quantity, 0),
+        notes,
+        created_at: new Date().toISOString(),
+      }, { status: 201 });
+    }
+
+    // Calcular total
+    const total = items.reduce((acc: number, i: any) => acc + i.unit_price * i.quantity, 0);
+
+    // Criar pedido
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from('orders')
+      .insert({ vendor_id, customer_id, umbrella_id, total, notes })
+      .select()
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    // Criar itens do pedido
+    const orderItems = items.map((item: any) => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      subtotal: item.unit_price * item.quantity,
+    }));
+
+    const { error: itemsErr } = await supabaseAdmin
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsErr) throw itemsErr;
+
+    // Atualizar total gasto do cliente
+    await supabaseAdmin.rpc('', {}); // Placeholder para RPC se necessário
+    // Fallback: atualizar manualmente
+    const { data: customer } = await supabaseAdmin
+      .from('customers')
+      .select('total_spent')
+      .eq('id', customer_id)
+      .single();
+
+    if (customer) {
+      await supabaseAdmin
+        .from('customers')
+        .update({
+          total_spent: customer.total_spent + total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', customer_id);
+    }
+
+    return NextResponse.json(order, { status: 201 });
+  } catch (err) {
+    console.error('Orders POST error:', err);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}

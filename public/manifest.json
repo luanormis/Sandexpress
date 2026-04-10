@@ -1,0 +1,17 @@
+{
+  "name": "SandExpress",
+  "short_name": "SandExpress",
+  "description": "Seu quiosque vendendo mais, sem esforço.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FF6B00",
+  "theme_color": "#FF6B00",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
