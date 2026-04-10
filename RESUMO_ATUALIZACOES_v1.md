@@ -133,8 +133,8 @@ git push origin main
 - [ ] **SMS de Confirmação** (Twilio)
 - [ ] **Dashboard Analítico** (Faturamento, vendas)
 - [ ] **Sistema de Cupons** (Desconto automático)
-- [ ] **Integração com WhatsApp** (Pedidos via chat)
-- [ ] **Notificações Push** (Cliente e vendedor)
+- [ ] **Integração com WhatsApp** para validar telefone do cliente
+- [ ] **Notificações Push** (Cliente e vendedor) - vendedor pode enviar promoções e cliente pode solicitar garçom
 
 ---
 
