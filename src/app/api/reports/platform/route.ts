@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession } from '@/lib/auth-session';
 
 const PLAN_PRICES: Record<string, number> = {
   monthly: 199,
@@ -17,32 +18,11 @@ function getVendorPlanAmount(vendor: { plan_type: string | null }) {
  * Relatórios da plataforma (para admin).
  * GMV, total de pedidos, faturamento e inadimplência.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-
-    if (isDemo) {
-      return NextResponse.json({
-        gmv: 285000,
-        total_orders: 4250,
-        total_customers: 1890,
-        avg_ticket: 67.06,
-        active_vendors: 42,
-        trial_vendors: 8,
-        overdue_vendors: 3,
-        blocked_vendors: 1,
-        retention_rate: 68.5,
-        top_vendors: [
-          { name: 'Quiosque do Sol', city: 'Santos', revenue: 45200 },
-          { name: 'Barraca Tropical', city: 'Rio de Janeiro', revenue: 38900 },
-          { name: 'Mar Azul Beach', city: 'Guarujá', revenue: 32100 },
-          { name: 'Coqueiro Verde', city: 'Florianópolis', revenue: 28700 },
-          { name: 'Praia Bela', city: 'Recife', revenue: 21500 },
-        ],
-        monthly_received: 285000,
-        next_cycle_receivable: 7200,
-        overdue_amount: 1200,
-      });
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
 
     // Contar vendors por status

@@ -1,26 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { canAccessVendor, getRequestSession } from "@/lib/auth-session";
+import { validateImageUpload } from "@/lib/upload-guard";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const session = getRequestSession(request);
+    if (!session) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+
+    const { id: productId } = await params;
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const vendorId = formData.get("vendorId") as string;
-    const authToken = request.headers.get("authorization")?.replace("Bearer ", "");
 
-    if (!file || !vendorId || !authToken) {
+    if (!file || !vendorId) {
       return NextResponse.json(
-        { error: "File, vendorId, and authorization required" },
+        { error: "file e vendorId são obrigatórios." },
         { status: 400 }
       );
     }
+    const validationError = validateImageUpload(file);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+    if (!canAccessVendor(session, vendorId)) {
+      return NextResponse.json({ error: "Não autorizado para este vendor." }, { status: 403 });
+    }
 
     // Verificar se o vendor tem plano plus
-    const { data: plan, error: planError } = await supabase
+    const { data: plan, error: planError } = await supabaseAdmin
       .from("vendor_plans")
       .select("*")
       .eq("vendor_id", vendorId)
@@ -28,14 +39,14 @@ export async function POST(
 
     if (planError || !plan) {
       return NextResponse.json(
-        { error: "Plan not found for vendor" },
+        { error: "Plano não encontrado para o vendor." },
         { status: 404 }
       );
     }
 
     if (plan.plan_type !== "plus") {
       return NextResponse.json(
-        { error: "Plus plan required for custom images" },
+        { error: "Plano Plus obrigatório para imagens personalizadas." },
         { status: 403 }
       );
     }
@@ -43,7 +54,7 @@ export async function POST(
     if (plan.custom_images_used >= plan.max_custom_images) {
       return NextResponse.json(
         {
-          error: `Custom image limit reached (${plan.max_custom_images})`,
+          error: `Limite de imagens personalizadas atingido (${plan.max_custom_images}).`,
         },
         { status: 403 }
       );
@@ -51,24 +62,24 @@ export async function POST(
 
     // Upload da imagem para o storage
     const fileName = `products/${vendorId}/${productId}/${Date.now()}-${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from("product-images")
       .upload(fileName, file);
 
     if (uploadError) {
       return NextResponse.json(
-        { error: "Failed to upload image" },
+        { error: "Falha no upload da imagem." },
         { status: 500 }
       );
     }
 
     // Get public URL
-    const { data: publicUrl } = supabase.storage
+    const { data: publicUrl } = supabaseAdmin.storage
       .from("product-images")
       .getPublicUrl(uploadData.path);
 
     // Atualizar produto com a nova imagem
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("products")
       .update({
         image_url: publicUrl.publicUrl,
@@ -80,13 +91,13 @@ export async function POST(
 
     if (updateError) {
       return NextResponse.json(
-        { error: "Failed to update product" },
+        { error: "Falha ao atualizar produto." },
         { status: 500 }
       );
     }
 
     // Incrementar contador de imagens usadas
-    const { error: counterError } = await supabase
+    const { error: counterError } = await supabaseAdmin
       .from("vendor_plans")
       .update({
         custom_images_used: plan.custom_images_used + 1,
@@ -94,7 +105,7 @@ export async function POST(
       .eq("vendor_id", vendorId);
 
     if (counterError) {
-      console.error("Failed to update custom images counter:", counterError);
+      console.error("Falha ao atualizar contador de imagens personalizadas:", counterError);
     }
 
     return NextResponse.json(
@@ -108,7 +119,7 @@ export async function POST(
   } catch (error) {
     console.error("Product image upload error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno." },
       { status: 500 }
     );
   }

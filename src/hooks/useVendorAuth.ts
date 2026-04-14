@@ -42,8 +42,8 @@ export function useVendorAuth(): UseVendorAuthReturn {
         }
 
         sessionStorage.setItem("vendor_id", result.vendor_id);
-        sessionStorage.setItem("vendor_token", result.token);
         sessionStorage.setItem("vendor_name", result.vendor_name);
+        localStorage.setItem("vendor_id", result.vendor_id);
 
         if (result.must_change_password) {
           router.push("/vendor/change-password");
@@ -62,8 +62,8 @@ export function useVendorAuth(): UseVendorAuthReturn {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("vendor_id");
-    sessionStorage.removeItem("vendor_token");
     sessionStorage.removeItem("vendor_name");
+    localStorage.removeItem("vendor_id");
     router.push("/vendor/login");
   }, [router]);
 

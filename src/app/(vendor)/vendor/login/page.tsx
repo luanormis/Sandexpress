@@ -39,7 +39,10 @@ export default function VendorLogin() {
         alert('Faça a alteração da senha padrão no primeiro acesso.');
       }
 
-      sessionStorage.setItem('vendor_token', result.token);
+      if (result.vendor_id) {
+        sessionStorage.setItem('vendor_id', result.vendor_id);
+        localStorage.setItem('vendor_id', result.vendor_id);
+      }
       router.push('/vendor/dashboard');
     } catch (err) {
       console.error('Login error:', err);

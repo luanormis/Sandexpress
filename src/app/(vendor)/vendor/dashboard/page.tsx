@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
@@ -68,36 +69,25 @@ interface Customer {
 }
 
 // ---------- MOCK DATA ----------
-const MOCK_ORDERS: Order[] = [
-  { id: "101", umbrella: 12, customer: "João Silva", phone: "(11) 9999-9999", total: 45.0, status: "received", time: "5 min", items: [{ q: 2, n: "Cerveja Heineken" }], notes: "Bem gelada por favor" },
-  { id: "102", umbrella: 5, customer: "Maria Souza", phone: "(11) 8888-8888", total: 110.0, status: "preparing", time: "15 min", items: [{ q: 1, n: "Isca de Peixe" }, { q: 2, n: "Caipirinha" }] },
-  { id: "103", umbrella: 22, customer: "Carlos Mendes", phone: "(11) 7777-7777", total: 15.0, status: "delivering", time: "2 min", items: [{ q: 3, n: "Água de Coco" }] },
-  { id: "104", umbrella: 8, customer: "Ana Lima", phone: "(11) 6666-6666", total: 75.0, status: "received", time: "1 min", items: [{ q: 1, n: "Combo Casal" }] },
-];
-
-const MOCK_PRODUCTS: Product[] = [
-  { id: "1", name: "Cerveja Heineken", category: "Bebidas", price: 15.0, promotional_price: 12.0, description: "Garrafa 600ml estupidamente gelada", image_url: "", active: true, is_combo: false, sort_order: 1 },
-  { id: "2", name: "Porção de Fritas", category: "Petiscos", price: 35.0, promotional_price: null, description: "Porção bem servida para 2 pessoas", image_url: "", active: true, is_combo: false, sort_order: 2 },
-  { id: "3", name: "Isca de Peixe", category: "Petiscos", price: 65.0, promotional_price: null, description: "Peixe fresco empanado no capricho", image_url: "", active: true, is_combo: false, sort_order: 3 },
-  { id: "4", name: "Água de Coco", category: "Bebidas", price: 10.0, promotional_price: 8.0, description: "Coco verde natural", image_url: "", active: true, is_combo: false, sort_order: 4 },
-  { id: "5", name: "Caipirinha", category: "Alcoólicos", price: 22.0, promotional_price: null, description: "Limão, cachaça e açúcar", image_url: "", active: true, is_combo: false, sort_order: 5 },
-  { id: "6", name: "Combo Casal", category: "Combos", price: 89.0, promotional_price: 75.0, description: "2 cervejas + fritas + isca", image_url: "", active: true, is_combo: true, sort_order: 6 },
-];
-
-const MOCK_UMBRELLAS: Umbrella[] = [
-  { id: "u1", number: 1, label: "Barraca 1", active: true, qr_url: null },
-  { id: "u2", number: 2, label: "Barraca 2", active: true, qr_url: null },
-  { id: "u3", number: 3, label: "Barraca 3", active: true, qr_url: null },
-  { id: "u4", number: 4, label: "Barraca 4", active: false, qr_url: null },
-];
-
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: "c1", name: "João Silva", phone: "(11)99999-9999", visit_count: 12, total_spent: 890, last_visit_at: new Date().toISOString() },
-  { id: "c2", name: "Maria Souza", phone: "(21)88888-8888", visit_count: 8, total_spent: 645, last_visit_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "c3", name: "Carlos Mendes", phone: "(13)77777-7777", visit_count: 6, total_spent: 420, last_visit_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: "c4", name: "Ana Lima", phone: "(71)66666-6666", visit_count: 3, total_spent: 195, last_visit_at: new Date(Date.now() - 259200000).toISOString() },
-  { id: "c5", name: "Pedro Santos", phone: "(11)55555-5555", visit_count: 1, total_spent: 45, last_visit_at: new Date().toISOString() },
-];
+function mapApiOrder(o: Record<string, unknown>): Order {
+  const customers = o.customers as { name?: string; phone?: string } | null | undefined;
+  const umbrellas = o.umbrellas as { number?: number } | null | undefined;
+  const orderItems =
+    (o.order_items as { quantity: number; products?: { name?: string } | null }[]) || [];
+  const created = new Date(String(o.created_at));
+  const diffMin = Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000));
+  return {
+    id: String(o.id),
+    umbrella: umbrellas?.number ?? 0,
+    customer: customers?.name || "—",
+    phone: customers?.phone || "—",
+    total: Number(o.total),
+    status: String(o.status),
+    time: `${diffMin} min`,
+    items: orderItems.map((i) => ({ q: i.quantity, n: i.products?.name || "Item" })),
+    notes: (o.notes as string) || undefined,
+  };
+}
 
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
@@ -113,20 +103,23 @@ const TABS = [
 // MAIN COMPONENT
 // =========================================================
 export default function VendorDashboard() {
+  const router = useRouter();
+  const [vendorId, setVendorId] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState("orders");
 
   // --- Orders State ---
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
-  const [newOrderCount, setNewOrderCount] = useState(2);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [newOrderCount, setNewOrderCount] = useState(0);
 
   // --- Products State ---
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [productFilter, setProductFilter] = useState("Todos");
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // --- Umbrellas State ---
-  const [umbrellas, setUmbrellas] = useState<Umbrella[]>(MOCK_UMBRELLAS);
+  const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
   const [showAddUmbrella, setShowAddUmbrella] = useState(false);
   const [newUmbrellaNumber, setNewUmbrellaNumber] = useState("");
 
@@ -136,58 +129,177 @@ export default function VendorDashboard() {
   const [reportLoading, setReportLoading] = useState(false);
 
   // --- Customers State ---
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+  useEffect(() => {
+    const vid = typeof window !== "undefined" ? localStorage.getItem("vendor_id") : null;
+    if (!vid) {
+      router.replace("/vendor/login");
+      return;
+    }
+    setVendorId(vid);
+  }, [router]);
+
+  const loadOrders = useCallback(async () => {
+    if (!vendorId) return;
+    const res = await fetch(`/api/orders?vendor_id=${vendorId}`, { credentials: "include" });
+    if (!res.ok) return;
+    const raw = await res.json();
+    if (!Array.isArray(raw)) return;
+    setOrders(raw.map((row: Record<string, unknown>) => mapApiOrder(row)));
+    setNewOrderCount(raw.filter((x: { status: string }) => x.status === "received").length);
+  }, [vendorId]);
+
+  const loadProducts = useCallback(async () => {
+    if (!vendorId) return;
+    const res = await fetch(`/api/products?vendor_id=${vendorId}`, { credentials: "include" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setProducts(Array.isArray(data) ? data : []);
+  }, [vendorId]);
+
+  const loadUmbrellas = useCallback(async () => {
+    if (!vendorId) return;
+    const res = await fetch(`/api/umbrellas?vendor_id=${vendorId}`, { credentials: "include" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setUmbrellas(Array.isArray(data) ? data : []);
+  }, [vendorId]);
+
+  const loadCustomers = useCallback(async () => {
+    if (!vendorId) return;
+    const res = await fetch(`/api/customers?vendor_id=${vendorId}`, { credentials: "include" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setCustomers(Array.isArray(data) ? data : []);
+  }, [vendorId]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    void loadOrders();
+  }, [vendorId, loadOrders]);
+
+  useEffect(() => {
+    if (!vendorId || activeTab !== "orders") return;
+    const t = setInterval(() => void loadOrders(), 5000);
+    return () => clearInterval(t);
+  }, [vendorId, activeTab, loadOrders]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    if (activeTab === "menu") void loadProducts();
+    if (activeTab === "qr") void loadUmbrellas();
+    if (activeTab === "customers") void loadCustomers();
+  }, [vendorId, activeTab, loadProducts, loadUmbrellas, loadCustomers]);
+
   // Load reports when tab or period changes
   useEffect(() => {
-    if (activeTab === "reports") {
+    if (activeTab === "reports" && vendorId) {
       setReportLoading(true);
-      fetch(`/api/reports?vendor_id=demo&period=${reportPeriod}`)
-        .then(r => r.json())
-        .then(d => { setReportData(d); setReportLoading(false); })
+      fetch(`/api/reports?vendor_id=${vendorId}&period=${reportPeriod}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setReportData(d);
+          setReportLoading(false);
+        })
         .catch(() => setReportLoading(false));
     }
-  }, [activeTab, reportPeriod]);
+  }, [activeTab, reportPeriod, vendorId]);
 
   // Order management
-  const moveOrder = (id: string, newStatus: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+  const moveOrder = async (id: string, newStatus: string) => {
+    const res = await fetch(`/api/orders/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) void loadOrders();
   };
 
   // Product management
-  const toggleProduct = (id: string) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, active: !p.active } : p));
+  const toggleProduct = async (id: string) => {
+    const p = products.find((x) => x.id === id);
+    if (!p) return;
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ active: !p.active }),
+    });
+    if (res.ok) void loadProducts();
   };
 
-  const deleteProduct = (id: string) => {
-    if (confirm("Tem certeza que deseja remover este produto?")) {
-      setProducts(prev => prev.filter(p => p.id !== id));
-    }
+  const deleteProduct = async (id: string) => {
+    if (!confirm("Tem certeza que deseja remover este produto?")) return;
+    const res = await fetch(`/api/products/${id}`, { method: "DELETE", credentials: "include" });
+    if (res.ok) void loadProducts();
   };
 
-  const saveProduct = (product: Product) => {
+  const saveProduct = async (product: Product) => {
+    if (!vendorId) return;
     if (editingProduct) {
-      setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(product),
+      });
+      if (res.ok) void loadProducts();
     } else {
-      setProducts(prev => [...prev, { ...product, id: "p-" + Date.now() }]);
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          name: product.name,
+          category: product.category,
+          price: product.price,
+          promotional_price: product.promotional_price,
+          description: product.description,
+          image_url: product.image_url,
+          active: product.active,
+          is_combo: product.is_combo,
+          sort_order: product.sort_order,
+        }),
+      });
+      if (res.ok) void loadProducts();
     }
     setShowProductModal(false);
     setEditingProduct(null);
   };
 
   // Umbrella management
-  const addUmbrella = () => {
+  const addUmbrella = async () => {
     const num = parseInt(newUmbrellaNumber);
-    if (!num || umbrellas.some(u => u.number === num)) return alert("Número inválido ou já existe!");
-    setUmbrellas(prev => [...prev, { id: "u-" + Date.now(), number: num, label: `Barraca ${num}`, active: true, qr_url: null }]);
-    setNewUmbrellaNumber("");
-    setShowAddUmbrella(false);
+    if (!num || umbrellas.some((u) => u.number === num)) return alert("Número inválido ou já existe!");
+    if (!vendorId) return;
+    const res = await fetch("/api/umbrellas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ vendor_id: vendorId, number: num, label: `Barraca ${num}` }),
+    });
+    if (res.ok) {
+      setNewUmbrellaNumber("");
+      setShowAddUmbrella(false);
+      void loadUmbrellas();
+    }
   };
 
-  const toggleUmbrella = (id: string) => {
-    setUmbrellas(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u));
+  const toggleUmbrella = async (id: string) => {
+    const u = umbrellas.find((x) => x.id === id);
+    if (!u) return;
+    const res = await fetch(`/api/umbrellas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ active: !u.active }),
+    });
+    if (res.ok) void loadUmbrellas();
   };
 
   const generateQR = (umbrella: Umbrella) => {
@@ -288,7 +400,14 @@ export default function VendorDashboard() {
           ))}
         </nav>
         <div className="p-4 border-t border-gray-200">
-          <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50">
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem("vendor_id");
+              router.push("/vendor/login");
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50"
+          >
             <LogOut size={18} /> Sair
           </button>
         </div>
@@ -728,6 +847,7 @@ export default function VendorDashboard() {
       {showProductModal && (
         <ProductModal
           product={editingProduct}
+          vendorId={vendorId || ""}
           onSave={saveProduct}
           onClose={() => { setShowProductModal(false); setEditingProduct(null); }}
         />
@@ -747,7 +867,17 @@ export default function VendorDashboard() {
 // =========================================================
 // PRODUCT MODAL COMPONENT
 // =========================================================
-function ProductModal({ product, onSave, onClose }: { product: Product | null; onSave: (p: Product) => void; onClose: () => void }) {
+function ProductModal({
+  product,
+  vendorId,
+  onSave,
+  onClose,
+}: {
+  product: Product | null;
+  vendorId: string;
+  onSave: (p: Product) => void | Promise<void>;
+  onClose: () => void;
+}) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
     description: "", image_url: "", active: true, is_combo: false, sort_order: 99,
@@ -762,7 +892,7 @@ function ProductModal({ product, onSave, onClose }: { product: Product | null; o
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("vendor_id", "demo");
+      fd.append("vendor_id", vendorId);
       const res = await fetch("/api/products/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (data.url) setForm(prev => ({ ...prev, image_url: data.url }));

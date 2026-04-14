@@ -1,26 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * GET /api/customers/[id]/orders
  * Retorna todos os pedidos de um cliente (com itens).
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = getRequestSession(req);
+    if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+
     const { id } = await params;
 
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-
-    if (isDemo) {
-      return NextResponse.json([]);
+    const customerLookup = await supabaseAdmin
+      .from('customers')
+      .select('id, vendor_id')
+      .eq('id', id)
+      .single();
+    if (customerLookup.error || !customerLookup.data) {
+      return NextResponse.json({ error: 'Cliente não encontrado.' }, { status: 404 });
+    }
+    if (session.role === 'customer' && session.customer_id !== id) {
+      return NextResponse.json({ error: 'Não autorizado para este cliente.' }, { status: 403 });
+    }
+    if (session.role !== 'customer' && !canAccessVendor(session, customerLookup.data.vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este cliente.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(quantity, subtotal, products(name))')
       .eq('customer_id', id)
       .order('created_at', { ascending: false });
 

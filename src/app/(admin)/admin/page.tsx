@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Users, ShoppingBag, Phone,
@@ -43,15 +43,6 @@ interface PlatformReport {
   overdue_amount: number;
 }
 
-// ---------- MOCK DATA ----------
-const MOCK_VENDORS: Vendor[] = [
-  { id: "v1", name: "Quiosque do Sol", owner_name: "João Silva", owner_phone: "11999999999", owner_email: "joao@email.com", city: "Santos", state: "SP", cnpj: "12.345.678/0001-90", cpf: "123.456.789-00", subscription_status: "active", plan_type: "monthly", trial_ends_at: null, is_active: true, max_umbrellas: 50, created_at: "2025-01-01T00:00:00Z" },
-  { id: "v2", name: "Barraca Tropical", owner_name: "Maria Souza", owner_phone: "21888888888", owner_email: "maria@email.com", city: "Rio de Janeiro", state: "RJ", cnpj: null, cpf: "987.654.321-00", subscription_status: "trial", plan_type: "trial", trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(), is_active: true, max_umbrellas: 5, created_at: "2025-06-01T00:00:00Z" },
-  { id: "v3", name: "Mar Azul Beach", owner_name: "Carlos Mendes", owner_phone: "13777777777", owner_email: null, city: "Guarujá", state: "SP", cnpj: "98.765.432/0001-10", cpf: null, subscription_status: "overdue", plan_type: "monthly", trial_ends_at: null, is_active: true, max_umbrellas: 50, created_at: "2025-03-15T00:00:00Z" },
-  { id: "v4", name: "Quiosque Pé na Areia", owner_name: "Ana Lima", owner_phone: "71666666666", owner_email: "ana@email.com", city: "Salvador", state: "BA", cnpj: null, cpf: "111.222.333-44", subscription_status: "blocked", plan_type: null, trial_ends_at: null, is_active: false, max_umbrellas: 5, created_at: "2025-02-10T00:00:00Z" },
-  { id: "v5", name: "Coqueiro Verde", owner_name: "Pedro Santos", owner_phone: "48555555555", owner_email: "pedro@email.com", city: "Florianópolis", state: "SC", cnpj: "33.444.555/0001-66", cpf: null, subscription_status: "active", plan_type: "12months", trial_ends_at: null, is_active: true, max_umbrellas: 100, created_at: "2025-04-20T00:00:00Z" },
-];
-
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "vendors", label: "Quiosques", icon: Store },
@@ -64,7 +55,7 @@ const TABS = [
 // =========================================================
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
-  const [vendors, setVendors] = useState<Vendor[]>(MOCK_VENDORS);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [platformReport, setPlatformReport] = useState<PlatformReport | null>(null);
@@ -74,19 +65,36 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", document_login: "", cpf: "", cnpj: "", city: "", state: "",
   });
   const [regSuccess, setRegSuccess] = useState(false);
 
+  const loadVendors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/vendors", { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setVendors(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void loadVendors();
+  }, [isAuthenticated, loadVendors]);
+
   // Load platform report
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (activeTab === "analytics" || activeTab === "overview") {
-      fetch("/api/reports/platform")
+      fetch("/api/reports/platform", { credentials: "include" })
         .then(r => r.json())
         .then(d => setPlatformReport(d))
         .catch(console.error);
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   // Admin login
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -96,11 +104,11 @@ export default function AdminDashboard() {
       const res = await fetch("/api/auth/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ password: adminPassword }),
       });
       if (res.ok) {
         setIsAuthenticated(true);
-        sessionStorage.setItem("admin_token", "authenticated");
       } else {
         setAuthError("Senha incorreta.");
       }
@@ -109,53 +117,47 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    if (sessionStorage.getItem("admin_token")) setIsAuthenticated(true);
-  }, []);
-
-  // Toggle vendor status
-  const toggleVendor = (id: string) => {
-    setVendors(prev => prev.map(v => {
-      if (v.id !== id) return v;
-      const newActive = !v.is_active;
-      return {
-        ...v,
-        is_active: newActive,
-        subscription_status: newActive ? (v.subscription_status === "blocked" ? "active" : v.subscription_status) : "blocked",
-      };
-    }));
+  const toggleVendor = async (id: string) => {
+    const v = vendors.find(x => x.id === id);
+    if (!v) return;
+    const newActive = !v.is_active;
+    const subscription_status = newActive
+      ? (v.subscription_status === "blocked" ? "active" : v.subscription_status)
+      : "blocked";
+    try {
+      const res = await fetch(`/api/vendors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ is_active: newActive, subscription_status }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVendors(prev => prev.map(x => (x.id === id ? { ...x, ...data } : x)));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Register vendor
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regForm.name || !regForm.owner_name || !regForm.owner_phone) return;
+    const document_login = regForm.document_login.replace(/\D/g, "");
+    if (!document_login) return;
 
     try {
       const res = await fetch("/api/vendors/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(regForm),
+        credentials: "include",
+        body: JSON.stringify({ ...regForm, document_login }),
       });
       if (res.ok) {
-        const data = await res.json();
-        setVendors(prev => [{
-          id: data.id,
-          ...regForm,
-          owner_email: regForm.owner_email || null,
-          city: regForm.city || null,
-          state: regForm.state || null,
-          cnpj: regForm.cnpj || null,
-          cpf: regForm.cpf || null,
-          subscription_status: "trial",
-          plan_type: "trial",
-          trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-          is_active: true,
-          max_umbrellas: 5,
-          created_at: new Date().toISOString(),
-        }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "" });
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", document_login: "", cpf: "", cnpj: "", city: "", state: "" });
+        await loadVendors();
       }
     } catch (err) {
       console.error("Register error:", err);
@@ -554,6 +556,15 @@ export default function AdminDashboard() {
 
                 <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 space-y-4">
                   <h3 className="font-bold text-lg text-gray-200 mb-2">Dados do Responsável</h3>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-1">CPF/CNPJ para login *</label>
+                    <input
+                      type="text" required
+                      value={regForm.document_login} onChange={e => setRegForm(p => ({ ...p, document_login: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                      placeholder="Apenas números (mesmo CPF ou CNPJ cadastrado)"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-400 mb-1">Nome Completo *</label>
                     <input

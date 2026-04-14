@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession } from '@/lib/auth-session';
 
 const DEFAULT_VENDOR_PASSWORD = 'senha123@';
 
@@ -21,6 +22,11 @@ async function hashPassword(password: string) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Apenas admin pode cadastrar quiosques.' }, { status: 403 });
+    }
+
     const body = await req.json();
 
     if (!body.name || !body.owner_name || !body.owner_phone) {
@@ -32,19 +38,6 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await hashPassword(DEFAULT_VENDOR_PASSWORD);
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) {
-      return NextResponse.json({
-        id: 'demo-vendor-' + Date.now(),
-        ...body,
-        subscription_status: 'trial',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        max_umbrellas: 5,
-        is_active: true,
-        password: DEFAULT_VENDOR_PASSWORD,
-      }, { status: 201 });
-    }
 
     const { data, error } = await supabaseAdmin
       .from('vendors')
@@ -72,7 +65,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...data,
       message: 'Conta criada com senha padrão. Altere a senha no primeiro acesso.',
-      default_password: DEFAULT_VENDOR_PASSWORD,
     }, { status: 201 });
   } catch (err) {
     console.error('Vendor register error:', err);

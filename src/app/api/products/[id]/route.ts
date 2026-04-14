@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession } from '@/lib/auth-session';
 
 /**
  * PATCH /api/products/[id]
@@ -13,11 +14,25 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await req.json();
 
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) return NextResponse.json({ id, ...body });
+    const productLookup = await supabaseAdmin
+      .from('products')
+      .select('vendor_id')
+      .eq('id', id)
+      .single();
+    if (productLookup.error || !productLookup.data) {
+      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
+    }
+    if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
+      return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
+    }
 
     const { data, error } = await supabaseAdmin
       .from('products')
@@ -35,14 +50,28 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const { id } = await params;
 
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) return NextResponse.json({ success: true });
+    const productLookup = await supabaseAdmin
+      .from('products')
+      .select('vendor_id')
+      .eq('id', id)
+      .single();
+    if (productLookup.error || !productLookup.data) {
+      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
+    }
+    if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
+      return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
+    }
 
     const { error } = await supabaseAdmin
       .from('products')

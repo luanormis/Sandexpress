@@ -22,6 +22,7 @@ export default function VendorProductsPage() {
   }, [vendorId, isAuthenticated]);
 
   const fetchProducts = async () => {
+    if (!vendorId) return;
     try {
       const { data, error } = await supabase
         .from("products")
@@ -40,6 +41,7 @@ export default function VendorProductsPage() {
   };
 
   const fetchVendorPlan = async () => {
+    if (!vendorId) return;
     try {
       const { data, error } = await supabase
         .from("vendor_plans")

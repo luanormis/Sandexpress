@@ -2,7 +2,7 @@
 -- Imagens gratuitas e premium para cada categoria
 
 -- Bebidas (Free)
-INSERT INTO public.product_images (category, title, image_url, description, plan_type)
+INSERT INTO public.product_images (category, name, image_url, description, plan_type)
 VALUES
   ('Bebidas', 'Refrigerante Vidro', 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=300&fit=crop', 'Refrigerante em garrafa de vidro gelada', 'free'),
   ('Bebidas', 'Suco Natural', 'https://images.unsplash.com/photo-1600271886742-f049cd1f3033?w=400&h=300&fit=crop', 'Suco natural de frutas frescas', 'free'),
@@ -13,7 +13,7 @@ VALUES
   ('Bebidas', 'Milkshake', 'https://images.unsplash.com/photo-1555014393-54563dc25268?w=400&h=300&fit=crop', 'Milkshake espesso e cremoso', 'plus');
 
 -- Petiscos (Free)
-INSERT INTO public.product_images (category, title, image_url, description, plan_type)
+INSERT INTO public.product_images (category, name, image_url, description, plan_type)
 VALUES
   ('Petiscos', 'Batata Frita', 'https://images.unsplash.com/photo-1599599810694-4c73bbd2eefd?w=400&h=300&fit=crop', 'Batata frita crocante e quente', 'free'),
   ('Petiscos', 'Bolinhas de Queijo', 'https://images.unsplash.com/photo-1599599810942-d3ee11effa11?w=400&h=300&fit=crop', 'Bolinhas de queijo empanadas', 'free'),
@@ -24,7 +24,7 @@ VALUES
   ('Petiscos', 'Aipe Queijo', 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=300&fit=crop', 'Aipim frito com queijo derretido', 'plus');
 
 -- Pratos Principais (Free)
-INSERT INTO public.product_images (category, title, image_url, description, plan_type)
+INSERT INTO public.product_images (category, name, image_url, description, plan_type)
 VALUES
   ('Pratos Principais', 'Arroz com Frango', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', 'Arroz solto com frango suculento', 'free'),
   ('Pratos Principais', 'Estrogonofe de Frango', 'https://images.unsplash.com/photo-1555939594-58d7cb561911?w=400&h=300&fit=crop', 'Estrogonofe cremoso e saboroso', 'free'),
@@ -35,7 +35,7 @@ VALUES
   ('Pratos Principais', 'Frango ao Molho Pardo', 'https://images.unsplash.com/photo-1626082901512-aa4fff8e6f19?w=400&h=300&fit=crop', 'Frango ao molho pardo português', 'plus');
 
 -- Sobremesas (Free)
-INSERT INTO public.product_images (category, title, image_url, description, plan_type)
+INSERT INTO public.product_images (category, name, image_url, description, plan_type)
 VALUES
   ('Sobremesas', 'Pudim', 'https://images.unsplash.com/photo-1488477181946-6558a6b037e3?w=400&h=300&fit=crop', 'Pudim cremoso com calda de caramelo', 'free'),
   ('Sobremesas', 'Brigadeiro', 'https://images.unsplash.com/photo-1586985289688-ca3242da3c3a?w=400&h=300&fit=crop', 'Brigadeiro derretendo na boca', 'free'),
@@ -46,7 +46,7 @@ VALUES
   ('Sobremesas', 'Mousse de Maracuja', 'https://images.unsplash.com/photo-1488477181946-6558a6b037e3?w=400&h=300&fit=crop', 'Mousse leve e refrescante', 'plus');
 
 -- Combos (Free)
-INSERT INTO public.product_images (category, title, image_url, description, plan_type)
+INSERT INTO public.product_images (category, name, image_url, description, plan_type)
 VALUES
   ('Combos', 'Combo Frango Frito', 'https://images.unsplash.com/photo-1555939594-58d7cb561911?w=400&h=300&fit=crop', 'Frango, batata e bebida', 'free'),
   ('Combos', 'Combo Executivo', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', 'Prato, acompanhamento e bebida', 'free'),

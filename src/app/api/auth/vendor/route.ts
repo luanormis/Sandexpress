@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createSessionToken } from '@/lib/auth-session';
+import { isRateLimited } from '@/lib/rate-limit';
 
 async function verifyPassword(password: string, storedHash: string) {
   const [salt, key] = storedHash.split(':');
@@ -21,22 +23,14 @@ async function verifyPassword(password: string, storedHash: string) {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (isRateLimited(req, 'auth-vendor', 10, 10 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
+    }
+
     const { document_login, password } = await req.json();
 
     if (!document_login || !password) {
       return NextResponse.json({ error: 'CPF/CNPJ e senha são obrigatórios.' }, { status: 400 });
-    }
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-
-    if (isDemo) {
-      return NextResponse.json({
-        vendor_id: 'demo-vendor-id',
-        vendor_name: 'Quiosque Demo',
-        owner_name: 'Usuário Demo',
-        token: 'demo-token-' + Date.now(),
-        must_change_password: false,
-      });
     }
 
     const { data: vendor, error } = await supabaseAdmin
@@ -58,15 +52,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Quiosque bloqueado. Entre em contato com o suporte.' }, { status: 403 });
     }
 
-    const token = Buffer.from(`${vendor.id}:${Date.now()}`).toString('base64');
-
-    return NextResponse.json({
+    const token = createSessionToken({ role: 'vendor', vendor_id: vendor.id }, 8 * 60 * 60);
+    const response = NextResponse.json({
       vendor_id: vendor.id,
       vendor_name: vendor.name,
       owner_name: vendor.owner_name,
       token,
       must_change_password: vendor.password_needs_reset ?? false,
     });
+    response.cookies.set({
+      name: 'vendor_session',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 8 * 60 * 60,
+    });
+    return response;
   } catch (err) {
     console.error('Vendor auth error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

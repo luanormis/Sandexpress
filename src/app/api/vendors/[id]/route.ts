@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession } from '@/lib/auth-session';
 
 /**
  * GET /api/vendors/[id]
@@ -9,21 +10,16 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * Atualiza dados do vendor (incluindo bloquear/desbloquear).
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) {
-      return NextResponse.json({
-        id,
-        name: 'Quiosque Demo',
-        owner_name: 'Usuário Demo',
-        subscription_status: 'active',
-      });
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
+
+    const { id } = await params;
 
     const { data, error } = await supabaseAdmin
       .from('vendors')
@@ -44,11 +40,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await req.json();
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) return NextResponse.json({ id, ...body });
 
     const { data, error } = await supabaseAdmin
       .from('vendors')

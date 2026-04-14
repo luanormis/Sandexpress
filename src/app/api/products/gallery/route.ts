@@ -5,7 +5,6 @@ export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category");
     const planType = request.nextUrl.searchParams.get("planType") || "free";
-    const authToken = request.headers.get("authorization")?.replace("Bearer ", "");
 
     let query = supabase.from("product_images").select("*");
 

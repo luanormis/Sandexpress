@@ -89,14 +89,31 @@ export interface OrderItem {
   created_at?: string
 }
 
+// Tipos de Ajuste de Conta (cancelamento/abatimento)
+export interface AccountAdjustment {
+  id: string
+  vendor_id: string
+  customer_id: string
+  order_id?: string | null
+  adjustment_type: 'cancellation' | 'deduction' | 'credit'
+  description?: string | null
+  amount: number
+  reason?: string | null
+  processed_by?: string | null
+  password_verified: boolean
+  created_at?: string
+  updated_at?: string
+}
+
 // Tipos de Galeria de Imagens Padrão
 export interface ProductImage {
   id: string
-  product_category: string
+  category: string
   image_url: string
   title: string
-  plan_type: 'free' | 'plus' // Disponível em qual plano
-  created_at?: string
+  description?: string | null
+  plan_type: 'free' | 'plus'
+  created_at?: string | null
 }
 
 // Autenticação
@@ -124,8 +141,8 @@ export interface VendorPlan {
   can_upload_images: boolean
   max_custom_images: number
   custom_images_used: number
-  custom_theme: boolean
-  created_at?: string
-  updated_at?: string
+  custom_theme: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 

@@ -67,6 +67,7 @@ async function createVendorWithData(vendorNumber: number) {
       .from('vendors')
       .insert({
         name: vendorName,
+        document_login: String(vendorNumber).padStart(11, '0'),
         owner_name: `Proprietário Teste ${vendorNumber}`,
         owner_phone: `11999999${String(vendorNumber % 100).padStart(3, '0')}`,
         owner_email: `teste${vendorNumber}@sandexpress.com`,

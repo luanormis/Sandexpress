@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+
+type ReportOrderRow = {
+  customer_id: string;
+  total: number;
+  created_at: string;
+  order_items?: Array<{
+    quantity?: number;
+    unit_price?: number;
+    products?: { name?: string; price?: number } | null;
+  }> | null;
+  customers?: { name?: string; phone?: string } | null;
+};
 
 /**
  * GET /api/reports?vendor_id=xxx&period=month
@@ -15,50 +28,9 @@ export async function GET(req: NextRequest) {
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
     }
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-
-    if (isDemo) {
-      return NextResponse.json({
-        period,
-        kpis: {
-          total_revenue: 12850.0,
-          total_orders: 187,
-          avg_ticket: 68.72,
-          unique_customers: 94,
-        },
-        daily_summary: {
-          available_products: 24,
-          active_umbrellas: 50,
-          today_orders: 18,
-          today_revenue: 2180.0,
-          new_customers_today: 5,
-        },
-        top_products: [
-          { name: 'Cerveja Heineken', quantity: 312, revenue: 3744 },
-          { name: 'Porção de Fritas', quantity: 89, revenue: 3115 },
-          { name: 'Isca de Peixe', quantity: 64, revenue: 4160 },
-          { name: 'Caipirinha', quantity: 156, revenue: 3432 },
-          { name: 'Água de Coco', quantity: 201, revenue: 1608 },
-        ],
-        top_customers: [
-          { name: 'João Silva', phone: '(11)99999-9999', visits: 12, total_spent: 890.0 },
-          { name: 'Maria Souza', phone: '(21)88888-8888', visits: 8, total_spent: 645.0 },
-          { name: 'Carlos Mendes', phone: '(13)77777-7777', visits: 6, total_spent: 420.0 },
-        ],
-        hourly_sales: [
-          { hour: '08h', orders: 5 },
-          { hour: '09h', orders: 12 },
-          { hour: '10h', orders: 28 },
-          { hour: '11h', orders: 35 },
-          { hour: '12h', orders: 42 },
-          { hour: '13h', orders: 38 },
-          { hour: '14h', orders: 30 },
-          { hour: '15h', orders: 22 },
-          { hour: '16h', orders: 18 },
-          { hour: '17h', orders: 10 },
-        ],
-      });
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     // Calcular período
@@ -83,7 +55,7 @@ export async function GET(req: NextRequest) {
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: false });
 
-    const allOrders = orders || [];
+    const allOrders = (orders || []) as ReportOrderRow[];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
     const total_orders = allOrders.length;
     const avg_ticket = total_orders > 0 ? total_revenue / total_orders : 0;
@@ -127,7 +99,7 @@ export async function GET(req: NextRequest) {
     const top_customers = Array.from(
       new Map((allOrders || []).map(order => [order.customer_id, order])).values()
     ).map(order => ({
-      name: order.customers?.name || order.customer || 'Cliente',
+      name: order.customers?.name || 'Cliente',
       phone: order.customers?.phone || '',
       visits: allOrders.filter(o => o.customer_id === order.customer_id).length,
       total_spent: allOrders

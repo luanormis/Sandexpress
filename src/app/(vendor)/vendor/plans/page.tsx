@@ -19,6 +19,7 @@ export default function VendorPlanPage() {
   }, [vendorId, isAuthenticated]);
 
   const fetchVendorPlan = async () => {
+    if (!vendorId) return;
     try {
       const { data, error } = await supabase
         .from("vendor_plans")
@@ -55,6 +56,7 @@ export default function VendorPlanPage() {
   };
 
   const handleUpgradeToPlusTier = async () => {
+    if (!vendorId) return;
     setUpgrading(true);
     try {
       const { error } = await supabase

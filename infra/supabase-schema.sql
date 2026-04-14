@@ -67,8 +67,10 @@ CREATE TABLE products (
   description        TEXT,
   price              NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
   promotional_price  NUMERIC(10,2),
-  image_url          TEXT,  is_default_image   BOOLEAN DEFAULT TRUE,        -- usa imagem padrão da galeria
-  image_plan_type    TEXT DEFAULT 'free',        -- 'free' = padrão, 'plus' = exclusiva  active             BOOLEAN DEFAULT TRUE,          -- visível no cardápio
+  image_url          TEXT,
+  is_default_image   BOOLEAN DEFAULT TRUE,        -- usa imagem padrão da galeria
+  image_plan_type    TEXT DEFAULT 'free',        -- 'free' = padrão, 'plus' = exclusiva
+  active             BOOLEAN DEFAULT TRUE,          -- visível no cardápio
   is_combo           BOOLEAN DEFAULT FALSE,
   sort_order         INTEGER DEFAULT 99,
   stock_quantity     INTEGER,                       -- estoque (NULL = infinito)
@@ -164,3 +166,31 @@ CREATE TABLE vendor_plans (
 );
 
 CREATE INDEX idx_vendor_plans_vendor ON vendor_plans(vendor_id);
+
+-- ACCOUNT ADJUSTMENTS (ajustes de conta - cancelamentos/abatimentos)
+CREATE TABLE account_adjustments (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vendor_id       UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  customer_id     UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_id        UUID REFERENCES orders(id) ON DELETE SET NULL,
+  adjustment_type TEXT NOT NULL CHECK (adjustment_type IN ('cancellation', 'deduction', 'credit')),
+  description     TEXT,
+  amount          NUMERIC(10,2) NOT NULL,
+  reason          TEXT,  -- motivo da alteração (ex: "Cliente solicitou cancelamento", "Erro no pedido")
+  processed_by    TEXT,  -- identificação de quem processou (user/admin)
+  password_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ÍNDICES PARA ACCOUNT_ADJUSTMENTS
+CREATE INDEX idx_adjustments_vendor ON account_adjustments(vendor_id);
+CREATE INDEX idx_adjustments_customer ON account_adjustments(customer_id);
+CREATE INDEX idx_adjustments_order ON account_adjustments(order_id);
+CREATE INDEX idx_adjustments_created ON account_adjustments(vendor_id, created_at DESC);
+
+-- SECURITY POLICY PARA ACCOUNT_ADJUSTMENTS
+ALTER TABLE account_adjustments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pol_adjustments_insert ON account_adjustments FOR INSERT WITH CHECK (TRUE);
+CREATE POLICY pol_adjustments_select ON account_adjustments FOR SELECT USING (TRUE);
+CREATE POLICY pol_adjustments_update ON account_adjustments FOR UPDATE USING (TRUE);

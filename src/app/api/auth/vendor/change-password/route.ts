@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { isRateLimited } from '@/lib/rate-limit';
+
+type VendorAuthRecord = {
+  id: string;
+  password_hash: string | null;
+  password_reset_expires_at: string | null;
+};
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -19,18 +27,17 @@ async function hashPassword(password: string) {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (isRateLimited(req, 'auth-vendor-change-password', 8, 10 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
+    }
+
     const { document_login, current_password, reset_token, new_password } = await req.json();
 
     if (!new_password || new_password.length < 8) {
       return NextResponse.json({ error: 'Nova senha deve ter ao menos 8 caracteres.' }, { status: 400 });
     }
 
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) {
-      return NextResponse.json({ message: 'Em modo demo, a senha foi alterada com sucesso.' });
-    }
-
-    let vendor: any;
+    let vendor: VendorAuthRecord;
     if (reset_token) {
       const { data, error } = await (supabaseAdmin.from('vendors') as any)
         .select('*')
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
       if (error || !data) {
         return NextResponse.json({ error: 'Token inválido ou expirado.' }, { status: 400 });
       }
-      const vendorData: any = data;
+      const vendorData = data as VendorAuthRecord;
       if (!vendorData.password_reset_expires_at || new Date(vendorData.password_reset_expires_at) < new Date()) {
         return NextResponse.json({ error: 'Token de recuperação expirou.' }, { status: 400 });
       }
@@ -70,7 +77,11 @@ export async function POST(req: NextRequest) {
       if (!passwordMatches) {
         return NextResponse.json({ error: 'Credenciais inválidas.' }, { status: 401 });
       }
-      vendor = data;
+      vendor = data as VendorAuthRecord;
+      const session = getRequestSession(req);
+      if (session && session.role !== 'admin' && !canAccessVendor(session, vendor.id)) {
+        return NextResponse.json({ error: 'Não autorizado para alterar esta senha.' }, { status: 403 });
+      }
     }
 
     const passwordHash = await hashPassword(new_password);
@@ -81,7 +92,7 @@ export async function POST(req: NextRequest) {
         password_reset_token: null,
         password_reset_expires_at: null,
       })
-      .eq('id', vendor.id as string);
+      .eq('id', vendor.id);
 
     if (updateError) {
       console.error('Vendor change password error:', updateError);

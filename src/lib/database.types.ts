@@ -94,6 +94,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -126,6 +127,7 @@ export interface Database {
           last_visit_at?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       umbrellas: {
         Row: {
@@ -155,6 +157,7 @@ export interface Database {
           active?: boolean | null
           qr_url?: string | null
         }
+        Relationships: []
       }
       products: {
         Row: {
@@ -211,6 +214,7 @@ export interface Database {
           blocked_by_stock?: boolean | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       product_images: {
         Row: {
@@ -238,6 +242,7 @@ export interface Database {
           description?: string | null
           plan_type?: string
         }
+        Relationships: []
       }
       vendor_plans: {
         Row: {
@@ -270,6 +275,7 @@ export interface Database {
           custom_theme?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -306,6 +312,7 @@ export interface Database {
           payment_method?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       order_items: {
         Row: {
@@ -331,7 +338,52 @@ export interface Database {
           unit_price?: number
           subtotal?: number
         }
+        Relationships: []
+      }
+      account_adjustments: {
+        Row: {
+          id: string
+          vendor_id: string
+          customer_id: string
+          order_id: string | null
+          adjustment_type: string
+          description: string | null
+          amount: number
+          reason: string | null
+          processed_by: string | null
+          password_verified: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          vendor_id: string
+          customer_id: string
+          order_id?: string | null
+          adjustment_type: string
+          description?: string | null
+          amount: number
+          reason?: string | null
+          processed_by?: string | null
+          password_verified?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          order_id?: string | null
+          adjustment_type?: string
+          description?: string | null
+          amount?: number
+          reason?: string | null
+          processed_by?: string | null
+          password_verified?: boolean
+          updated_at?: string | null
+        }
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
   }
 }

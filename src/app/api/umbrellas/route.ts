@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
@@ -16,14 +17,9 @@ export async function GET(req: NextRequest) {
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
     }
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) {
-      return NextResponse.json([
-        { id: 'umb-1', vendor_id, number: 1, label: 'Barraca 1', active: true, qr_url: null },
-        { id: 'umb-2', vendor_id, number: 2, label: 'Barraca 2', active: true, qr_url: null },
-        { id: 'umb-3', vendor_id, number: 3, label: 'Barraca 3', active: false, qr_url: null },
-      ]);
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
@@ -47,15 +43,9 @@ export async function POST(req: NextRequest) {
     if (!body.vendor_id || body.number === undefined) {
       return NextResponse.json({ error: 'vendor_id e number são obrigatórios.' }, { status: 400 });
     }
-
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://mock.supabase.co';
-    if (isDemo) {
-      return NextResponse.json({
-        id: 'umb-demo-' + Date.now(),
-        ...body,
-        active: true,
-        qr_url: null,
-      }, { status: 201 });
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, body.vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
