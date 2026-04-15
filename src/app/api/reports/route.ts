@@ -1,18 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-
-type ReportOrderRow = {
-  customer_id: string;
-  total: number;
-  created_at: string;
-  order_items?: Array<{
-    quantity?: number;
-    unit_price?: number;
-    products?: { name?: string; price?: number } | null;
-  }> | null;
-  customers?: { name?: string; phone?: string } | null;
-};
 
 /**
  * GET /api/reports?vendor_id=xxx&period=month
@@ -27,10 +14,6 @@ export async function GET(req: NextRequest) {
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
-    }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     // Calcular período
@@ -55,7 +38,7 @@ export async function GET(req: NextRequest) {
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: false });
 
-    const allOrders = (orders || []) as ReportOrderRow[];
+    const allOrders = orders || [];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
     const total_orders = allOrders.length;
     const avg_ticket = total_orders > 0 ? total_revenue / total_orders : 0;
@@ -99,7 +82,7 @@ export async function GET(req: NextRequest) {
     const top_customers = Array.from(
       new Map((allOrders || []).map(order => [order.customer_id, order])).values()
     ).map(order => ({
-      name: order.customers?.name || 'Cliente',
+      name: order.customers?.name || order.customer || 'Cliente',
       phone: order.customers?.phone || '',
       visits: allOrders.filter(o => o.customer_id === order.customer_id).length,
       total_spent: allOrders

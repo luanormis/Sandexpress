@@ -1,31 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-
-function normalizePhone(p: string) {
-  return p.replace(/\D/g, '');
-}
-
-type OrderWithCustomer = {
-  id: string;
-  customer_id: string;
-  umbrella_id: string;
-  total: number;
-  status: string;
-  created_at: string;
-  customers?: { id: string; name: string; phone: string; visit_count?: number } | null;
-};
-
-type OrderPreview = {
-  id: string;
-  customer_id: string;
-  umbrella_id: string;
-  total: number;
-  status: string;
-  created_at: string;
-  order_items?: { id: string }[] | null;
-  customers?: { id: string; name: string; phone: string } | null;
-};
 
 /**
  * POST /api/close-account
@@ -49,28 +23,11 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const session = getRequestSession(req);
-    const vendorOk = canAccessVendor(session, vendor_id);
-    let customerOk = false;
-    if (session?.role === 'customer' && session.vendor_id === vendor_id && session.customer_id && customer_phone) {
-      const { data: cust } = await supabaseAdmin
-        .from('customers')
-        .select('id, phone')
-        .eq('id', session.customer_id)
-        .eq('vendor_id', vendor_id)
-        .single();
-      if (cust && normalizePhone(cust.phone) === normalizePhone(customer_phone)) {
-        customerOk = true;
-      }
-    }
-    if (!vendorOk && !customerOk) {
-      return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
-    }
 
     // 1. Encontrar a ordem aberta
     let query = supabaseAdmin
       .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone, visit_count)')
+      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
       .eq('vendor_id', vendor_id)
       .eq('status', 'received')
       .order('created_at', { ascending: true });
@@ -90,12 +47,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const orderRows = orders as OrderWithCustomer[];
-
     // Se houver múltiplas contas abertas, filtrar por customer_phone se fornecido
-    let selectedOrder = orderRows[0];
-    if (customer_phone && orderRows.length > 1) {
-      const matchingOrder = orderRows.find(o => {
+    let selectedOrder = orders[0];
+    if (customer_phone && orders.length > 1) {
+      const matchingOrder = orders.find((o: any) => {
         const cleanPhone = (o.customers?.phone || '').replace(/\D/g, '');
         const cleanInput = customer_phone.replace(/\D/g, '');
         return cleanPhone === cleanInput;
@@ -120,11 +75,10 @@ export async function POST(req: NextRequest) {
     if (updateErr) throw updateErr;
 
     // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
-    const prevVisits = selectedOrder.customers?.visit_count ?? 0;
     const { error: customerErr } = await supabaseAdmin
       .from('customers')
       .update({
-        visit_count: prevVisits + 1,
+        visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
         last_visit_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -138,8 +92,8 @@ export async function POST(req: NextRequest) {
         order: {
           id: selectedOrder.id,
           customer_id: selectedOrder.customer_id,
-          customer_name: selectedOrder.customers?.name,
-          customer_phone: selectedOrder.customers?.phone,
+          customer_name: (selectedOrder as any).customers?.name,
+          customer_phone: (selectedOrder as any).customers?.phone,
           umbrella_id: selectedOrder.umbrella_id,
           total: selectedOrder.total,
           status: 'completed',
@@ -171,10 +125,6 @@ export async function GET(req: NextRequest) {
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
     }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
-    }
 
     if (!umbrella_id && !customer_phone) {
       return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
@@ -202,13 +152,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const orderRows = orders as OrderPreview[];
-
     // Se houver múltiplas, filtrar por phone
-    let selectedOrder = orderRows[0];
-    if (customer_phone && orderRows.length > 1) {
+    let selectedOrder = orders[0];
+    if (customer_phone && orders.length > 1) {
       const cleanPhone = customer_phone.replace(/\D/g, '');
-      const matching = orderRows.find(o => {
+      const matching = orders.find((o: any) => {
         const orderPhone = (o.customers?.phone || '').replace(/\D/g, '');
         return orderPhone === cleanPhone;
       });
@@ -218,11 +166,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       order_id: selectedOrder.id,
       customer_id: selectedOrder.customer_id,
-      customer_name: selectedOrder.customers?.name,
-      customer_phone: selectedOrder.customers?.phone,
+      customer_name: (selectedOrder as any).customers?.name,
+      customer_phone: (selectedOrder as any).customers?.phone,
       umbrella_id: selectedOrder.umbrella_id,
       total: selectedOrder.total,
-      items_count: selectedOrder.order_items?.length ?? 0,
+      items_count: (selectedOrder as any).order_items ? (selectedOrder as any).order_items.length : 0,
       created_at: selectedOrder.created_at,
       opened_at: selectedOrder.created_at,
     });

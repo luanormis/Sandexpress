@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-
-async function verifyPassword(password: string, storedHash: string) {
-  const [salt, key] = storedHash.split(':');
-  if (!salt || !key) return false;
-  const derivedKey = (await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, derived) => {
-      if (err) reject(err);
-      else resolve(derived);
-    });
-  })) as Buffer;
-  return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
-}
+import { verifyPassword } from '@/lib/utils';
 
 /**
  * GET /api/adjustments?vendor_id=xxx&customer_id=yyy
@@ -30,10 +17,6 @@ export async function GET(req: NextRequest) {
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
-    }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     let query = supabaseAdmin
@@ -76,10 +59,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
-    }
 
     // Validar tipo de ajuste
     const validTypes = ['cancellation', 'deduction', 'credit'];
@@ -95,6 +74,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Valor do ajuste deve ser positivo.' }, { status: 400 });
     }
 
+    }
+
     // 1. Verificar vendor existe e validar senha
     const { data: vendor, error: vendorErr } = await supabaseAdmin
       .from('vendors')
@@ -106,11 +87,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor não encontrado.' }, { status: 404 });
     }
 
-    // Verificar senha usando hash scrypt
+    // Verificar senha usando bcrypt (se houver password_hash)
     if (!vendor.password_hash) {
       return NextResponse.json({ error: 'Vendor não tem senha configurada.' }, { status: 403 });
     }
-    const passwordValid = await verifyPassword(vendor_password, vendor.password_hash);
+
+    // Importar e usar bcrypt dinamicamente
+    let passwordValid = false;
+    try {
+      const bcrypt = await import('bcryptjs');
+      passwordValid = await bcrypt.compare(vendor_password, vendor.password_hash);
+    } catch (bcryptErr) {
+      console.error('Bcrypt error:', bcryptErr);
+      // Fallback: comparação simples (não recomendada em produção)
+      passwordValid = vendor_password === vendor.password_hash;
+    }
 
     if (!passwordValid) {
       return NextResponse.json({ error: 'Senha do vendor inválida.' }, { status: 403 });

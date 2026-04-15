@@ -39,7 +39,6 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
-          /* Insert Types... */
           id?: string
           name: string
           cnpj?: string | null
@@ -68,7 +67,6 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
-          /* Update Types... */
           name?: string
           cnpj?: string | null
           cpf?: string | null
@@ -138,6 +136,8 @@ export interface Database {
           location_hint: string | null
           active: boolean | null
           qr_url: string | null
+          is_occupied: boolean
+          current_order_id: string | null
           created_at: string | null
         }
         Insert: {
@@ -148,6 +148,8 @@ export interface Database {
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
+          is_occupied?: boolean
+          current_order_id?: string | null
           created_at?: string | null
         }
         Update: {
@@ -156,6 +158,8 @@ export interface Database {
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
+          is_occupied?: boolean
+          current_order_id?: string | null
         }
         Relationships: []
       }
@@ -288,6 +292,7 @@ export interface Database {
           notes: string | null
           paid: boolean | null
           payment_method: string | null
+          pending_close: boolean
           created_at: string | null
           updated_at: string | null
         }
@@ -301,6 +306,7 @@ export interface Database {
           notes?: string | null
           paid?: boolean | null
           payment_method?: string | null
+          pending_close?: boolean
           created_at?: string | null
           updated_at?: string | null
         }
@@ -310,9 +316,14 @@ export interface Database {
           notes?: string | null
           paid?: boolean | null
           payment_method?: string | null
+          pending_close?: boolean
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          { foreignKeyName: "orders_customer_id_fkey"; columns: ["customer_id"]; referencedRelation: "customers"; referencedColumns: ["id"] },
+          { foreignKeyName: "orders_umbrella_id_fkey"; columns: ["umbrella_id"]; referencedRelation: "umbrellas"; referencedColumns: ["id"] },
+          { foreignKeyName: "orders_vendor_id_fkey"; columns: ["vendor_id"]; referencedRelation: "vendors"; referencedColumns: ["id"] }
+        ]
       }
       order_items: {
         Row: {
@@ -322,6 +333,9 @@ export interface Database {
           quantity: number
           unit_price: number
           subtotal: number
+          cancelled: boolean
+          cancelled_at: string | null
+          cancel_reason: string | null
           created_at: string | null
         }
         Insert: {
@@ -331,14 +345,23 @@ export interface Database {
           quantity: number
           unit_price: number
           subtotal: number
+          cancelled?: boolean
+          cancelled_at?: string | null
+          cancel_reason?: string | null
           created_at?: string | null
         }
         Update: {
           quantity?: number
           unit_price?: number
           subtotal?: number
+          cancelled?: boolean
+          cancelled_at?: string | null
+          cancel_reason?: string | null
         }
-        Relationships: []
+        Relationships: [
+          { foreignKeyName: "order_items_order_id_fkey"; columns: ["order_id"]; referencedRelation: "orders"; referencedColumns: ["id"] },
+          { foreignKeyName: "order_items_product_id_fkey"; columns: ["product_id"]; referencedRelation: "products"; referencedColumns: ["id"] }
+        ]
       }
       account_adjustments: {
         Row: {
@@ -381,9 +404,57 @@ export interface Database {
         }
         Relationships: []
       }
+      customer_otps: {
+        Row: {
+          id: string
+          phone: string
+          vendor_id: string
+          code: string
+          expires_at: string
+          used: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          phone: string
+          vendor_id: string
+          code: string
+          expires_at: string
+          used?: boolean
+          created_at?: string | null
+        }
+        Update: {
+          used?: boolean
+        }
+        Relationships: [
+          { foreignKeyName: "customer_otps_vendor_id_fkey"; columns: ["vendor_id"]; referencedRelation: "vendors"; referencedColumns: ["id"] }
+        ]
+      }
+      rate_limit_buckets: {
+        Row: {
+          key: string
+          count: number
+          reset_at: string
+        }
+        Insert: {
+          key: string
+          count?: number
+          reset_at: string
+        }
+        Update: {
+          count?: number
+          reset_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      increment_stock: {
+        Args: { p_product_id: string; p_qty: number }
+        Returns: undefined
+      }
+    }
     Enums: Record<string, never>
   }
 }

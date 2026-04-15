@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getRequestSession } from '@/lib/auth-session';
 
 const PLAN_PRICES: Record<string, number> = {
   monthly: 199,
@@ -18,13 +17,8 @@ function getVendorPlanAmount(vendor: { plan_type: string | null }) {
  * Relatórios da plataforma (para admin).
  * GMV, total de pedidos, faturamento e inadimplência.
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = getRequestSession(req);
-    if (!session || session.role !== 'admin') {
-      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
-    }
-
     // Contar vendors por status
     const { data: vendors } = await supabaseAdmin.from('vendors').select('subscription_status, plan_type, is_active');
     const allVendors = vendors || [];

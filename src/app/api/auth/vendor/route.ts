@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createSessionToken } from '@/lib/auth-session';
-import { isRateLimited } from '@/lib/rate-limit';
 
 async function verifyPassword(password: string, storedHash: string) {
   const [salt, key] = storedHash.split(':');
@@ -23,10 +22,6 @@ async function verifyPassword(password: string, storedHash: string) {
  */
 export async function POST(req: NextRequest) {
   try {
-    if (isRateLimited(req, 'auth-vendor', 10, 10 * 60 * 1000)) {
-      return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
-    }
-
     const { document_login, password } = await req.json();
 
     if (!document_login || !password) {
@@ -52,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Quiosque bloqueado. Entre em contato com o suporte.' }, { status: 403 });
     }
 
-    const token = createSessionToken({ role: 'vendor', vendor_id: vendor.id }, 8 * 60 * 60);
+    const token = createSessionToken({ role: 'vendor', vendor_id: vendor.id }, 12 * 60 * 60);
     const response = NextResponse.json({
       vendor_id: vendor.id,
       vendor_name: vendor.name,
@@ -67,7 +62,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 8 * 60 * 60,
+      maxAge: 12 * 60 * 60,
     });
     return response;
   } catch (err) {

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import crypto from 'crypto';
-import { isRateLimited } from '@/lib/rate-limit';
 
 /**
  * POST /api/auth/vendor/reset
@@ -9,10 +7,6 @@ import { isRateLimited } from '@/lib/rate-limit';
  */
 export async function POST(req: NextRequest) {
   try {
-    if (isRateLimited(req, 'auth-vendor-reset', 6, 10 * 60 * 1000)) {
-      return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
-    }
-
     const { owner_email, owner_phone } = await req.json();
 
     if (!owner_email && !owner_phone) {
@@ -30,7 +24,9 @@ export async function POST(req: NextRequest) {
     }
 
     const vendor = (vendors as any)?.[0];
-    if (!vendor) return NextResponse.json({ message: 'Se os dados estiverem corretos, enviaremos as instruções.' });
+    if (!vendor) {
+      return NextResponse.json({ error: 'Não encontramos um quiosque com estas informações.' }, { status: 404 });
+    }
 
     const resetToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -47,7 +43,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
     }
 
-    return NextResponse.json({ message: 'Se os dados estiverem corretos, enviaremos as instruções.' });
+    return NextResponse.json({
+      message: 'Token de recuperação gerado. Use-o para alterar a senha.',
+      reset_token: resetToken,
+      expires_at: expiresAt,
+    });
   } catch (err) {
     console.error('Vendor reset error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

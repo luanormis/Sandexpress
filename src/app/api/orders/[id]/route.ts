@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
+/** Campos permitidos para atualização de pedido (whitelist contra mass-assignment) */
+const ALLOWED_ORDER_FIELDS = new Set(['status', 'notes']);
+
 /**
  * PATCH /api/orders/[id]
  * Atualiza status de um pedido (received → preparing → delivering → completed).
@@ -17,6 +20,15 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json();
 
+    // Whitelist: apenas campos permitidos
+    const safeUpdate: Record<string, unknown> = {};
+    for (const field of ALLOWED_ORDER_FIELDS) {
+      if (field in body) safeUpdate[field] = body[field];
+    }
+    if (Object.keys(safeUpdate).length === 0) {
+      return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
+    }
+
     const orderLookup = await supabaseAdmin.from('orders').select('vendor_id').eq('id', id).single();
     if (orderLookup.error || !orderLookup.data) {
       return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 });
@@ -27,7 +39,7 @@ export async function PATCH(
 
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...safeUpdate, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
