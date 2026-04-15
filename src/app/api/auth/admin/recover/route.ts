@@ -7,7 +7,7 @@ import { isRateLimited } from '@/lib/rate-limit';
  */
 export async function POST(req: NextRequest) {
   try {
-    if (isRateLimited(req, 'auth-admin-recover', 5, 10 * 60 * 1000)) {
+    if (await isRateLimited(req, 'auth-admin-recover', 5, 10 * 60 * 1000)) {
       return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
     }
 

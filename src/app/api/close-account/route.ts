@@ -12,8 +12,9 @@ type OrderWithCustomer = {
   umbrella_id: string;
   total: number;
   status: string;
+  pending_close: boolean;
   created_at: string;
-  customers?: { id: string; name: string; phone: string; visit_count?: number } | null;
+  customers?: { id: string; name: string; phone: string } | null;
 };
 
 type OrderPreview = {
@@ -22,6 +23,7 @@ type OrderPreview = {
   umbrella_id: string;
   total: number;
   status: string;
+  pending_close: boolean;
   created_at: string;
   order_items?: { id: string }[] | null;
   customers?: { id: string; name: string; phone: string } | null;
@@ -29,14 +31,9 @@ type OrderPreview = {
 
 /**
  * POST /api/close-account
- * Fechar conta do cliente (após pagamento confirmado)
- * 
- * Body: {
- *   vendor_id,
- *   umbrella_id OR (customer_phone),
- *   payment_method (optional),
- *   notes (optional)
- * }
+ * Dois fluxos:
+ *   - Cliente (role=customer): marca pending_close=true (solicitação).
+ *   - Quiosque (role=vendor/admin): confirma fechamento, libera guarda-sol.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -49,68 +46,79 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
     const session = getRequestSession(req);
-    const vendorOk = canAccessVendor(session, vendor_id);
-    let customerOk = false;
-    if (session?.role === 'customer' && session.vendor_id === vendor_id && session.customer_id && customer_phone) {
-      const { data: cust } = await supabaseAdmin
-        .from('customers')
-        .select('id, phone')
-        .eq('id', session.customer_id)
-        .eq('vendor_id', vendor_id)
-        .single();
-      if (cust && normalizePhone(cust.phone) === normalizePhone(customer_phone)) {
-        customerOk = true;
-      }
-    }
-    if (!vendorOk && !customerOk) {
+    const isVendor = canAccessVendor(session, vendor_id);
+    const isCustomer = session?.role === 'customer' && session.vendor_id === vendor_id;
+
+    if (!isVendor && !isCustomer) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
     }
 
-    // 1. Encontrar a ordem aberta
-    let query = supabaseAdmin
-      .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone, visit_count)')
-      .eq('vendor_id', vendor_id)
-      .eq('status', 'received')
-      .order('created_at', { ascending: true });
-
-    if (umbrella_id) {
-      query = query.eq('umbrella_id', umbrella_id);
+    // Validação extra: cliente só pode fechar sua própria conta
+    if (isCustomer && !isVendor) {
+      const { data: cust } = await supabaseAdmin
+        .from('customers')
+        .select('id, phone')
+        .eq('id', session!.customer_id!)
+        .eq('vendor_id', vendor_id)
+        .single();
+      if (!cust || (customer_phone && normalizePhone(cust.phone) !== normalizePhone(customer_phone))) {
+        return NextResponse.json({ error: 'Não autorizado para esta conta.' }, { status: 403 });
+      }
     }
 
-    const { data: orders, error: ordersErr } = await query;
+    // Encontrar a ordem aberta
+    let query = supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, umbrella_id, total, status, pending_close, created_at, customers(id, name, phone)')
+      .eq('vendor_id', vendor_id)
+      .in('status', ['received', 'preparing', 'delivering'])
+      .order('created_at', { ascending: true });
 
+    if (umbrella_id) query = query.eq('umbrella_id', umbrella_id);
+
+    const { data: orders, error: ordersErr } = await query;
     if (ordersErr) throw ordersErr;
 
     if (!orders || orders.length === 0) {
       return NextResponse.json(
-        { error: 'Nenhuma conta aberta encontrada para este guarda-sol/cliente' },
+        { error: 'Nenhuma conta aberta encontrada.' },
         { status: 404 }
       );
     }
 
-    const orderRows = orders as OrderWithCustomer[];
-
-    // Se houver múltiplas contas abertas, filtrar por customer_phone se fornecido
+    const orderRows = orders as unknown as OrderWithCustomer[];
     let selectedOrder = orderRows[0];
+
     if (customer_phone && orderRows.length > 1) {
-      const matchingOrder = orderRows.find(o => {
-        const cleanPhone = (o.customers?.phone || '').replace(/\D/g, '');
-        const cleanInput = customer_phone.replace(/\D/g, '');
-        return cleanPhone === cleanInput;
-      });
-      if (matchingOrder) {
-        selectedOrder = matchingOrder;
-      }
+      const match = orderRows.find(o =>
+        normalizePhone(o.customers?.phone || '') === normalizePhone(customer_phone)
+      );
+      if (match) selectedOrder = match;
     }
 
-    // 2. Atualizar ordem para completed e pago
+    // Fluxo CLIENTE: apenas sinaliza pending_close
+    if (isCustomer && !isVendor) {
+      await supabaseAdmin
+        .from('orders')
+        .update({ pending_close: true, updated_at: new Date().toISOString() })
+        .eq('id', selectedOrder.id);
+
+      return NextResponse.json({
+        success: true,
+        pending: true,
+        message: 'Solicitação de fechamento enviada. Aguarde a confirmação do quiosque.',
+      });
+    }
+
+    // Fluxo QUIOSQUE/ADMIN: confirma fechamento e libera guarda-sol
     const { error: updateErr } = await supabaseAdmin
       .from('orders')
       .update({
         status: 'completed',
         paid: true,
+        pending_close: false,
         payment_method: payment_method || 'cash',
         notes: notes || null,
         updated_at: new Date().toISOString(),
@@ -119,25 +127,19 @@ export async function POST(req: NextRequest) {
 
     if (updateErr) throw updateErr;
 
-    // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
-    const prevVisits = selectedOrder.customers?.visit_count ?? 0;
-    const { error: customerErr } = await supabaseAdmin
-      .from('customers')
-      .update({
-        visit_count: prevVisits + 1,
-        last_visit_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', selectedOrder.customer_id);
+    // Liberar guarda-sol
+    await supabaseAdmin
+      .from('umbrellas')
+      .update({ is_occupied: false, current_order_id: null })
+      .eq('id', selectedOrder.umbrella_id);
 
-    if (customerErr) throw customerErr;
+    // NÃO incrementa visit_count aqui (feito apenas no login)
 
     return NextResponse.json(
       {
         success: true,
         order: {
           id: selectedOrder.id,
-          customer_id: selectedOrder.customer_id,
           customer_name: selectedOrder.customers?.name,
           customer_phone: selectedOrder.customers?.phone,
           umbrella_id: selectedOrder.umbrella_id,
@@ -147,7 +149,7 @@ export async function POST(req: NextRequest) {
           payment_method: payment_method || 'cash',
           closed_at: new Date().toISOString(),
         },
-        message: `Conta fechada com sucesso! Guarda-sol ${selectedOrder.umbrella_id} liberado.`,
+        message: `Conta fechada com sucesso! Guarda-sol liberado.`,
       },
       { status: 200 }
     );
@@ -159,7 +161,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET /api/close-account?vendor_id=xxx&umbrella_id=yyy
- * Buscar conta aberta para fechar (preview)
+ * Buscar conta aberta (preview) — apenas vendor/admin.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -175,43 +177,33 @@ export async function GET(req: NextRequest) {
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
-
     if (!umbrella_id && !customer_phone) {
       return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
     }
 
-    // Buscar ordem aberta
     let query = supabaseAdmin
       .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
+      .select('id, customer_id, umbrella_id, total, status, pending_close, created_at, order_items(id), customers(id, name, phone)')
       .eq('vendor_id', vendor_id)
-      .eq('status', 'received');
+      .in('status', ['received', 'preparing', 'delivering']);
 
-    if (umbrella_id) {
-      query = query.eq('umbrella_id', umbrella_id);
-    }
+    if (umbrella_id) query = query.eq('umbrella_id', umbrella_id);
 
     const { data: orders, error } = await query;
-
     if (error) throw error;
 
     if (!orders || orders.length === 0) {
-      return NextResponse.json(
-        { error: 'Nenhuma conta aberta encontrada' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Nenhuma conta aberta encontrada' }, { status: 404 });
     }
 
-    const orderRows = orders as OrderPreview[];
-
-    // Se houver múltiplas, filtrar por phone
+    const orderRows = orders as unknown as OrderPreview[];
     let selectedOrder = orderRows[0];
+
     if (customer_phone && orderRows.length > 1) {
-      const cleanPhone = customer_phone.replace(/\D/g, '');
-      const matching = orderRows.find(o => {
-        const orderPhone = (o.customers?.phone || '').replace(/\D/g, '');
-        return orderPhone === cleanPhone;
-      });
+      const cleanPhone = normalizePhone(customer_phone);
+      const matching = orderRows.find(o =>
+        normalizePhone(o.customers?.phone || '') === cleanPhone
+      );
       if (matching) selectedOrder = matching;
     }
 
@@ -222,8 +214,8 @@ export async function GET(req: NextRequest) {
       customer_phone: selectedOrder.customers?.phone,
       umbrella_id: selectedOrder.umbrella_id,
       total: selectedOrder.total,
+      pending_close: selectedOrder.pending_close,
       items_count: selectedOrder.order_items?.length ?? 0,
-      created_at: selectedOrder.created_at,
       opened_at: selectedOrder.created_at,
     });
   } catch (err) {

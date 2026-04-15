@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createSessionToken } from '@/lib/auth-session';
 import { getOtpMode, verifyCustomerOtp } from '@/lib/customer-otp';
+import { isRateLimited } from '@/lib/rate-limit';
 
 /**
  * POST /api/customers/login
- * Login/cadastro do cliente.
- * Se o cliente já existe (mesmo phone + vendor_id), incrementa visitas.
- * Se não, cria novo registro.
- *
- * Env CUSTOMER_OTP_MODE=dev → aceita código fixo 000000 (apenas desenvolvimento).
- * Env CUSTOMER_OTP_MODE=required → exige otp_code válido após /api/customers/request-otp.
+ * Login/cadastro do cliente com verificação OTP.
+ * visit_count é gerenciado APENAS aqui (removido do close-account para evitar duplicata).
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limiting no login para evitar brute-force de OTP
+    if (await isRateLimited(req, 'customer-login', 10, 10 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
+    }
+
     const { name, phone, vendor_id, otp_code } = await req.json();
 
     if (!name || !phone || !vendor_id) {
@@ -30,7 +32,8 @@ export async function POST(req: NextRequest) {
       if (!otp_code) {
         return NextResponse.json({ error: 'Código de verificação obrigatório.' }, { status: 400 });
       }
-      if (!verifyCustomerOtp(phone, vendor_id, otp_code)) {
+      const valid = await verifyCustomerOtp(phone, vendor_id, otp_code);
+      if (!valid) {
         return NextResponse.json({ error: 'Código inválido ou expirado.' }, { status: 401 });
       }
     }
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
       .from('customers')
       .select('*')
       .eq('vendor_id', vendor_id)
-      .eq('phone', phone)
+      .eq('phone', phone.replace(/\D/g, ''))
       .single();
 
     if (existing) {
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Criar novo cliente
     const { data: newCustomer, error } = await supabaseAdmin
       .from('customers')
-      .insert({ name, phone, vendor_id })
+      .insert({ name, phone: phone.replace(/\D/g, ''), vendor_id })
       .select()
       .single();
 

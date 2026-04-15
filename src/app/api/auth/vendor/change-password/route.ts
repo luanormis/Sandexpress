@@ -27,7 +27,7 @@ async function hashPassword(password: string) {
  */
 export async function POST(req: NextRequest) {
   try {
-    if (isRateLimited(req, 'auth-vendor-change-password', 8, 10 * 60 * 1000)) {
+    if (await isRateLimited(req, 'auth-vendor-change-password', 8, 10 * 60 * 1000)) {
       return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
     }
 

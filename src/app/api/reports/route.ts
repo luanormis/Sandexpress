@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: false });
 
-    const allOrders = (orders || []) as ReportOrderRow[];
+    const allOrders = (orders || []) as unknown as ReportOrderRow[];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
     const total_orders = allOrders.length;
     const avg_ticket = total_orders > 0 ? total_revenue / total_orders : 0;
