@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Users, ShoppingBag, Phone,
@@ -65,36 +65,19 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", document_login: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
   });
   const [regSuccess, setRegSuccess] = useState(false);
 
-  const loadVendors = useCallback(async () => {
-    try {
-      const res = await fetch("/api/vendors", { credentials: "include" });
-      if (!res.ok) return;
-      const data = await res.json();
-      setVendors(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    void loadVendors();
-  }, [isAuthenticated, loadVendors]);
-
   // Load platform report
   useEffect(() => {
-    if (!isAuthenticated) return;
     if (activeTab === "analytics" || activeTab === "overview") {
-      fetch("/api/reports/platform", { credentials: "include" })
+      fetch("/api/reports/platform")
         .then(r => r.json())
         .then(d => setPlatformReport(d))
         .catch(console.error);
     }
-  }, [activeTab, isAuthenticated]);
+  }, [activeTab]);
 
   // Admin login
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -104,11 +87,11 @@ export default function AdminDashboard() {
       const res = await fetch("/api/auth/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ password: adminPassword }),
       });
       if (res.ok) {
         setIsAuthenticated(true);
+        sessionStorage.setItem("admin_token", "authenticated");
       } else {
         setAuthError("Senha incorreta.");
       }
@@ -117,47 +100,81 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleVendor = async (id: string) => {
-    const v = vendors.find(x => x.id === id);
-    if (!v) return;
-    const newActive = !v.is_active;
-    const subscription_status = newActive
-      ? (v.subscription_status === "blocked" ? "active" : v.subscription_status)
-      : "blocked";
+  useEffect(() => {
+    if (sessionStorage.getItem("admin_token")) {
+      setIsAuthenticated(true);
+      loadVendors();
+      loadPlatformReport();
+    }
+  }, []);
+
+  const loadVendors = async () => {
     try {
-      const res = await fetch(`/api/vendors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ is_active: newActive, subscription_status }),
-      });
+      const res = await fetch('/api/vendors');
       if (res.ok) {
         const data = await res.json();
-        setVendors(prev => prev.map(x => (x.id === id ? { ...x, ...data } : x)));
+        setVendors(data);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error('Failed to load vendors:', err);
     }
+  };
+
+  const loadPlatformReport = async () => {
+    try {
+      const res = await fetch('/api/reports/platform');
+      if (res.ok) {
+        const data = await res.json();
+        setPlatformReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to load platform report:', err);
+    }
+  };
+
+  // Toggle vendor status
+  const toggleVendor = (id: string) => {
+    setVendors(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      const newActive = !v.is_active;
+      return {
+        ...v,
+        is_active: newActive,
+        subscription_status: newActive ? (v.subscription_status === "blocked" ? "active" : v.subscription_status) : "blocked",
+      };
+    }));
   };
 
   // Register vendor
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regForm.name || !regForm.owner_name || !regForm.owner_phone) return;
-    const document_login = regForm.document_login.replace(/\D/g, "");
-    if (!document_login) return;
 
     try {
       const res = await fetch("/api/vendors/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ...regForm, document_login }),
+        body: JSON.stringify(regForm),
       });
       if (res.ok) {
+        const data = await res.json();
+        setVendors(prev => [{
+          id: data.id,
+          ...regForm,
+          owner_email: regForm.owner_email || null,
+          city: regForm.city || null,
+          state: regForm.state || null,
+          cnpj: regForm.cnpj || null,
+          cpf: regForm.cpf || null,
+          subscription_status: "trial",
+          plan_type: "trial",
+          trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+          is_active: true,
+          max_umbrellas: 5,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", document_login: "", cpf: "", cnpj: "", city: "", state: "" });
-        await loadVendors();
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "" });
       }
     } catch (err) {
       console.error("Register error:", err);
@@ -556,15 +573,6 @@ export default function AdminDashboard() {
 
                 <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 space-y-4">
                   <h3 className="font-bold text-lg text-gray-200 mb-2">Dados do Responsável</h3>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-400 mb-1">CPF/CNPJ para login *</label>
-                    <input
-                      type="text" required
-                      value={regForm.document_login} onChange={e => setRegForm(p => ({ ...p, document_login: e.target.value }))}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
-                      placeholder="Apenas números (mesmo CPF ou CNPJ cadastrado)"
-                    />
-                  </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-400 mb-1">Nome Completo *</label>
                     <input

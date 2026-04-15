@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
@@ -68,27 +67,6 @@ interface Customer {
   last_visit_at: string;
 }
 
-// ---------- MOCK DATA ----------
-function mapApiOrder(o: Record<string, unknown>): Order {
-  const customers = o.customers as { name?: string; phone?: string } | null | undefined;
-  const umbrellas = o.umbrellas as { number?: number } | null | undefined;
-  const orderItems =
-    (o.order_items as { quantity: number; products?: { name?: string } | null }[]) || [];
-  const created = new Date(String(o.created_at));
-  const diffMin = Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000));
-  return {
-    id: String(o.id),
-    umbrella: umbrellas?.number ?? 0,
-    customer: customers?.name || "—",
-    phone: customers?.phone || "—",
-    total: Number(o.total),
-    status: String(o.status),
-    time: `${diffMin} min`,
-    items: orderItems.map((i) => ({ q: i.quantity, n: i.products?.name || "Item" })),
-    notes: (o.notes as string) || undefined,
-  };
-}
-
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
 const TABS = [
@@ -103,10 +81,8 @@ const TABS = [
 // MAIN COMPONENT
 // =========================================================
 export default function VendorDashboard() {
-  const router = useRouter();
-  const [vendorId, setVendorId] = useState<string | null>(null);
-
   const [activeTab, setActiveTab] = useState("orders");
+  const [vendorId, setVendorId] = useState<string | null>(null);
 
   // --- Orders State ---
   const [orders, setOrders] = useState<Order[]>([]);
@@ -133,173 +109,202 @@ export default function VendorDashboard() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  useEffect(() => {
-    const vid = typeof window !== "undefined" ? localStorage.getItem("vendor_id") : null;
-    if (!vid) {
-      router.replace("/vendor/login");
-      return;
+  // Data loading functions
+  const loadOrders = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/orders?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+        setNewOrderCount(data.filter((o: Order) => o.status === 'received').length);
+      }
+    } catch (err) {
+      console.error('Failed to load orders:', err);
     }
-    setVendorId(vid);
-  }, [router]);
+  };
 
-  const loadOrders = useCallback(async () => {
-    if (!vendorId) return;
-    const res = await fetch(`/api/orders?vendor_id=${vendorId}`, { credentials: "include" });
-    if (!res.ok) return;
-    const raw = await res.json();
-    if (!Array.isArray(raw)) return;
-    setOrders(raw.map((row: Record<string, unknown>) => mapApiOrder(row)));
-    setNewOrderCount(raw.filter((x: { status: string }) => x.status === "received").length);
-  }, [vendorId]);
+  const loadProducts = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/products?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    }
+  };
 
-  const loadProducts = useCallback(async () => {
-    if (!vendorId) return;
-    const res = await fetch(`/api/products?vendor_id=${vendorId}`, { credentials: "include" });
-    if (!res.ok) return;
-    const data = await res.json();
-    setProducts(Array.isArray(data) ? data : []);
-  }, [vendorId]);
+  const loadUmbrellas = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/umbrellas?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUmbrellas(data);
+      }
+    } catch (err) {
+      console.error('Failed to load umbrellas:', err);
+    }
+  };
 
-  const loadUmbrellas = useCallback(async () => {
-    if (!vendorId) return;
-    const res = await fetch(`/api/umbrellas?vendor_id=${vendorId}`, { credentials: "include" });
-    if (!res.ok) return;
-    const data = await res.json();
-    setUmbrellas(Array.isArray(data) ? data : []);
-  }, [vendorId]);
+  const loadCustomers = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/customers?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomers(data);
+      }
+    } catch (err) {
+      console.error('Failed to load customers:', err);
+    }
+  };
 
-  const loadCustomers = useCallback(async () => {
-    if (!vendorId) return;
-    const res = await fetch(`/api/customers?vendor_id=${vendorId}`, { credentials: "include" });
-    if (!res.ok) return;
-    const data = await res.json();
-    setCustomers(Array.isArray(data) ? data : []);
-  }, [vendorId]);
-
+  // Load vendor ID and initial data
   useEffect(() => {
-    if (!vendorId) return;
-    void loadOrders();
-  }, [vendorId, loadOrders]);
-
-  useEffect(() => {
-    if (!vendorId || activeTab !== "orders") return;
-    const t = setInterval(() => void loadOrders(), 5000);
-    return () => clearInterval(t);
-  }, [vendorId, activeTab, loadOrders]);
-
-  useEffect(() => {
-    if (!vendorId) return;
-    if (activeTab === "menu") void loadProducts();
-    if (activeTab === "qr") void loadUmbrellas();
-    if (activeTab === "customers") void loadCustomers();
-  }, [vendorId, activeTab, loadProducts, loadUmbrellas, loadCustomers]);
+    const vid = sessionStorage.getItem("vendor_id");
+    if (vid) {
+      setVendorId(vid);
+      // Load initial data
+      loadOrders(vid);
+      loadProducts(vid);
+      loadUmbrellas(vid);
+      loadCustomers(vid);
+    }
+  }, []);
 
   // Load reports when tab or period changes
   useEffect(() => {
     if (activeTab === "reports" && vendorId) {
       setReportLoading(true);
       fetch(`/api/reports?vendor_id=${vendorId}&period=${reportPeriod}`)
-        .then((r) => r.json())
-        .then((d) => {
-          setReportData(d);
-          setReportLoading(false);
-        })
+        .then(r => r.json())
+        .then(d => { setReportData(d); setReportLoading(false); })
         .catch(() => setReportLoading(false));
     }
   }, [activeTab, reportPeriod, vendorId]);
 
   // Order management
-  const moveOrder = async (id: string, newStatus: string) => {
-    const res = await fetch(`/api/orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ status: newStatus }),
-    });
-    if (res.ok) void loadOrders();
+  const moveOrder = (id: string, newStatus: string) => {
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
   };
 
   // Product management
   const toggleProduct = async (id: string) => {
-    const p = products.find((x) => x.id === id);
-    if (!p) return;
-    const res = await fetch(`/api/products/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ active: !p.active }),
-    });
-    if (res.ok) void loadProducts();
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !product.active }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return alert(err?.error || 'Erro ao atualizar produto.');
+      }
+      const updated = await res.json();
+      setProducts(prev => prev.map(p => p.id === id ? updated : p));
+    } catch (err) {
+      console.error('Toggle product error:', err);
+      alert('Erro de rede ao atualizar produto.');
+    }
   };
 
   const deleteProduct = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este produto?")) return;
-    const res = await fetch(`/api/products/${id}`, { method: "DELETE", credentials: "include" });
-    if (res.ok) void loadProducts();
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return alert(err?.error || 'Erro ao remover produto.');
+      }
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Delete product error:', err);
+      alert('Erro de rede ao remover produto.');
+    }
   };
 
   const saveProduct = async (product: Product) => {
-    if (!vendorId) return;
-    if (editingProduct) {
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(product),
-      });
-      if (res.ok) void loadProducts();
-    } else {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          vendor_id: vendorId,
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          promotional_price: product.promotional_price,
-          description: product.description,
-          image_url: product.image_url,
-          active: product.active,
-          is_combo: product.is_combo,
-          sort_order: product.sort_order,
-        }),
-      });
-      if (res.ok) void loadProducts();
+    if (!vendorId) {
+      return alert('Não foi possível identificar o seu quiosque. Faça login novamente.');
     }
-    setShowProductModal(false);
-    setEditingProduct(null);
+
+    try {
+      const method = editingProduct ? 'PATCH' : 'POST';
+      const url = editingProduct ? `/api/products/${product.id}` : '/api/products';
+      const payload = { ...product, vendor_id: vendorId };
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return alert(err?.error || 'Erro ao salvar produto.');
+      }
+      const saved = await res.json();
+      if (editingProduct) {
+        setProducts(prev => prev.map(p => p.id === saved.id ? saved : p));
+      } else {
+        setProducts(prev => [saved, ...prev]);
+      }
+      setShowProductModal(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error('Save product error:', err);
+      alert('Erro de rede ao salvar produto.');
+    }
   };
 
   // Umbrella management
   const addUmbrella = async () => {
     const num = parseInt(newUmbrellaNumber);
-    if (!num || umbrellas.some((u) => u.number === num)) return alert("Número inválido ou já existe!");
-    if (!vendorId) return;
-    const res = await fetch("/api/umbrellas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ vendor_id: vendorId, number: num, label: `Barraca ${num}` }),
-    });
-    if (res.ok) {
-      setNewUmbrellaNumber("");
+    if (!vendorId) {
+      return alert('Não foi possível identificar o seu quiosque. Faça login novamente.');
+    }
+    if (!num || umbrellas.some(u => u.number === num)) return alert('Número inválido ou já existe!');
+
+    try {
+      const res = await fetch('/api/umbrellas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, number: num, label: `Barraca ${num}` }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return alert(err?.error || 'Erro ao adicionar guarda-sol.');
+      }
+      const saved = await res.json();
+      setUmbrellas(prev => [...prev, saved]);
+      setNewUmbrellaNumber('');
       setShowAddUmbrella(false);
-      void loadUmbrellas();
+    } catch (err) {
+      console.error('Add umbrella error:', err);
+      alert('Erro de rede ao adicionar guarda-sol.');
     }
   };
 
   const toggleUmbrella = async (id: string) => {
-    const u = umbrellas.find((x) => x.id === id);
-    if (!u) return;
-    const res = await fetch(`/api/umbrellas/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ active: !u.active }),
-    });
-    if (res.ok) void loadUmbrellas();
+    const current = umbrellas.find(u => u.id === id);
+    if (!current) return;
+
+    try {
+      const res = await fetch(`/api/umbrellas/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !current.active }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return alert(err?.error || 'Erro ao atualizar guarda-sol.');
+      }
+      const updated = await res.json();
+      setUmbrellas(prev => prev.map(u => u.id === id ? updated : u));
+    } catch (err) {
+      console.error('Toggle umbrella error:', err);
+      alert('Erro de rede ao atualizar guarda-sol.');
+    }
   };
 
   const generateQR = (umbrella: Umbrella) => {
@@ -400,14 +405,7 @@ export default function VendorDashboard() {
           ))}
         </nav>
         <div className="p-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.removeItem("vendor_id");
-              router.push("/vendor/login");
-            }}
-            className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50"
-          >
+          <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50">
             <LogOut size={18} /> Sair
           </button>
         </div>
@@ -847,7 +845,7 @@ export default function VendorDashboard() {
       {showProductModal && (
         <ProductModal
           product={editingProduct}
-          vendorId={vendorId || ""}
+          vendorId={vendorId}
           onSave={saveProduct}
           onClose={() => { setShowProductModal(false); setEditingProduct(null); }}
         />
@@ -867,17 +865,7 @@ export default function VendorDashboard() {
 // =========================================================
 // PRODUCT MODAL COMPONENT
 // =========================================================
-function ProductModal({
-  product,
-  vendorId,
-  onSave,
-  onClose,
-}: {
-  product: Product | null;
-  vendorId: string;
-  onSave: (p: Product) => void | Promise<void>;
-  onClose: () => void;
-}) {
+function ProductModal({ product, vendorId, onSave, onClose }: { product: Product | null; vendorId: string | null; onSave: (p: Product) => Promise<void> | void; onClose: () => void }) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
     description: "", image_url: "", active: true, is_combo: false, sort_order: 99,
@@ -887,6 +875,7 @@ function ProductModal({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!vendorId) return alert('Não foi possível identificar o seu quiosque. Faça login novamente.');
 
     setUploading(true);
     try {
@@ -898,6 +887,7 @@ function ProductModal({
       if (data.url) setForm(prev => ({ ...prev, image_url: data.url }));
     } catch (err) {
       console.error("Upload failed:", err);
+      alert('Erro ao enviar imagem.');
     }
     setUploading(false);
   };

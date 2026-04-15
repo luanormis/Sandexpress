@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * GET /api/daily-report?vendor_id=xxx&date=2024-04-11
@@ -14,10 +13,6 @@ export async function GET(req: NextRequest) {
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
-    }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     // Construir datas para query

@@ -6,12 +6,39 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint']);
 
 /**
+ * GET /api/umbrellas/[id]
+ * Obtém informações públicas de um guarda-sol (para clientes).
+ *
  * PATCH /api/umbrellas/[id]
  * Atualiza um guarda-sol (ex: toggle ativo/inativo).
  *
  * DELETE /api/umbrellas/[id]
  * Remove um guarda-sol.
  */
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const { data, error } = await supabaseAdmin
+      .from('umbrellas')
+      .select('id, number, label, active, vendor_id')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
+    }
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error('Umbrella GET error:', err);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

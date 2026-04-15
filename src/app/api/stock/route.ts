@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * PUT /api/stock
@@ -17,10 +16,6 @@ export async function PUT(req: NextRequest) {
         { error: 'vendor_id e updates (array) são obrigatórios' },
         { status: 400 }
       );
-    }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     // Atualizar cada produto
@@ -65,10 +60,6 @@ export async function GET(req: NextRequest) {
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
-    }
-    const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
