@@ -167,6 +167,31 @@ CREATE TABLE vendor_plans (
 
 CREATE INDEX idx_vendor_plans_vendor ON vendor_plans(vendor_id);
 
+-- BEACHES (Analytics de praias mais visitadas e vendas)
+CREATE TABLE beaches (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  city            TEXT,
+  state           TEXT,
+  region          TEXT,
+  latitude        DECIMAL(10,8),
+  longitude       DECIMAL(11,8),
+  total_visits    INTEGER NOT NULL DEFAULT 0,
+  total_sales     NUMERIC(12,2) NOT NULL DEFAULT 0,
+  avg_ticket      NUMERIC(10,2) NOT NULL DEFAULT 0,
+  peak_hours      JSONB,
+  popular_products JSONB,
+  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, name)
+);
+
+CREATE INDEX idx_beaches_tenant ON beaches(tenant_id);
+CREATE INDEX idx_beaches_active ON beaches(is_active);
+CREATE INDEX idx_beaches_location ON beaches(latitude, longitude);
+
 -- ACCOUNT ADJUSTMENTS (ajustes de conta - cancelamentos/abatimentos)
 CREATE TABLE account_adjustments (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
