@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
+import { getTenantIdFromRequest, enforceTenantScope } from '@/lib/tenant-utils';
 
 /** Campos que o admin pode atualizar num vendor (whitelist contra mass-assignment) */
 const ALLOWED_VENDOR_FIELDS = new Set([
@@ -21,18 +22,25 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = getRequestSession(req);
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
+    const session = await getRequestSession(req);
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
 
     const { id } = await params;
 
-    const { data, error } = await supabaseAdmin
-      .from('vendors')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('vendors')
+        .select('*')
+        .eq('id', id),
+      tenantId
+    ).single();
 
     if (error) throw error;
     return NextResponse.json(data);
@@ -47,7 +55,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = getRequestSession(req);
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
+    const session = await getRequestSession(req);
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
@@ -64,12 +77,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('vendors')
-      .update({ ...safeUpdate, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('vendors')
+        .update({ ...safeUpdate, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select(),
+      tenantId
+    ).single();
 
     if (error) throw error;
     return NextResponse.json(data);

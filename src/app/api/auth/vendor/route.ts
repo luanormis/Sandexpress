@@ -47,7 +47,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Quiosque bloqueado. Entre em contato com o suporte.' }, { status: 403 });
     }
 
-    const token = createSessionToken({ role: 'vendor', vendor_id: vendor.id }, 12 * 60 * 60);
+    const token = await createSessionToken(
+      { role: 'vendor', vendor_id: vendor.id, tenant_id: vendor.id },
+      12 * 60 * 60
+    );
     const response = NextResponse.json({
       vendor_id: vendor.id,
       vendor_name: vendor.name,

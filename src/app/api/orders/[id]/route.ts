@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /** Campos permitidos para atualização de pedido (whitelist contra mass-assignment) */
 const ALLOWED_ORDER_FIELDS = new Set(['status', 'notes']);
@@ -14,7 +15,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = getRequestSession(req);
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
+    const session = await getRequestSession(req);
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
     const { id } = await params;
@@ -29,7 +35,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
     }
 
-    const orderLookup = await supabaseAdmin.from('orders').select('vendor_id').eq('id', id).single();
+    const orderLookup = await enforceTenantScope(
+      supabaseAdmin.from('orders').select('vendor_id').eq('id', id),
+      tenantId
+    ).single();
     if (orderLookup.error || !orderLookup.data) {
       return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 });
     }
@@ -37,12 +46,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autorizado para este pedido.' }, { status: 403 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .update({ ...safeUpdate, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('orders')
+        .update({ ...safeUpdate, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select(),
+      tenantId
+    ).single();
 
     if (error) throw error;
     return NextResponse.json(data);
@@ -61,7 +72,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = getRequestSession(req);
+    const session = await getRequestSession(req);
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
     const { id } = await params;

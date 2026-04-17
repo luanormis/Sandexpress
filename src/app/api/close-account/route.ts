@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * POST /api/close-account
@@ -14,6 +15,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  */
 export async function POST(req: NextRequest) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const body = await req.json();
     const { vendor_id, umbrella_id, customer_phone, payment_method, notes } = body;
 
@@ -25,12 +31,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Encontrar a ordem aberta
-    let query = supabaseAdmin
-      .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
-      .eq('vendor_id', vendor_id)
-      .eq('status', 'received')
-      .order('created_at', { ascending: true });
+    let query = enforceTenantScope(
+      supabaseAdmin
+        .from('orders')
+        .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
+        .eq('vendor_id', vendor_id)
+        .eq('status', 'received')
+        .order('created_at', { ascending: true }),
+      tenantId
+    );
 
     if (umbrella_id) {
       query = query.eq('umbrella_id', umbrella_id);
@@ -61,28 +70,34 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Atualizar ordem para completed e pago
-    const { error: updateErr } = await supabaseAdmin
-      .from('orders')
-      .update({
-        status: 'completed',
-        paid: true,
-        payment_method: payment_method || 'cash',
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', selectedOrder.id);
+    const { error: updateErr } = await enforceTenantScope(
+      (supabaseAdmin as any)
+        .from('orders')
+        .update({
+          status: 'completed',
+          paid: true,
+          payment_method: payment_method || 'cash',
+          notes: notes || null,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', selectedOrder.id),
+      tenantId
+    );
 
     if (updateErr) throw updateErr;
 
     // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
-    const { error: customerErr } = await supabaseAdmin
-      .from('customers')
-      .update({
-        visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
-        last_visit_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', selectedOrder.customer_id);
+    const { error: customerErr } = await enforceTenantScope(
+      (supabaseAdmin as any)
+        .from('customers')
+        .update({
+          visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
+          last_visit_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', selectedOrder.customer_id),
+      tenantId
+    );
 
     if (customerErr) throw customerErr;
 

@@ -39,6 +39,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          /* Insert Types... */
           id?: string
           name: string
           cnpj?: string | null
@@ -67,6 +68,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          /* Update Types... */
           name?: string
           cnpj?: string | null
           cpf?: string | null
@@ -92,11 +94,11 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
       }
       customers: {
         Row: {
           id: string
+          tenant_id: string
           vendor_id: string
           name: string
           phone: string
@@ -108,6 +110,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          tenant_id?: string
           vendor_id: string
           name: string
           phone: string
@@ -118,6 +121,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          tenant_id?: string
           name?: string
           phone?: string
           visit_count?: number
@@ -125,47 +129,43 @@ export interface Database {
           last_visit_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
       }
       umbrellas: {
         Row: {
           id: string
+          tenant_id: string
           vendor_id: string
           number: number
           label: string | null
           location_hint: string | null
           active: boolean | null
           qr_url: string | null
-          is_occupied: boolean
-          current_order_id: string | null
           created_at: string | null
         }
         Insert: {
           id?: string
+          tenant_id?: string
           vendor_id: string
           number: number
           label?: string | null
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
-          is_occupied?: boolean
-          current_order_id?: string | null
           created_at?: string | null
         }
         Update: {
+          tenant_id?: string
           number?: number
           label?: string | null
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
-          is_occupied?: boolean
-          current_order_id?: string | null
         }
-        Relationships: []
       }
       products: {
         Row: {
           id: string
+          tenant_id: string
           vendor_id: string
           category: string
           name: string
@@ -185,6 +185,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          tenant_id?: string
           vendor_id: string
           category?: string
           name: string
@@ -203,6 +204,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          tenant_id?: string
           category?: string
           name?: string
           description?: string | null
@@ -218,13 +220,12 @@ export interface Database {
           blocked_by_stock?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
       }
       product_images: {
         Row: {
           id: string
           category: string
-          title: string
+          name: string
           image_url: string
           description: string | null
           plan_type: string
@@ -233,7 +234,7 @@ export interface Database {
         Insert: {
           id?: string
           category: string
-          title: string
+          name: string
           image_url: string
           description?: string | null
           plan_type: string
@@ -241,12 +242,11 @@ export interface Database {
         }
         Update: {
           category?: string
-          title?: string
+          name?: string
           image_url?: string
           description?: string | null
           plan_type?: string
         }
-        Relationships: []
       }
       vendor_plans: {
         Row: {
@@ -256,7 +256,7 @@ export interface Database {
           can_upload_images: boolean
           max_custom_images: number
           custom_images_used: number
-          custom_theme: string | null
+          custom_theme: boolean
           created_at: string | null
           updated_at: string | null
         }
@@ -267,7 +267,7 @@ export interface Database {
           can_upload_images: boolean
           max_custom_images: number
           custom_images_used?: number
-          custom_theme?: string | null
+          custom_theme?: boolean
           created_at?: string | null
           updated_at?: string | null
         }
@@ -276,14 +276,116 @@ export interface Database {
           can_upload_images?: boolean
           max_custom_images?: number
           custom_images_used?: number
-          custom_theme?: string | null
+          custom_theme?: boolean
           updated_at?: string | null
         }
-        Relationships: []
+      }
+      tenants: {
+        Row: {
+          id: string
+          name: string
+          status: string
+          city: string | null
+          state: string | null
+          region: string | null
+          beach_name: string | null
+          primary_color: string | null
+          logo_url: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          status?: string
+          city?: string | null
+          state?: string | null
+          region?: string | null
+          beach_name?: string | null
+          primary_color?: string | null
+          logo_url?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          name?: string
+          status?: string
+          city?: string | null
+          state?: string | null
+          region?: string | null
+          beach_name?: string | null
+          primary_color?: string | null
+          logo_url?: string | null
+        }
+      }
+      users: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          email: string | null
+          role: string
+          password_hash: string | null
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          email?: string | null
+          role?: string
+          password_hash?: string | null
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          tenant_id?: string
+          name?: string
+          email?: string | null
+          role?: string
+          password_hash?: string | null
+          is_active?: boolean
+          updated_at?: string | null
+        }
+      }
+      sessions: {
+        Row: {
+          id: string
+          tenant_id: string
+          customer_id: string | null
+          umbrella_id: string | null
+          status: string
+          opened_at: string | null
+          closed_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          customer_id?: string | null
+          umbrella_id?: string | null
+          status?: string
+          opened_at?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          tenant_id?: string
+          customer_id?: string | null
+          umbrella_id?: string | null
+          status?: string
+          opened_at?: string | null
+          closed_at?: string | null
+          updated_at?: string | null
+        }
       }
       orders: {
         Row: {
           id: string
+          tenant_id: string
           vendor_id: string
           customer_id: string
           umbrella_id: string
@@ -292,12 +394,12 @@ export interface Database {
           notes: string | null
           paid: boolean | null
           payment_method: string | null
-          pending_close: boolean
           created_at: string | null
           updated_at: string | null
         }
         Insert: {
           id?: string
+          tenant_id?: string
           vendor_id: string
           customer_id: string
           umbrella_id: string
@@ -306,155 +408,49 @@ export interface Database {
           notes?: string | null
           paid?: boolean | null
           payment_method?: string | null
-          pending_close?: boolean
           created_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          tenant_id?: string
           status?: string
           total?: number
           notes?: string | null
           paid?: boolean | null
           payment_method?: string | null
-          pending_close?: boolean
           updated_at?: string | null
         }
-        Relationships: [
-          { foreignKeyName: "orders_customer_id_fkey"; columns: ["customer_id"]; referencedRelation: "customers"; referencedColumns: ["id"] },
-          { foreignKeyName: "orders_umbrella_id_fkey"; columns: ["umbrella_id"]; referencedRelation: "umbrellas"; referencedColumns: ["id"] },
-          { foreignKeyName: "orders_vendor_id_fkey"; columns: ["vendor_id"]; referencedRelation: "vendors"; referencedColumns: ["id"] }
-        ]
       }
       order_items: {
         Row: {
           id: string
+          tenant_id: string
           order_id: string
           product_id: string
           quantity: number
           unit_price: number
           subtotal: number
-          cancelled: boolean
-          cancelled_at: string | null
-          cancel_reason: string | null
           created_at: string | null
         }
         Insert: {
           id?: string
+          tenant_id?: string
           order_id: string
           product_id: string
           quantity: number
           unit_price: number
           subtotal: number
-          cancelled?: boolean
-          cancelled_at?: string | null
-          cancel_reason?: string | null
           created_at?: string | null
         }
         Update: {
+          tenant_id?: string
           quantity?: number
           unit_price?: number
           subtotal?: number
-          cancelled?: boolean
-          cancelled_at?: string | null
-          cancel_reason?: string | null
         }
-        Relationships: [
-          { foreignKeyName: "order_items_order_id_fkey"; columns: ["order_id"]; referencedRelation: "orders"; referencedColumns: ["id"] },
-          { foreignKeyName: "order_items_product_id_fkey"; columns: ["product_id"]; referencedRelation: "products"; referencedColumns: ["id"] }
-        ]
       }
-      account_adjustments: {
-        Row: {
-          id: string
-          vendor_id: string
-          customer_id: string
-          order_id: string | null
-          adjustment_type: string
-          description: string | null
-          amount: number
-          reason: string | null
-          processed_by: string | null
-          password_verified: boolean
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          vendor_id: string
-          customer_id: string
-          order_id?: string | null
-          adjustment_type: string
-          description?: string | null
-          amount: number
-          reason?: string | null
-          processed_by?: string | null
-          password_verified?: boolean
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          order_id?: string | null
-          adjustment_type?: string
-          description?: string | null
-          amount?: number
-          reason?: string | null
-          processed_by?: string | null
-          password_verified?: boolean
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      customer_otps: {
-        Row: {
-          id: string
-          phone: string
-          vendor_id: string
-          code: string
-          expires_at: string
-          used: boolean
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          phone: string
-          vendor_id: string
-          code: string
-          expires_at: string
-          used?: boolean
-          created_at?: string | null
-        }
-        Update: {
-          used?: boolean
-        }
-        Relationships: [
-          { foreignKeyName: "customer_otps_vendor_id_fkey"; columns: ["vendor_id"]; referencedRelation: "vendors"; referencedColumns: ["id"] }
-        ]
-      }
-      rate_limit_buckets: {
-        Row: {
-          key: string
-          count: number
-          reset_at: string
-        }
-        Insert: {
-          key: string
-          count?: number
-          reset_at: string
-        }
-        Update: {
-          count?: number
-          reset_at?: string
-        }
-        Relationships: []
-      }
+      Views: {}
+      Functions: {}
     }
-    Views: Record<string, never>
-    Functions: {
-      increment_stock: {
-        Args: { p_product_id: string; p_qty: number }
-        Returns: undefined
-      }
-    }
-    Enums: Record<string, never>
   }
 }

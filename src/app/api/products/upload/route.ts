@@ -10,7 +10,7 @@ import { validateImageUpload } from '@/lib/upload-guard';
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = getRequestSession(req);
+    const session = await getRequestSession(req);
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
     const formData = await req.formData();

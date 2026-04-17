@@ -31,9 +31,24 @@ CREATE TABLE vendors (
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- TENANTS (multi-tenant)
+CREATE TABLE tenants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','blocked')),
+  city TEXT,
+  state TEXT,
+  region TEXT,
+  beach_name TEXT,
+  primary_color TEXT DEFAULT '#FF6B00',
+  logo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- CUSTOMERS (clientes de cada quiosque)
 CREATE TABLE customers (
   id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id      UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vendor_id      UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   name           TEXT NOT NULL,
   phone          TEXT NOT NULL,
@@ -48,6 +63,7 @@ CREATE TABLE customers (
 -- UMBRELLAS (guarda-sóis de cada quiosque)
 CREATE TABLE umbrellas (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vendor_id     UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   number        INTEGER NOT NULL,
   label         TEXT,
@@ -61,6 +77,7 @@ CREATE TABLE umbrellas (
 -- PRODUCTS (cardápio de cada quiosque - até 150 itens)
 CREATE TABLE products (
   id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id          UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vendor_id          UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   category           TEXT NOT NULL DEFAULT 'Geral',
   name               TEXT NOT NULL,
@@ -79,9 +96,36 @@ CREATE TABLE products (
   updated_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- USERS (autenticação SaaS)
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE,
+  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('admin','vendor','seller','customer')),
+  password_hash TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- SESSIONS (comandas / sessões por tenant)
+CREATE TABLE sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  umbrella_id UUID REFERENCES umbrellas(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','pending')),
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ORDERS (pedidos)
 CREATE TABLE orders (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vendor_id       UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   customer_id     UUID NOT NULL REFERENCES customers(id),
   umbrella_id     UUID NOT NULL REFERENCES umbrellas(id),
@@ -98,6 +142,7 @@ CREATE TABLE orders (
 -- ORDER ITEMS (itens de cada pedido)
 CREATE TABLE order_items (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   order_id    UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   product_id  UUID NOT NULL REFERENCES products(id),
   quantity    INTEGER NOT NULL CHECK (quantity > 0),
@@ -112,12 +157,24 @@ CREATE INDEX idx_customers_phone     ON customers(phone);
 CREATE INDEX idx_umbrellas_vendor    ON umbrellas(vendor_id);
 CREATE INDEX idx_products_vendor     ON products(vendor_id);
 CREATE INDEX idx_products_active     ON products(vendor_id, active);
+CREATE INDEX idx_products_tenant     ON products(tenant_id);
 CREATE INDEX idx_orders_vendor       ON orders(vendor_id);
+CREATE INDEX idx_orders_tenant       ON orders(tenant_id);
 CREATE INDEX idx_orders_status       ON orders(vendor_id, status);
 CREATE INDEX idx_orders_created      ON orders(vendor_id, created_at DESC);
 CREATE INDEX idx_order_items_order   ON order_items(order_id);
+CREATE INDEX idx_order_items_tenant  ON order_items(tenant_id);
+CREATE INDEX idx_customers_tenant    ON customers(tenant_id);
+CREATE INDEX idx_umbrellas_tenant    ON umbrellas(tenant_id);
+CREATE INDEX idx_tenants_status      ON tenants(status);
+CREATE INDEX idx_users_tenant        ON users(tenant_id);
+CREATE INDEX idx_sessions_tenant     ON sessions(tenant_id);
+CREATE INDEX idx_sessions_created   ON sessions(created_at DESC);
 
 -- ROW LEVEL SECURITY
+ALTER TABLE tenants     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE umbrellas   ENABLE ROW LEVEL SECURITY;

@@ -6,7 +6,224 @@ import { useVendorAuth } from "@/hooks/useVendorAuth";
 import { ProductImageManager } from "@/components/vendor/ProductImageManager";
 import { Product, VendorPlan } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { Edit2, Trash2, Plus } from "lucide-react";
+import { Edit2, Trash2, Plus, X } from "lucide-react";
+
+interface ProductCreationModalProps {
+  vendorId: string;
+  tenantId: string;
+  isPlusUser: boolean;
+  onClose: () => void;
+  onProductCreated: () => void;
+}
+
+function ProductCreationModal({
+  vendorId,
+  tenantId,
+  isPlusUser,
+  onClose,
+  onProductCreated,
+}: ProductCreationModalProps) {
+  const [formData, setFormData] = useState({
+    name: "",
+    category: "",
+    description: "",
+    price: "",
+    promotional_price: "",
+    image_url: "",
+    active: true,
+  });
+  const [selectedImage, setSelectedImage] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.category || !formData.price) return;
+
+    setSaving(true);
+    try {
+      const productData = {
+        tenant_id: tenantId,
+        vendor_id: vendorId,
+        name: formData.name,
+        category: formData.category,
+        description: formData.description || null,
+        price: parseFloat(formData.price),
+        promotional_price: formData.promotional_price ? parseFloat(formData.promotional_price) : null,
+        image_url: selectedImage || null,
+        is_default_image: !selectedImage,
+        image_plan_type: selectedImage ? "free" : "free",
+        active: formData.active,
+        is_combo: false,
+        sort_order: 99,
+      };
+
+      const { error } = await (supabase as any)
+        .from("products")
+        .insert(productData);
+
+      if (error) throw error;
+
+      onProductCreated();
+    } catch (err) {
+      console.error("Erro ao criar produto:", err);
+      alert("Erro ao criar produto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImageSelected = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    setFormData(prev => ({ ...prev, image_url: imageUrl }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-2xl font-bold text-gray-900">Novo Produto</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Nome e Categoria */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome do Produto *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
+                placeholder="Ex: X-Burger"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Categoria *
+              </label>
+              <select
+                required
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
+              >
+                <option value="">Selecione uma categoria</option>
+                <option value="Bebidas">Bebidas</option>
+                <option value="Petiscos">Petiscos</option>
+                <option value="Pratos Principais">Pratos Principais</option>
+                <option value="Sobremesas">Sobremesas</option>
+                <option value="Combos">Combos</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descrição
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
+              rows={3}
+              placeholder="Descrição opcional do produto"
+            />
+          </div>
+
+          {/* Preços */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Preço (R$) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={formData.price}
+                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Preço Promocional (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.promotional_price}
+                onChange={(e) => setFormData(prev => ({ ...prev, promotional_price: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent"
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+
+          {/* Imagem */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Imagem do Produto
+            </label>
+            <ProductImageManager
+              product={{
+                id: "temp",
+                tenant_id: tenantId,
+                vendor_id: vendorId,
+                category: formData.category,
+                name: formData.name,
+                description: formData.description,
+                price: parseFloat(formData.price) || 0,
+                promotional_price: formData.promotional_price ? parseFloat(formData.promotional_price) : undefined,
+                image_url: selectedImage,
+                is_default_image: !selectedImage,
+                image_plan_type: "free",
+                active: true,
+                is_combo: false,
+                sort_order: 99,
+                blocked_by_stock: false,
+                stock_quantity: null,
+                created_at: undefined,
+                updated_at: undefined,
+              }}
+              onImageSelected={handleImageSelected}
+              isPlusUser={isPlusUser}
+            />
+          </div>
+
+          {/* Botões */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 font-semibold transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !formData.name || !formData.category || !formData.price}
+              className="bg-[#FF6B00] hover:bg-orange-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              {saving ? "Criando..." : "Criar Produto"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function VendorProductsPage() {
   const { vendorId, isAuthenticated } = useVendorAuth();
@@ -14,6 +231,7 @@ export default function VendorProductsPage() {
   const [plan, setPlan] = useState<VendorPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !vendorId) return;
@@ -22,9 +240,8 @@ export default function VendorProductsPage() {
   }, [vendorId, isAuthenticated]);
 
   const fetchProducts = async () => {
-    if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -41,9 +258,8 @@ export default function VendorProductsPage() {
   };
 
   const fetchVendorPlan = async () => {
-    if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("vendor_plans")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -58,7 +274,7 @@ export default function VendorProductsPage() {
 
   const handleImageSelected = async (productId: string, imageUrl: string) => {
     try {
-      await supabase
+      await (supabase as any)
         .from("products")
         .update({
           image_url: imageUrl,
@@ -97,7 +313,10 @@ export default function VendorProductsPage() {
               {products.length} produto{products.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <button className="bg-[#FF6B00] hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors">
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-[#FF6B00] hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+          >
             <Plus size={20} />
             Novo Produto
           </button>
@@ -220,10 +439,27 @@ export default function VendorProductsPage() {
         {products.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-600 mb-4">Nenhum produto cadastrado</p>
-            <button className="bg-[#FF6B00] hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-[#FF6B00] hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+            >
               Criar Primeiro Produto
             </button>
           </div>
+        )}
+
+        {/* Product Creation Modal */}
+        {showCreateModal && vendorId && (
+          <ProductCreationModal
+            vendorId={vendorId as string}
+            tenantId={products[0]?.tenant_id || ""}
+            isPlusUser={plan?.plan_type === "plus" || false}
+            onClose={() => setShowCreateModal(false)}
+            onProductCreated={() => {
+              setShowCreateModal(false);
+              fetchProducts();
+            }}
+          />
         )}
       </div>
     </div>

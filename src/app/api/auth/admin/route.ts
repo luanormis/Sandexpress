@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Senha inválida.' }, { status: 401 });
     }
 
-    const token = createSessionToken({ role: 'admin' }, 12 * 60 * 60);
+    const token = await createSessionToken({ role: 'admin' }, 12 * 60 * 60);
     const response = NextResponse.json({
       role: 'admin',
       token,

@@ -107,7 +107,7 @@ export function ProductImageManager({
             >
               <img
                 src={img.image_url}
-                alt={img.title}
+                alt={img.name}
                 className="w-full h-full object-cover"
               />
               {selectedImage === img.image_url && (

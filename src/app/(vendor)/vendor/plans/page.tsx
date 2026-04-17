@@ -18,10 +18,9 @@ export default function VendorPlanPage() {
     fetchVendorPlan();
   }, [vendorId, isAuthenticated]);
 
-  const fetchVendorPlan = async () => {
-    if (!vendorId) return;
-    try {
-      const { data, error } = await supabase
+  const fetchVendorPlan = async () => {    if (!vendorId) return;
+        try {
+      const { data, error } = await (supabase as any)
         .from("vendor_plans")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -33,7 +32,7 @@ export default function VendorPlanPage() {
         setPlan(data as VendorPlan);
       } else {
         // Criar plano padrão (free)
-        const { data: newPlan, error: insertError } = await supabase
+        const { data: newPlan, error: insertError } = await (supabase as any)
           .from("vendor_plans")
           .insert({
             vendor_id: vendorId,
@@ -57,9 +56,10 @@ export default function VendorPlanPage() {
 
   const handleUpgradeToPlusTier = async () => {
     if (!vendorId) return;
+    
     setUpgrading(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("vendor_plans")
         .update({
           plan_type: "plus",

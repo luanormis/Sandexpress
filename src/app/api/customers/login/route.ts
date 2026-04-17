@@ -4,6 +4,8 @@ import { createSessionToken } from '@/lib/auth-session';
 import { getOtpMode, verifyCustomerOtp } from '@/lib/customer-otp';
 import { isRateLimited } from '@/lib/rate-limit';
 
+const pgAdmin = supabaseAdmin as any;
+
 /**
  * POST /api/customers/login
  * Login/cadastro do cliente com verificação OTP.
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar se cliente já existe neste quiosque
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await pgAdmin
       .from('customers')
       .select('*')
       .eq('vendor_id', vendor_id)
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       // Atualizar nome e incrementar visitas
-      const { data: updated, error } = await supabaseAdmin
+      const { data: updated, error } = await pgAdmin
         .from('customers')
         .update({
           name,
@@ -61,7 +63,10 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
-      const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id }, 12 * 60 * 60);
+      const token = await createSessionToken(
+        { role: 'customer', vendor_id, customer_id: updated.id, tenant_id: vendor_id },
+        12 * 60 * 60
+      );
       const response = NextResponse.json(updated);
       response.cookies.set({
         name: 'customer_session',
@@ -76,14 +81,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Criar novo cliente
-    const { data: newCustomer, error } = await supabaseAdmin
+    const { data: newCustomer, error } = await pg
       .from('customers')
       .insert({ name, phone: phone.replace(/\D/g, ''), vendor_id })
       .select()
       .single();
 
     if (error) throw error;
-    const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id }, 12 * 60 * 60);
+    const token = await createSessionToken(
+      { role: 'customer', vendor_id, customer_id: newCustomer.id, tenant_id: vendor_id },
+      12 * 60 * 60
+    );
     const response = NextResponse.json(newCustomer, { status: 201 });
     response.cookies.set({
       name: 'customer_session',

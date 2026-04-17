@@ -16,11 +16,37 @@ export interface Vendor {
   max_umbrellas: number
   plan_type?: 'trial' | 'monthly' | '6months' | '12months'
   created_at?: string
+  tenant_id?: string
+}
+
+export interface Tenant {
+  id: string
+  name: string
+  status: 'active' | 'blocked'
+  city?: string | null
+  state?: string | null
+  region?: string | null
+  beach_name?: string | null
+  primary_color?: string | null
+  logo_url?: string | null
+  created_at?: string
+}
+
+export interface User {
+  id: string
+  tenant_id: string
+  name: string
+  email?: string | null
+  role: 'admin' | 'vendor' | 'seller' | 'customer'
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 // Tipos de Produto/Cardápio
 export interface Product {
   id: string
+  tenant_id?: string
   vendor_id: string
   category: string
   name: string
@@ -42,6 +68,7 @@ export interface Product {
 // Tipos de Guarda-sol
 export interface Umbrella {
   id: string
+  tenant_id?: string
   vendor_id: string
   number: number
   label?: string | null
@@ -54,6 +81,7 @@ export interface Umbrella {
 // Tipos de Cliente
 export interface Customer {
   id: string
+  tenant_id?: string
   vendor_id: string
   name: string
   phone: string
@@ -66,6 +94,7 @@ export interface Customer {
 // Tipos de Pedido
 export interface Order {
   id: string
+  tenant_id?: string
   vendor_id: string
   customer_id: string
   umbrella_id: string
@@ -109,11 +138,11 @@ export interface AccountAdjustment {
 export interface ProductImage {
   id: string
   category: string
+  name: string
   image_url: string
-  title: string
   description?: string | null
-  plan_type: 'free' | 'plus'
-  created_at?: string | null
+  plan_type: 'free' | 'plus' // Disponível em qual plano
+  created_at?: string
 }
 
 // Autenticação
@@ -141,8 +170,8 @@ export interface VendorPlan {
   can_upload_images: boolean
   max_custom_images: number
   custom_images_used: number
-  custom_theme: string | null
-  created_at?: string | null
-  updated_at?: string | null
+  custom_theme: boolean
+  created_at?: string
+  updated_at?: string
 }
 

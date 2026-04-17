@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * GET /api/reports?vendor_id=xxx&period=month
@@ -8,6 +9,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  */
 export async function GET(req: NextRequest) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(req.url);
     const vendor_id = searchParams.get('vendor_id');
     const period = searchParams.get('period') || 'month';
@@ -31,12 +37,15 @@ export async function GET(req: NextRequest) {
     todayStart.setHours(0, 0, 0, 0);
 
     // Buscar pedidos no período
-    const { data: orders } = await supabaseAdmin
-      .from('orders')
-      .select('*, order_items(*, products(name, price)), customers(name, phone)')
-      .eq('vendor_id', vendor_id)
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: false });
+    const { data: orders } = await enforceTenantScope(
+      supabaseAdmin
+        .from('orders')
+        .select('*, order_items(*, products(name, price)), customers(name, phone)')
+        .eq('vendor_id', vendor_id)
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false }),
+      tenantId
+    );
 
     const allOrders = orders || [];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
@@ -46,8 +55,14 @@ export async function GET(req: NextRequest) {
 
     // Produtos ativos e guarda-sóis ativos
     const [productsResult, umbrellasResult] = await Promise.all([
-      supabaseAdmin.from('products').select('active').eq('vendor_id', vendor_id),
-      supabaseAdmin.from('umbrellas').select('active').eq('vendor_id', vendor_id),
+      enforceTenantScope(
+        supabaseAdmin.from('products').select('active').eq('vendor_id', vendor_id),
+        tenantId
+      ),
+      enforceTenantScope(
+        supabaseAdmin.from('umbrellas').select('active').eq('vendor_id', vendor_id),
+        tenantId
+      ),
     ]);
 
     const available_products = (productsResult.data || []).filter(p => p.active).length;

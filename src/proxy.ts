@@ -9,7 +9,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/customers/request-otp',
 ]);
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
@@ -23,7 +23,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = getRequestSession(req);
+  const session = await getRequestSession(req);
   if (!session) {
     return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
   }

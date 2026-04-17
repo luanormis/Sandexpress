@@ -48,14 +48,14 @@ export default function KioskConfigPage() {
           .getPublicUrl(data.path).data.publicUrl;
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from("vendors")
         .update({
           name,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
           logo_url: logoUrl,
-        })
+        } as any)
         .eq("id", vendorId);
 
       if (updateError) throw updateError;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * PUT /api/stock
@@ -9,6 +10,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  */
 export async function PUT(req: NextRequest) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const { vendor_id, updates } = await req.json();
 
     if (!vendor_id || !updates || !Array.isArray(updates)) {
@@ -21,15 +27,18 @@ export async function PUT(req: NextRequest) {
     // Atualizar cada produto
     const results = [];
     for (const { product_id, stock_quantity } of updates) {
-      const { error } = await supabaseAdmin
-        .from('products')
-        .update({
-          stock_quantity,
-          blocked_by_stock: stock_quantity === 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', product_id)
-        .eq('vendor_id', vendor_id);
+      const { error } = await enforceTenantScope(
+        supabaseAdmin
+          .from('products')
+          .update({
+            stock_quantity,
+            blocked_by_stock: stock_quantity === 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', product_id)
+          .eq('vendor_id', vendor_id),
+        tenantId
+      );
 
       if (!error) {
         results.push({ product_id, stock_quantity, success: true });

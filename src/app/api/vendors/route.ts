@@ -8,7 +8,7 @@ import { getRequestSession } from '@/lib/auth-session';
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = getRequestSession(req);
+    const session = await getRequestSession(req);
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
