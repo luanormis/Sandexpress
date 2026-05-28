@@ -184,8 +184,25 @@ export default function VendorDashboard() {
   }, [activeTab, reportPeriod, vendorId]);
 
   // Order management
-  const moveOrder = (id: string, newStatus: string) => {
+  const moveOrder = async (id: string, newStatus: string) => {
+    const previous = orders;
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setOrders(previous);
+        alert(err?.error || 'Erro ao atualizar pedido.');
+      }
+    } catch (err) {
+      console.error('Move order error:', err);
+      setOrders(previous);
+      alert('Erro de rede ao atualizar pedido.');
+    }
   };
 
   // Product management

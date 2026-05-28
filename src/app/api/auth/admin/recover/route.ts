@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isRateLimited } from '@/lib/rate-limit';
 
 /**
  * POST /api/auth/admin/recover
@@ -7,10 +6,6 @@ import { isRateLimited } from '@/lib/rate-limit';
  */
 export async function POST(req: NextRequest) {
   try {
-    if (await isRateLimited(req, 'auth-admin-recover', 5, 10 * 60 * 1000)) {
-      return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
-    }
-
     const { email } = await req.json();
 
     if (!email) {
@@ -18,10 +13,13 @@ export async function POST(req: NextRequest) {
     }
 
     const recoveryEmail = process.env.ADMIN_RECOVERY_EMAIL || 'admin@example.com';
-    if (email !== recoveryEmail) return NextResponse.json({ message: 'Se os dados estiverem corretos, enviaremos as instruções.' });
+    if (email !== recoveryEmail) {
+      return NextResponse.json({ error: 'Email não encontrado.' }, { status: 404 });
+    }
 
     return NextResponse.json({
-      message: 'Se os dados estiverem corretos, enviaremos as instruções.',
+      message: 'Solicitação de recuperação recebida. Envie instruções por email para o administrador.',
+      recovery_email: recoveryEmail,
     });
   } catch (err) {
     console.error('Admin recover error:', err);

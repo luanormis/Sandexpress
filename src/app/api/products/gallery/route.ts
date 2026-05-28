@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category");
     const planType = request.nextUrl.searchParams.get("planType") || "free";
+    const authToken = request.headers.get("authorization")?.replace("Bearer ", "");
 
     let query = supabase.from("product_images").select("*");
 
@@ -28,8 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Group by category
-    const groupedByCategory = data.reduce(
-      (acc: Record<string, typeof data>, image) => {
+    const images: any[] = data || [];
+    const groupedByCategory = images.reduce(
+      (acc: Record<string, any[]>, image: any) => {
         if (!acc[image.category]) {
           acc[image.category] = [];
         }
@@ -43,9 +45,9 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         data: {
-          images: data,
+          images,
           byCategory: groupedByCategory,
-          total: data.length,
+          total: images.length,
         },
       },
       { status: 200 }

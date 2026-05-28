@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * GET /api/daily-report?vendor_id=xxx&date=2024-04-11
@@ -7,6 +8,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  */
 export async function GET(req: NextRequest) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(req.url);
     const vendor_id = searchParams.get('vendor_id');
     const dateStr = searchParams.get('date') || new Date().toISOString().split('T')[0]; // padrão: hoje
@@ -20,14 +26,17 @@ export async function GET(req: NextRequest) {
     const endOfDay = new Date(`${dateStr}T23:59:59`).toISOString();
 
     // 1. Obter todos os pedidos do dia (completados)
-    const { data: orders, error: ordersErr } = await supabaseAdmin
-      .from('orders')
-      .select('id, umbrella_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas(number)')
-      .eq('vendor_id', vendor_id)
-      .eq('status', 'completed')
-      .gte('created_at', startOfDay)
-      .lte('created_at', endOfDay)
-      .order('created_at', { ascending: true });
+    const { data: orders, error: ordersErr } = await enforceTenantScope(
+      supabaseAdmin
+        .from('orders')
+        .select('id, umbrella_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas(number)')
+        .eq('vendor_id', vendor_id)
+        .eq('status', 'completed')
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay)
+        .order('created_at', { ascending: true }),
+      tenantId
+    );
 
     if (ordersErr) throw ordersErr;
 

@@ -62,6 +62,10 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetResult, setResetResult] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Registration form
   const [regForm, setRegForm] = useState({
@@ -92,6 +96,8 @@ export default function AdminDashboard() {
       if (res.ok) {
         setIsAuthenticated(true);
         sessionStorage.setItem("admin_token", "authenticated");
+        await loadVendors();
+        await loadPlatformReport();
       } else {
         setAuthError("Senha incorreta.");
       }
@@ -143,6 +149,34 @@ export default function AdminDashboard() {
         subscription_status: newActive ? (v.subscription_status === "blocked" ? "active" : v.subscription_status) : "blocked",
       };
     }));
+  };
+
+  const handleResetVendorPassword = async (vendorId: string) => {
+    setResetError(null);
+    setResetResult(null);
+    setIsResetting(true);
+
+    try {
+      const res = await fetch('/api/auth/admin/reset-vendor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, new_password: resetPassword || undefined }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setResetError(data?.error || 'Erro ao resetar senha.');
+      } else {
+        setResetResult(data.temporary_password ? `Senha temporária gerada: ${data.temporary_password}` : 'Senha atualizada com sucesso.');
+        setResetPassword('');
+        await loadVendors();
+      }
+    } catch (err) {
+      console.error('Reset vendor password error:', err);
+      setResetError('Erro ao conectar ao servidor.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   // Register vendor
@@ -683,6 +717,31 @@ export default function AdminDashboard() {
               </div>
               <div className="text-sm text-gray-500">
                 Cadastrado em {new Date(selectedVendor.created_at).toLocaleDateString("pt-BR")}
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-700 space-y-4">
+              <div>
+                <p className="text-sm text-gray-300 font-bold mb-2">Reset de senha do quiosque</p>
+                <p className="text-xs text-gray-500 mb-3">Digite uma senha nova ou deixe em branco para gerar uma senha temporária automática.</p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <input
+                    type="text"
+                    value={resetPassword}
+                    onChange={e => setResetPassword(e.target.value)}
+                    placeholder="Senha nova opcional"
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded-xl p-3 text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetVendorPassword(selectedVendor.id)}
+                    disabled={isResetting}
+                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResetting ? 'Resetando...' : 'Resetar senha'}
+                  </button>
+                </div>
+                {resetResult && <p className="text-green-400 text-sm mt-2">{resetResult}</p>}
+                {resetError && <p className="text-red-400 text-sm mt-2">{resetError}</p>}
               </div>
             </div>
             <div className="p-6 border-t border-gray-700 flex gap-3">

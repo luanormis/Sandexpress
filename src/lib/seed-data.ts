@@ -15,7 +15,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/lib/database.types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -24,7 +23,7 @@ if (!supabaseUrl || !serviceRoleKey) {
   throw new Error('SUPABASE_URL e SERVICE_ROLE_KEY são obrigatórios');
 }
 
-const supabase = createClient<Database>(supabaseUrl, serviceRoleKey, {
+const supabase: any = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
@@ -67,7 +66,6 @@ async function createVendorWithData(vendorNumber: number) {
       .from('vendors')
       .insert({
         name: vendorName,
-        document_login: String(vendorNumber).padStart(11, '0'),
         owner_name: `Proprietário Teste ${vendorNumber}`,
         owner_phone: `11999999${String(vendorNumber % 100).padStart(3, '0')}`,
         owner_email: `teste${vendorNumber}@sandexpress.com`,

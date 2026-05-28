@@ -7,6 +7,8 @@ import { VendorPlan } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Star, Check } from "lucide-react";
 
+const db = supabase as any;
+
 export default function VendorPlanPage() {
   const { vendorId, isAuthenticated } = useVendorAuth();
   const [plan, setPlan] = useState<VendorPlan | null>(null);
@@ -21,7 +23,7 @@ export default function VendorPlanPage() {
   const fetchVendorPlan = async () => {
     if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("vendor_plans")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -33,7 +35,7 @@ export default function VendorPlanPage() {
         setPlan(data as VendorPlan);
       } else {
         // Criar plano padrão (free)
-        const { data: newPlan, error: insertError } = await supabase
+        const { data: newPlan, error: insertError } = await db
           .from("vendor_plans")
           .insert({
             vendor_id: vendorId,
@@ -59,7 +61,7 @@ export default function VendorPlanPage() {
     if (!vendorId) return;
     setUpgrading(true);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from("vendor_plans")
         .update({
           plan_type: "plus",

@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { verifyPassword } from '@/lib/utils';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+
+const db = supabaseAdmin as any;
 
 /**
  * GET /api/adjustments?vendor_id=xxx&customer_id=yyy
  * Lista ajustes de conta de um cliente
  *
  * POST /api/adjustments
- * Cria um novo ajuste (cancelamento/abatimento/crédito) com validação de senha
+ * Cria um novo ajuste (cancelamento/abatimento/crédito) a partir de sessão autenticada.
  */
 export async function GET(req: NextRequest) {
   try {
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
-    const vendor_id = searchParams.get('vendor_id');
+    const vendor_id = searchParams.get('vendor_id') || session.vendor_id;
     const customer_id = searchParams.get('customer_id');
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
     }
+    if (session.role === 'vendor' && session.vendor_id !== vendor_id) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+    }
 
-    let query = supabaseAdmin
+    let query = db
       .from('account_adjustments')
       .select('*')
       .eq('vendor_id', vendor_id)
@@ -41,9 +51,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const {
-      vendor_id,
-      vendor_password,
+      vendor_id: rawVendorId,
       customer_id,
       order_id,
       adjustment_type,
@@ -52,15 +66,19 @@ export async function POST(req: NextRequest) {
       description,
     } = await req.json();
 
-    // Validar dados obrigatórios
-    if (!vendor_id || !vendor_password || !customer_id || !adjustment_type || !amount) {
+    const vendor_id = rawVendorId || session.vendor_id;
+
+    if (!vendor_id || !customer_id || !adjustment_type || amount === undefined || amount === null) {
       return NextResponse.json(
-        { error: 'Dados incompletos: vendor_id, vendor_password, customer_id, adjustment_type, amount são obrigatórios.' },
+        { error: 'Dados incompletos: vendor_id, customer_id, adjustment_type e amount são obrigatórios.' },
         { status: 400 }
       );
     }
 
-    // Validar tipo de ajuste
+    if (session.role === 'vendor' && session.vendor_id !== vendor_id) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+    }
+
     const validTypes = ['cancellation', 'deduction', 'credit'];
     if (!validTypes.includes(adjustment_type)) {
       return NextResponse.json(
@@ -69,46 +87,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validar amount > 0
-    if (amount <= 0) {
+    if (typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json({ error: 'Valor do ajuste deve ser positivo.' }, { status: 400 });
     }
 
-    }
-
-    // 1. Verificar vendor existe e validar senha
-    const { data: vendor, error: vendorErr } = await supabaseAdmin
-      .from('vendors')
-      .select('id, password_hash')
-      .eq('id', vendor_id)
-      .single();
-
-    if (vendorErr || !vendor) {
-      return NextResponse.json({ error: 'Vendor não encontrado.' }, { status: 404 });
-    }
-
-    // Verificar senha usando bcrypt (se houver password_hash)
-    if (!vendor.password_hash) {
-      return NextResponse.json({ error: 'Vendor não tem senha configurada.' }, { status: 403 });
-    }
-
-    // Importar e usar bcrypt dinamicamente
-    let passwordValid = false;
-    try {
-      const bcrypt = await import('bcryptjs');
-      passwordValid = await bcrypt.compare(vendor_password, vendor.password_hash);
-    } catch (bcryptErr) {
-      console.error('Bcrypt error:', bcryptErr);
-      // Fallback: comparação simples (não recomendada em produção)
-      passwordValid = vendor_password === vendor.password_hash;
-    }
-
-    if (!passwordValid) {
-      return NextResponse.json({ error: 'Senha do vendor inválida.' }, { status: 403 });
-    }
-
-    // 2. Verificar customer existe
-    const { data: customer, error: customerErr } = await supabaseAdmin
+    const { data: customer, error: customerErr } = await db
       .from('customers')
       .select('id, total_spent, vendor_id')
       .eq('id', customer_id)
@@ -118,16 +101,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cliente não encontrado.' }, { status: 404 });
     }
 
-    // Verificar se customer pertence ao vendor
     if (customer.vendor_id !== vendor_id) {
       return NextResponse.json({ error: 'Cliente não pertence a este vendor.' }, { status: 403 });
     }
 
-    // 3. Se for cancelamento e tiver order_id, verificar que a order existe
     if (order_id) {
-      const { data: order, error: orderErr } = await supabaseAdmin
+      const { data: order, error: orderErr } = await db
         .from('orders')
-        .select('id, total, customer_id')
+        .select('id, total, customer_id, vendor_id')
         .eq('id', order_id)
         .single();
 
@@ -135,13 +116,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 });
       }
 
-      if (order.customer_id !== customer_id) {
-        return NextResponse.json({ error: 'Pedido não pertence a este cliente.' }, { status: 403 });
+      if (order.customer_id !== customer_id || order.vendor_id !== vendor_id) {
+        return NextResponse.json({ error: 'Pedido não pertence a este cliente ou vendor.' }, { status: 403 });
       }
     }
 
-    // 4. Criar registro de ajuste
-    const { data: adjustment, error: adjustmentErr } = await supabaseAdmin
+    const { data: adjustment, error: adjustmentErr } = await db
       .from('account_adjustments')
       .insert({
         vendor_id,
@@ -152,24 +132,21 @@ export async function POST(req: NextRequest) {
         reason,
         description,
         password_verified: true,
-        processed_by: 'admin-api',
+        processed_by: session.role,
       })
       .select()
       .single();
 
     if (adjustmentErr) throw adjustmentErr;
 
-    // 5. Atualizar total_spent do cliente
     let newTotalSpent = customer.total_spent;
     if (adjustment_type === 'cancellation' || adjustment_type === 'deduction') {
-      // Reduzir o total gasto
       newTotalSpent = Math.max(0, customer.total_spent - amount);
     } else if (adjustment_type === 'credit') {
-      // Adicionar crédito (aumentar total)
       newTotalSpent = customer.total_spent + amount;
     }
 
-    const { error: updateErr } = await supabaseAdmin
+    const { error: updateErr } = await db
       .from('customers')
       .update({ total_spent: newTotalSpent, updated_at: new Date().toISOString() })
       .eq('id', customer_id);

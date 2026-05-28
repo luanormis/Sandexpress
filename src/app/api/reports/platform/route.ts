@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const PLAN_PRICES: Record<string, number> = {
@@ -21,7 +21,7 @@ export async function GET() {
   try {
     // Contar vendors por status
     const { data: vendors } = await supabaseAdmin.from('vendors').select('subscription_status, plan_type, is_active');
-    const allVendors = vendors || [];
+    const allVendors: any[] = vendors || [];
     const active_vendors = allVendors.filter(v => v.subscription_status === 'active' && v.is_active).length;
     const trial_vendors = allVendors.filter(v => v.subscription_status === 'trial').length;
     const overdue_vendors = allVendors.filter(v => v.subscription_status === 'overdue').length;
@@ -45,7 +45,7 @@ export async function GET() {
       .select('total')
       .gte('created_at', monthStart.toISOString());
 
-    const allOrders = orders || [];
+    const allOrders: any[] = orders || [];
     const gmv = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
 
     return NextResponse.json({

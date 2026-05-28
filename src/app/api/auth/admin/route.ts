@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Senha é obrigatória.' }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD || '123@senha123@';
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      return NextResponse.json({ error: 'ADMIN_PASSWORD não configurada.' }, { status: 500 });
+    }
 
     if (password !== adminPassword) {
       return NextResponse.json({ error: 'Senha inválida.' }, { status: 401 });

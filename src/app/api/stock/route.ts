@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession, canAccessVendor } from '@/lib/auth-session';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * PUT /api/stock
  * Atualizar estoque de produtos (abertura do dia)
- * 
+ *
  * Body: { vendor_id, updates: [{ product_id, stock_quantity }] }
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { vendor_id, updates } = await req.json();
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
+    const { vendor_id: rawVendorId, updates } = await req.json();
+    const vendor_id = rawVendorId || session.vendor_id;
 
     if (!vendor_id || !updates || !Array.isArray(updates)) {
       return NextResponse.json(
@@ -18,18 +31,24 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Atualizar cada produto
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+    }
+
     const results = [];
     for (const { product_id, stock_quantity } of updates) {
-      const { error } = await supabaseAdmin
-        .from('products')
-        .update({
-          stock_quantity,
-          blocked_by_stock: stock_quantity === 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', product_id)
-        .eq('vendor_id', vendor_id);
+      const { error } = await enforceTenantScope(
+        supabaseAdmin
+          .from('products')
+          .update({
+            stock_quantity,
+            blocked_by_stock: stock_quantity === 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', product_id)
+          .eq('vendor_id', vendor_id),
+        tenantId
+      );
 
       if (!error) {
         results.push({ product_id, stock_quantity, success: true });
@@ -40,7 +59,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       vendor_id,
-      updated_count: results.filter(r => r.success).length,
+      updated_count: results.filter((r) => r.success).length,
       results,
     });
   } catch (err) {
@@ -55,11 +74,19 @@ export async function PUT(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
+    const session = getRequestSession(req);
+    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
-    const vendor_id = searchParams.get('vendor_id');
+    const vendor_id = searchParams.get('vendor_id') || session.vendor_id;
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
+    }
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
