@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import {
-  LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
+  LayoutDashboard, Store, TrendingUp, Plus, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Users, ShoppingBag, Phone,
   Mail, MapPin, Clock, ExternalLink, ChevronDown,
 } from "lucide-react";
+import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
+import { PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans";
 
 // ---------- TYPES ----------
 interface Vendor {
@@ -202,9 +204,9 @@ export default function AdminDashboard() {
           cpf: regForm.cpf || null,
           subscription_status: "trial",
           plan_type: "trial",
-          trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+          trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString(),
           is_active: true,
-          max_umbrellas: 5,
+          max_umbrellas: PLAN_UMBRELLA_LIMIT,
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
@@ -242,7 +244,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
         <div className="bg-gray-800 rounded-2xl p-8 max-w-sm w-full border border-gray-700 shadow-2xl">
           <div className="flex items-center gap-3 mb-6 justify-center">
-            <ShieldCheck size={32} className="text-blue-500" />
+            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={40} height={40} />
             <h1 className="text-2xl font-display font-bold text-white">Admin</h1>
           </div>
           <p className="text-gray-400 text-center mb-6 text-sm">Acesso restrito. Informe a senha de administrador.</p>
@@ -252,10 +254,10 @@ export default function AdminDashboard() {
               value={adminPassword}
               onChange={e => setAdminPassword(e.target.value)}
               placeholder="Senha do admin"
-              className="w-full bg-gray-700 border-2 border-gray-600 rounded-xl p-4 text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
+              className="w-full bg-gray-700 border-2 border-gray-600 rounded-xl p-4 text-white placeholder:text-gray-500 focus:border-[#FF6B00] outline-none"
             />
             {authError && <p className="text-red-400 text-sm text-center">{authError}</p>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
+            <button type="submit" className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-xl hover:bg-[#E56000] active:scale-95 transition-all">
               Entrar
             </button>
           </form>
@@ -269,13 +271,13 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className="w-64 bg-gray-950 flex flex-col border-r border-gray-800 shrink-0">
         <div className="p-6 border-b border-gray-800">
-          <h1 className="font-display font-bold text-xl flex items-center gap-2"><ShieldCheck className="text-blue-500" /> God Mode</h1>
+          <h1 className="font-display font-bold text-xl flex items-center gap-2"><Image src="/sandexpress-logo.svg" alt="SandExpress" width={32} height={32} /> God Mode</h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {TABS.map(tab => (
             <button
               key={tab.id} onClick={() => { setActiveTab(tab.id); setRegSuccess(false); }}
-              className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-colors", activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white")}
+              className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-colors", activeTab === tab.id ? "bg-[#FF6B00] text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white")}
             >
               <tab.icon size={18} /> {tab.label}
             </button>
@@ -294,7 +296,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Receita Total</p>
-                <p className="text-3xl font-display font-bold text-blue-400">
+                <p className="text-3xl font-display font-bold text-[#ffb693]">
                   {platformReport ? formatCurrency(platformReport.gmv) : "..."}
                 </p>
               </div>
@@ -339,7 +341,7 @@ export default function AdminDashboard() {
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">A receber no próximo ciclo</p>
-                <p className="text-3xl font-display font-bold text-blue-400">
+                <p className="text-3xl font-display font-bold text-[#ffb693]">
                   {platformReport ? formatCurrency(platformReport.next_cycle_receivable) : '...'}
                 </p>
               </div>
@@ -399,7 +401,7 @@ export default function AdminDashboard() {
                 placeholder="Buscar por nome, responsável ou cidade..."
                 value={vendorSearch}
                 onChange={e => setVendorSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
+                className="w-full pl-9 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:border-[#FF6B00] outline-none"
               />
             </div>
 
@@ -494,7 +496,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">GMV do Mês</p>
-                <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport.gmv)}</p>
+                <p className="text-3xl font-display font-bold text-[#ffb693]">{formatCurrency(platformReport.gmv)}</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Total de Pedidos</p>
@@ -518,7 +520,7 @@ export default function AdminDashboard() {
                   <div className="relative w-36 h-36">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                       <path className="text-gray-700" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                      <path className="text-blue-500" strokeDasharray={`${platformReport.retention_rate}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      <path className="text-[#FF6B00]" strokeDasharray={`${platformReport.retention_rate}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-3xl font-display font-bold text-white">{platformReport.retention_rate}%</span>
@@ -543,7 +545,7 @@ export default function AdminDashboard() {
                             <span className="text-xs text-gray-400">{v.city} · {formatCurrency(v.revenue)}</span>
                           </div>
                           <div className="w-full bg-gray-700 rounded-full h-1.5">
-                            <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(v.revenue / maxRev) * 100}%` }} />
+                            <div className="bg-[#FF6B00] h-1.5 rounded-full" style={{ width: `${(v.revenue / maxRev) * 100}%` }} />
                           </div>
                         </div>
                       </div>
@@ -562,10 +564,10 @@ export default function AdminDashboard() {
               <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center">
                 <CheckCircle2 size={48} className="text-green-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-display font-bold text-green-400 mb-2">Quiosque cadastrado!</h3>
-                <p className="text-gray-400 mb-6">O quiosque foi criado com <strong>7 dias grátis</strong> de avaliação.</p>
+                <p className="text-gray-400 mb-6">O quiosque foi criado com <strong>{TRIAL_DAYS} dias grátis</strong> de avaliação.</p>
                 <button
                   onClick={() => { setRegSuccess(false); setActiveTab("vendors"); }}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700"
+                  className="bg-[#FF6B00] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#E56000]"
                 >
                   Ver Quiosques
                 </button>
@@ -579,7 +581,7 @@ export default function AdminDashboard() {
                     <input
                       type="text" required
                       value={regForm.name} onChange={e => setRegForm(p => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                       placeholder="Ex: Quiosque do Sol"
                     />
                   </div>
@@ -589,7 +591,7 @@ export default function AdminDashboard() {
                       <input
                         type="text"
                         value={regForm.city} onChange={e => setRegForm(p => ({ ...p, city: e.target.value }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="Santos"
                       />
                     </div>
@@ -598,7 +600,7 @@ export default function AdminDashboard() {
                       <input
                         type="text" maxLength={2}
                         value={regForm.state} onChange={e => setRegForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="SP"
                       />
                     </div>
@@ -612,7 +614,7 @@ export default function AdminDashboard() {
                     <input
                       type="text" required
                       value={regForm.owner_name} onChange={e => setRegForm(p => ({ ...p, owner_name: e.target.value }))}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                       placeholder="João Silva"
                     />
                   </div>
@@ -622,7 +624,7 @@ export default function AdminDashboard() {
                       <input
                         type="tel" required
                         value={regForm.owner_phone} onChange={e => setRegForm(p => ({ ...p, owner_phone: e.target.value.replace(/\D/g, '') }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="11999999999"
                       />
                     </div>
@@ -631,7 +633,7 @@ export default function AdminDashboard() {
                       <input
                         type="email"
                         value={regForm.owner_email} onChange={e => setRegForm(p => ({ ...p, owner_email: e.target.value }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="email@exemplo.com"
                       />
                     </div>
@@ -642,7 +644,7 @@ export default function AdminDashboard() {
                       <input
                         type="text"
                         value={regForm.cpf} onChange={e => setRegForm(p => ({ ...p, cpf: e.target.value }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="123.456.789-00"
                       />
                     </div>
@@ -651,15 +653,15 @@ export default function AdminDashboard() {
                       <input
                         type="text"
                         value={regForm.cnpj} onChange={e => setRegForm(p => ({ ...p, cnpj: e.target.value }))}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
                         placeholder="12.345.678/0001-90"
                       />
                     </div>
                   </div>
                 </div>
 
-                <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl text-lg hover:bg-blue-700 active:scale-95 transition-all">
-                  Cadastrar Quiosque (7 dias grátis)
+                <button type="submit" className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-xl text-lg hover:bg-[#E56000] active:scale-95 transition-all">
+                  Cadastrar Quiosque ({TRIAL_DAYS} dias grátis)
                 </button>
               </form>
             )}
@@ -729,13 +731,13 @@ export default function AdminDashboard() {
                     value={resetPassword}
                     onChange={e => setResetPassword(e.target.value)}
                     placeholder="Senha nova opcional"
-                    className="flex-1 bg-gray-700 border border-gray-600 rounded-xl p-3 text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded-xl p-3 text-white placeholder:text-gray-500 focus:border-[#FF6B00] outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => handleResetVendorPassword(selectedVendor.id)}
                     disabled={isResetting}
-                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="py-3 px-4 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isResetting ? 'Resetando...' : 'Resetar senha'}
                   </button>

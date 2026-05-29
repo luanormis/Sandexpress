@@ -6,6 +6,7 @@ import {
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
 } from "lucide-react";
+import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ---------- TYPES ----------
@@ -411,7 +412,10 @@ export default function VendorDashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-200 bg-white">
-          <h1 className="font-display font-bold text-xl text-[#FF6B00]">SandExpress</h1>
+          <div className="flex items-center gap-3">
+            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={36} height={36} />
+            <h1 className="font-display font-bold text-xl text-[#3D1A0A]">SandExpress</h1>
+          </div>
           <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">

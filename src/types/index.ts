@@ -14,7 +14,7 @@ export interface Vendor {
   is_active: boolean
   subscription_status: 'trial' | 'active' | 'overdue' | 'blocked'
   max_umbrellas: number
-  plan_type?: 'trial' | 'monthly' | '6months' | '12months'
+  plan_type?: 'trial' | 'monthly' | 'annual' | '12months'
   created_at?: string
   tenant_id?: string
 }

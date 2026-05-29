@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "next/navigation";
-import { MapPin, ShoppingBag, ShoppingCart, UserRound, UtensilsCrossed, Plus, Minus, Home, ListOrdered, Utensils, ChevronRight } from "lucide-react";
+import { MapPin, ShoppingBag, ShoppingCart, UserRound, Plus, Minus, Home, ListOrdered, Utensils, ChevronRight } from "lucide-react";
+import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Product = {
@@ -255,7 +256,7 @@ export default function CustomerApp() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FF6B00] to-[#E56000] flex flex-col items-center justify-center p-6 text-white text-center">
         <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl">
-          <UtensilsCrossed size={48} className="text-[#FF6B00]" />
+          <Image src="/sandexpress-logo.svg" alt="SandExpress" width={76} height={76} priority />
         </div>
         <h1 className="text-4xl font-display font-bold tracking-tight mb-2">{vendor?.name || "SandExpress"}</h1>
         <p className="text-[#F5E1C0] text-lg font-sans mb-12">Leia o QR e inicie sua conta do guarda-sol.</p>

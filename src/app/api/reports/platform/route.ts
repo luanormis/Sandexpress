@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { PLAN_PRICES } from '@/lib/plans';
 
-const PLAN_PRICES: Record<string, number> = {
-  monthly: 199,
-  '6months': 165,
-  '12months': 149,
-  trial: 199,
+const BILLING_PRICES: Record<string, number> = {
+  monthly: PLAN_PRICES.monthly,
+  '12months': PLAN_PRICES.annualMonthly,
+  annual: PLAN_PRICES.annualMonthly,
+  trial: 0,
 };
 
 function getVendorPlanAmount(vendor: { plan_type: string | null }) {
-  return PLAN_PRICES[vendor.plan_type || 'monthly'] ?? PLAN_PRICES.monthly;
+  return BILLING_PRICES[vendor.plan_type || 'monthly'] ?? BILLING_PRICES.monthly;
 }
 
 /**

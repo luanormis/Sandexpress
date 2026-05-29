@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="SandExpress">
+  <path d="M50 50 L50 10 L78 22 Z" fill="#FF6B00"/>
+  <path d="M50 50 L78 22 L90 50 Z" fill="#FFF8F6"/>
+  <path d="M50 50 L90 50 L78 78 Z" fill="#3D1A0A"/>
+  <path d="M50 50 L78 78 L50 90 Z" fill="#FF6B00"/>
+  <path d="M50 50 L50 90 L22 78 Z" fill="#FFF8F6"/>
+  <path d="M50 50 L22 78 L10 50 Z" fill="#3D1A0A"/>
+  <path d="M50 50 L10 50 L22 22 Z" fill="#FF6B00"/>
+  <path d="M50 50 L22 22 L50 10 Z" fill="#FFF8F6"/>
+  <circle cx="50" cy="50" r="1.5" fill="#1A0D06"/>
+</svg>

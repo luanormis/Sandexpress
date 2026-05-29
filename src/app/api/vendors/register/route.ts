@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from '@/lib/plans';
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -70,7 +71,8 @@ export async function POST(req: NextRequest) {
         password_needs_reset: passwordNeedsReset,
         subscription_status: 'trial',
         plan_type: 'trial',
-        max_umbrellas: 120,
+        trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString(),
+        max_umbrellas: PLAN_UMBRELLA_LIMIT,
       })
       .select()
       .single();
