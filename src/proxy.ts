@@ -7,6 +7,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/qr',
   '/api/customers/login',
   '/api/customers/request-otp',
+  '/api/vendors/register',
 ]);
 
 export function proxy(req: NextRequest) {

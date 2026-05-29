@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering'];
+
 /**
  * POST /api/close-account
  * Fechar conta do cliente (após pagamento confirmado)
@@ -46,7 +48,8 @@ export async function POST(req: NextRequest) {
         .from('orders')
         .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
         .eq('vendor_id', vendor_id)
-        .eq('status', 'received')
+        .in('status', OPEN_ACCOUNT_STATUSES)
+        .or('paid.is.null,paid.eq.false')
         .order('created_at', { ascending: true }),
       tenantId
     );
@@ -66,17 +69,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let selectedOrder = orders[0];
+    let selectedOrders = orders;
     if (customer_phone && orders.length > 1) {
-      const matchingOrder = orders.find((o: any) => {
+      const cleanInput = customer_phone.replace(/\D/g, '');
+      const matchingOrders = orders.filter((o: any) => {
         const cleanPhone = (o.customers?.phone || '').replace(/\D/g, '');
-        const cleanInput = customer_phone.replace(/\D/g, '');
         return cleanPhone === cleanInput;
       });
-      if (matchingOrder) {
-        selectedOrder = matchingOrder;
+      if (matchingOrders.length > 0) selectedOrders = matchingOrders;
+      else if (!umbrella_id) {
+        return NextResponse.json({ error: 'Nenhuma conta aberta encontrada para este cliente.' }, { status: 404 });
       }
     }
+
+    const orderIds = selectedOrders.map((order: any) => order.id);
+    const firstOrder = selectedOrders[0];
+    const total = selectedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
 
     const { error: updateErr } = await enforceTenantScope(
       supabaseAdmin
@@ -88,7 +96,7 @@ export async function POST(req: NextRequest) {
           notes: notes || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', selectedOrder.id),
+        .in('id', orderIds),
       tenantId
     );
 
@@ -98,32 +106,46 @@ export async function POST(req: NextRequest) {
       supabaseAdmin
         .from('customers')
         .update({
-          visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
           last_visit_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', selectedOrder.customer_id),
+        .eq('id', firstOrder.customer_id),
       tenantId
     );
 
     if (customerErr) throw customerErr;
 
+    const { error: umbrellaErr } = await enforceTenantScope(
+      supabaseAdmin
+        .from('umbrellas')
+        .update({
+          is_occupied: false,
+          current_order_id: null,
+        })
+        .eq('id', firstOrder.umbrella_id)
+        .eq('vendor_id', vendor_id),
+      tenantId
+    );
+
+    if (umbrellaErr) throw umbrellaErr;
+
     return NextResponse.json(
       {
         success: true,
-        order: {
-          id: selectedOrder.id,
-          customer_id: selectedOrder.customer_id,
-          customer_name: (selectedOrder as any).customers?.name,
-          customer_phone: (selectedOrder as any).customers?.phone,
-          umbrella_id: selectedOrder.umbrella_id,
-          total: selectedOrder.total,
+        account: {
+          order_ids: orderIds,
+          customer_id: firstOrder.customer_id,
+          customer_name: (firstOrder as any).customers?.name,
+          customer_phone: (firstOrder as any).customers?.phone,
+          umbrella_id: firstOrder.umbrella_id,
+          total,
           status: 'completed',
           paid: true,
           payment_method: payment_method || 'cash',
           closed_at: new Date().toISOString(),
+          umbrella_released: true,
         },
-        message: `Conta fechada com sucesso! Guarda-sol ${selectedOrder.umbrella_id} liberado.`,
+        message: `Conta fechada com sucesso! Guarda-sol ${firstOrder.umbrella_id} liberado.`,
       },
       { status: 200 }
     );
@@ -148,6 +170,11 @@ export async function GET(req: NextRequest) {
     const vendor_id = searchParams.get('vendor_id') || session.vendor_id;
     const umbrella_id = searchParams.get('umbrella_id');
     const customer_phone = searchParams.get('customer_phone');
+    const tenantId = getTenantIdFromRequest(req);
+
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant nÃ£o identificado.' }, { status: 400 });
+    }
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
@@ -160,11 +187,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
     }
 
-    let query = supabaseAdmin
-      .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
-      .eq('vendor_id', vendor_id)
-      .eq('status', 'received');
+    let query = enforceTenantScope(
+      supabaseAdmin
+        .from('orders')
+        .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
+        .eq('vendor_id', vendor_id)
+        .in('status', OPEN_ACCOUNT_STATUSES)
+        .or('paid.is.null,paid.eq.false'),
+      tenantId
+    );
 
     if (umbrella_id) {
       query = query.eq('umbrella_id', umbrella_id);
@@ -181,26 +212,31 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let selectedOrder = orders[0];
+    let selectedOrders = orders;
     if (customer_phone && orders.length > 1) {
       const cleanPhone = customer_phone.replace(/\D/g, '');
-      const matching = orders.find((o: any) => {
+      const matching = orders.filter((o: any) => {
         const orderPhone = (o.customers?.phone || '').replace(/\D/g, '');
         return orderPhone === cleanPhone;
       });
-      if (matching) selectedOrder = matching;
+      if (matching.length > 0) selectedOrders = matching;
+      else if (!umbrella_id) {
+        return NextResponse.json({ error: 'Nenhuma conta aberta encontrada para este cliente.' }, { status: 404 });
+      }
     }
 
+    const firstOrder = selectedOrders[0];
+
     return NextResponse.json({
-      order_id: selectedOrder.id,
-      customer_id: selectedOrder.customer_id,
-      customer_name: (selectedOrder as any).customers?.name,
-      customer_phone: (selectedOrder as any).customers?.phone,
-      umbrella_id: selectedOrder.umbrella_id,
-      total: selectedOrder.total,
-      items_count: (selectedOrder as any).order_items ? (selectedOrder as any).order_items.length : 0,
-      created_at: selectedOrder.created_at,
-      opened_at: selectedOrder.created_at,
+      order_ids: selectedOrders.map((order: any) => order.id),
+      customer_id: firstOrder.customer_id,
+      customer_name: (firstOrder as any).customers?.name,
+      customer_phone: (firstOrder as any).customers?.phone,
+      umbrella_id: firstOrder.umbrella_id,
+      total: selectedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0),
+      items_count: selectedOrders.reduce((sum: number, order: any) => sum + ((order as any).order_items?.length || 0), 0),
+      created_at: firstOrder.created_at,
+      opened_at: firstOrder.created_at,
     });
   } catch (err) {
     console.error('Close account GET error:', err);

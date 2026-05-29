@@ -4,7 +4,7 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /** Campos permitidos para atualização de guarda-sol (whitelist contra mass-assignment) */
-const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint']);
+const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url']);
 
 /**
  * GET /api/umbrellas/[id]
@@ -68,10 +68,15 @@ export async function PATCH(
       active?: boolean | null;
       label?: string | null;
       location_hint?: string | null;
+      qr_url?: string | null;
     } = {};
-    if ('active' in body) safeUpdate.active = body.active as boolean | null;
-    if ('label' in body) safeUpdate.label = body.label as string | null;
-    if ('location_hint' in body) safeUpdate.location_hint = body.location_hint as string | null;
+    for (const field of ALLOWED_UMBRELLA_FIELDS) {
+      if (!(field in body)) continue;
+      if (field === 'active') safeUpdate.active = body.active as boolean | null;
+      if (field === 'label') safeUpdate.label = body.label as string | null;
+      if (field === 'location_hint') safeUpdate.location_hint = body.location_hint as string | null;
+      if (field === 'qr_url') safeUpdate.qr_url = body.qr_url as string | null;
+    }
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
     }

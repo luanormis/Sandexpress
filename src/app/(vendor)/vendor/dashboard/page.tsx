@@ -324,11 +324,24 @@ export default function VendorDashboard() {
     }
   };
 
-  const generateQR = (umbrella: Umbrella) => {
+  const generateQR = async (umbrella: Umbrella) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const targetUrl = `${baseUrl}/u/${umbrella.id}`;
-    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(targetUrl)}&format=png&margin=20`;
-    setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: qrImg, qr_url: targetUrl } : u));
+    try {
+      const res = await fetch(`/api/qr?umbrella_id=${umbrella.id}&number=${umbrella.number}&format=png&base_url=${encodeURIComponent(baseUrl)}`);
+      if (!res.ok) throw new Error('QR generation failed');
+      const data = await res.json();
+
+      await fetch(`/api/umbrellas/${umbrella.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qr_url: data.target_url }),
+      });
+
+      setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: data.qr_image_url, qr_url: data.target_url } : u));
+    } catch (err) {
+      console.error('Generate QR error:', err);
+      alert('Erro ao gerar QR Code.');
+    }
   };
 
   // Filtered products
