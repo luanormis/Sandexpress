@@ -248,8 +248,13 @@ export default function VendorDashboard() {
       .channel(`vendor-orders-${vendorId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "orders", filter: `vendor_id=eq.${vendorId}` },
-        () => loadOrders(vendorId, { notifyNew: true })
+        { event: "*", schema: "public", table: "orders" },
+        (payload: { new?: { vendor_id?: string }; old?: { vendor_id?: string } }) => {
+          const changedOrder = (payload.new || payload.old) as { vendor_id?: string };
+          if (changedOrder.vendor_id === vendorId) {
+            loadOrders(vendorId, { notifyNew: true });
+          }
+        }
       )
       .on(
         "postgres_changes",
