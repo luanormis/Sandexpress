@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
-  Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
+  Search, CheckCircle2, Clock, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
 } from "lucide-react";
 import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 // ---------- TYPES ----------
 interface Product {
@@ -35,6 +36,18 @@ interface Order {
   items: OrderItem[];
   notes?: string;
 }
+
+type OrderRow = {
+  id: string;
+  umbrella_id?: string;
+  status: string;
+  total: number;
+  notes?: string | null;
+  created_at?: string;
+  order_items?: { quantity: number; products?: { name?: string } | null }[];
+  customers?: { name?: string; phone?: string } | null;
+  umbrellas?: { number?: number } | null;
+};
 
 interface Umbrella {
   id: string;
@@ -88,6 +101,9 @@ export default function VendorDashboard() {
   // --- Orders State ---
   const [orders, setOrders] = useState<Order[]>([]);
   const [newOrderCount, setNewOrderCount] = useState(0);
+  const [soundReady, setSoundReady] = useState(false);
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const audioContext = useRef<AudioContext | null>(null);
 
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,13 +127,65 @@ export default function VendorDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Data loading functions
-  const loadOrders = async (vid: string) => {
+  const mapOrder = (row: OrderRow): Order => ({
+    id: row.id,
+    umbrella: row.umbrellas?.number || 0,
+    customer: row.customers?.name || "Cliente",
+    phone: row.customers?.phone || "",
+    total: Number(row.total || 0),
+    status: row.status,
+    time: row.created_at
+      ? new Date(row.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      : "--:--",
+    items: (row.order_items || []).map((item) => ({
+      q: item.quantity,
+      n: item.products?.name || "Produto",
+    })),
+    notes: row.notes || undefined,
+  });
+
+  const playNewOrderSound = () => {
+    if (!audioContext.current) return;
+    const ctx = audioContext.current;
+    const now = ctx.currentTime;
+    [0, 0.18].forEach((offset) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, now + offset);
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.14);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(now + offset);
+      oscillator.stop(now + offset + 0.15);
+    });
+  };
+
+  const enableSound = async () => {
+    if (!audioContext.current) {
+      audioContext.current = new AudioContext();
+    }
+    if (audioContext.current.state === "suspended") {
+      await audioContext.current.resume();
+    }
+    setSoundReady(true);
+  };
+
+  const loadOrders = async (vid: string, options: { notifyNew?: boolean } = {}) => {
     try {
       const res = await fetch(`/api/orders?vendor_id=${vid}`);
       if (res.ok) {
-        const data = await res.json();
-        setOrders(data);
-        setNewOrderCount(data.filter((o: Order) => o.status === 'received').length);
+        const data = (await res.json()) as OrderRow[];
+        const mapped = data.map(mapOrder);
+        const incomingIds = new Set(mapped.map((order) => order.id));
+        const hasNewOrder = options.notifyNew && mapped.some((order) => !knownOrderIds.current.has(order.id));
+
+        knownOrderIds.current = incomingIds;
+        setOrders(mapped);
+        setNewOrderCount(mapped.filter((o) => o.status === 'received').length);
+        if (hasNewOrder) playNewOrderSound();
       }
     } catch (err) {
       console.error('Failed to load orders:', err);
@@ -173,6 +241,31 @@ export default function VendorDashboard() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!vendorId) return;
+
+    const channel = supabase
+      .channel(`vendor-orders-${vendorId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `vendor_id=eq.${vendorId}` },
+        () => loadOrders(vendorId, { notifyNew: true })
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_items" },
+        () => loadOrders(vendorId)
+      )
+      .subscribe();
+
+    const interval = window.setInterval(() => loadOrders(vendorId, { notifyNew: true }), 5000);
+
+    return () => {
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [vendorId]);
+
   // Load reports when tab or period changes
   useEffect(() => {
     if (activeTab === "reports" && vendorId) {
@@ -225,21 +318,6 @@ export default function VendorDashboard() {
     } catch (err) {
       console.error('Toggle product error:', err);
       alert('Erro de rede ao atualizar produto.');
-    }
-  };
-
-  const deleteProduct = async (id: string) => {
-    if (!confirm("Tem certeza que deseja remover este produto?")) return;
-    try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        return alert(err?.error || 'Erro ao remover produto.');
-      }
-      setProducts(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      console.error('Delete product error:', err);
-      alert('Erro de rede ao remover produto.');
     }
   };
 
@@ -408,9 +486,9 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex font-sans">
+    <div className="min-h-screen bg-white flex flex-col md:flex-row font-sans" onClick={() => { if (!soundReady) void enableSound(); }}>
       {/* Sidebar */}
-      <aside className="w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
+      <aside className="w-full md:w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
             <Image src="/sandexpress-logo.svg" alt="SandExpress" width={36} height={36} />
@@ -418,13 +496,13 @@ export default function VendorDashboard() {
           </div>
           <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex gap-2 overflow-x-auto p-3 md:flex-1 md:p-4 md:space-y-2 md:block">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm relative",
+                "min-w-max md:w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm relative",
                 activeTab === tab.id ? "bg-[#FF6B00] text-white shadow-md" : "text-gray-600 hover:bg-gray-200"
               )}
             >
@@ -438,7 +516,7 @@ export default function VendorDashboard() {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-gray-200">
+        <div className="hidden md:block p-4 border-t border-gray-200">
           <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50">
             <LogOut size={18} /> Sair
           </button>
@@ -446,9 +524,9 @@ export default function VendorDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-20 border-b border-gray-100 flex items-center justify-between px-8 bg-white shrink-0">
+        <header className="min-h-20 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 md:px-8 bg-white shrink-0">
           <h2 className="text-2xl font-bold font-display text-gray-800">
             {TABS.find(t => t.id === activeTab)?.label}
           </h2>
@@ -457,6 +535,16 @@ export default function VendorDashboard() {
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Quiosque Aberto
             </span>
+            <button
+              type="button"
+              onClick={enableSound}
+              className={cn(
+                "px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 border",
+                soundReady ? "bg-orange-50 text-[#FF6B00] border-orange-200" : "bg-gray-50 text-gray-500 border-gray-200"
+              )}
+            >
+              <Bell size={14} /> {soundReady ? "Som ligado" : "Ativar som"}
+            </button>
           </div>
         </header>
 
@@ -465,7 +553,7 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
-            <div className="flex gap-4 overflow-x-auto pb-4 h-full">
+            <div className="grid grid-cols-1 md:flex gap-4 overflow-x-auto pb-4 h-full">
               {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
               {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
               {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
@@ -556,9 +644,6 @@ export default function VendorDashboard() {
                             <div className="flex gap-1">
                               <button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors">
                                 <Pencil size={16} />
-                              </button>
-                              <button onClick={() => deleteProduct(p.id)} className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors">
-                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
