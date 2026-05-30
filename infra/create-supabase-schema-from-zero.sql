@@ -5,6 +5,8 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
 CREATE TABLE vendors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
@@ -334,3 +336,10 @@ WITH CHECK (bucket_id IN ('product-images', 'kiosk-uploads'));
 CREATE POLICY pol_storage_public_delete_sandexpress
 ON storage.objects FOR DELETE
 USING (bucket_id IN ('product-images', 'kiosk-uploads'));
+
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
