@@ -233,7 +233,7 @@ CREATE POLICY pol_rate_limit_all ON rate_limit_buckets USING (TRUE) WITH CHECK (
 CREATE TABLE product_images (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category        TEXT NOT NULL,
-  name            TEXT NOT NULL,
+  title           TEXT NOT NULL,
   image_url       TEXT NOT NULL,
   description     TEXT,
   plan_type       TEXT NOT NULL DEFAULT 'free' CHECK (plan_type IN ('free','plus')),

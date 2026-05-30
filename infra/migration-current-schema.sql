@@ -233,7 +233,7 @@ ALTER TABLE order_items
 CREATE TABLE IF NOT EXISTS product_images (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category TEXT NOT NULL,
-  name TEXT NOT NULL,
+  title TEXT NOT NULL,
   image_url TEXT NOT NULL,
   description TEXT,
   plan_type TEXT NOT NULL DEFAULT 'free',

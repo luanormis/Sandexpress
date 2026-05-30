@@ -1,24 +1,9 @@
--- SANDEXPRESS - SCHEMA COMPLETO PARA BANCO NOVO
--- Use em um projeto Supabase novo ou depois de apagar as tabelas.
--- ATENCAO: este script apaga as tabelas existentes do SandExpress.
+-- SANDEXPRESS - BANCO NOVO DO ZERO
+-- Use este arquivo em um projeto Supabase vazio.
+-- Cole e execute o arquivo INTEIRO no SQL Editor.
+-- Nao selecione linhas soltas, porque comandos incompletos geram erro de sintaxe.
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-DROP TABLE IF EXISTS beaches CASCADE;
-DROP TABLE IF EXISTS rate_limit_buckets CASCADE;
-DROP TABLE IF EXISTS customer_otps CASCADE;
-DROP TABLE IF EXISTS account_adjustments CASCADE;
-DROP TABLE IF EXISTS vendor_plans CASCADE;
-DROP TABLE IF EXISTS product_images CASCADE;
-DROP TABLE IF EXISTS order_items CASCADE;
-DROP TABLE IF EXISTS orders CASCADE;
-DROP TABLE IF EXISTS sessions CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS products CASCADE;
-DROP TABLE IF EXISTS umbrellas CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
-DROP TABLE IF EXISTS tenants CASCADE;
-DROP TABLE IF EXISTS vendors CASCADE;
 
 CREATE TABLE vendors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -87,6 +72,7 @@ CREATE TABLE umbrellas (
   location_hint TEXT,
   active BOOLEAN DEFAULT TRUE,
   is_occupied BOOLEAN NOT NULL DEFAULT FALSE,
+  current_order_id UUID,
   qr_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(vendor_id, number)
@@ -154,9 +140,6 @@ CREATE TABLE orders (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-ALTER TABLE umbrellas
-  ADD COLUMN current_order_id UUID REFERENCES orders(id) ON DELETE SET NULL;
 
 CREATE TABLE order_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -251,6 +234,7 @@ CREATE INDEX idx_customers_tenant ON customers(tenant_id);
 CREATE INDEX idx_umbrellas_vendor ON umbrellas(vendor_id);
 CREATE INDEX idx_umbrellas_tenant ON umbrellas(tenant_id);
 CREATE INDEX idx_umbrellas_occupied ON umbrellas(vendor_id, is_occupied);
+CREATE INDEX idx_umbrellas_current_order ON umbrellas(current_order_id);
 CREATE INDEX idx_products_vendor ON products(vendor_id);
 CREATE INDEX idx_products_active ON products(vendor_id, active);
 CREATE INDEX idx_products_tenant ON products(tenant_id);
@@ -293,13 +277,24 @@ ALTER TABLE customer_otps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beaches ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY pol_tenants_all ON tenants USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY pol_users_all ON users USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY pol_sessions_all ON sessions USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_vendors_select ON vendors FOR SELECT USING (is_active = TRUE AND subscription_status != 'blocked');
+CREATE POLICY pol_vendors_insert ON vendors FOR INSERT WITH CHECK (TRUE);
+CREATE POLICY pol_vendors_update ON vendors FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_umbrellas_select ON umbrellas FOR SELECT USING (active = TRUE);
+CREATE POLICY pol_umbrellas_insert ON umbrellas FOR INSERT WITH CHECK (TRUE);
+CREATE POLICY pol_umbrellas_update ON umbrellas FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_products_select ON products FOR SELECT USING (active = TRUE);
+CREATE POLICY pol_products_insert ON products FOR INSERT WITH CHECK (TRUE);
+CREATE POLICY pol_products_update ON products FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY pol_products_delete ON products FOR DELETE USING (TRUE);
 CREATE POLICY pol_customers_all ON customers USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_orders_all ON orders USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_items_all ON order_items USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_product_images_select ON product_images FOR SELECT USING (TRUE);
+CREATE POLICY pol_product_images_insert ON product_images FOR INSERT WITH CHECK (TRUE);
 CREATE POLICY pol_vendor_plans_all ON vendor_plans USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_adjustments_all ON account_adjustments USING (TRUE) WITH CHECK (TRUE);
 CREATE POLICY pol_otps_all ON customer_otps USING (TRUE) WITH CHECK (TRUE);
@@ -316,3 +311,26 @@ BEGIN
   WHERE id = p_product_id AND stock_quantity IS NOT NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES
+  ('product-images', 'product-images', TRUE),
+  ('kiosk-uploads', 'kiosk-uploads', TRUE)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
+CREATE POLICY pol_storage_public_read_sandexpress
+ON storage.objects FOR SELECT
+USING (bucket_id IN ('product-images', 'kiosk-uploads'));
+
+CREATE POLICY pol_storage_public_insert_sandexpress
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id IN ('product-images', 'kiosk-uploads'));
+
+CREATE POLICY pol_storage_public_update_sandexpress
+ON storage.objects FOR UPDATE
+USING (bucket_id IN ('product-images', 'kiosk-uploads'))
+WITH CHECK (bucket_id IN ('product-images', 'kiosk-uploads'));
+
+CREATE POLICY pol_storage_public_delete_sandexpress
+ON storage.objects FOR DELETE
+USING (bucket_id IN ('product-images', 'kiosk-uploads'));
