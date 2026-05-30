@@ -22,10 +22,10 @@ CREATE TABLE vendors (
   password_reset_expires_at TIMESTAMPTZ,
   subscription_status TEXT NOT NULL DEFAULT 'trial'
     CHECK (subscription_status IN ('trial','active','overdue','blocked')),
-  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
-  plan_type           TEXT CHECK (plan_type IN ('trial','monthly','6months','12months')),
+  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '3 days'),
+  plan_type           TEXT CHECK (plan_type IN ('trial','monthly','annual','12months')),
   plan_expires_at     TIMESTAMPTZ,
-  max_umbrellas       INTEGER NOT NULL DEFAULT 120,  -- aumentado para 120
+  max_umbrellas       INTEGER NOT NULL DEFAULT 50,
   is_active           BOOLEAN DEFAULT TRUE,
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
@@ -69,6 +69,7 @@ CREATE TABLE umbrellas (
   label         TEXT,
   location_hint TEXT,
   active        BOOLEAN DEFAULT TRUE,
+  is_occupied   BOOLEAN NOT NULL DEFAULT FALSE,
   qr_url        TEXT,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(vendor_id, number)
@@ -135,6 +136,7 @@ CREATE TABLE orders (
   notes           TEXT,
   paid            BOOLEAN DEFAULT FALSE,
   payment_method  TEXT,
+  pending_close   BOOLEAN NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -148,13 +150,20 @@ CREATE TABLE order_items (
   quantity    INTEGER NOT NULL CHECK (quantity > 0),
   unit_price  NUMERIC(10,2) NOT NULL,
   subtotal    NUMERIC(10,2) NOT NULL,
+  cancelled   BOOLEAN NOT NULL DEFAULT FALSE,
+  cancelled_at TIMESTAMPTZ,
+  cancel_reason TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE umbrellas
+  ADD COLUMN current_order_id UUID REFERENCES orders(id) ON DELETE SET NULL;
 
 -- ÍNDICES DE PERFORMANCE
 CREATE INDEX idx_customers_vendor    ON customers(vendor_id);
 CREATE INDEX idx_customers_phone     ON customers(phone);
 CREATE INDEX idx_umbrellas_vendor    ON umbrellas(vendor_id);
+CREATE INDEX idx_umbrellas_occupied  ON umbrellas(vendor_id, is_occupied);
 CREATE INDEX idx_products_vendor     ON products(vendor_id);
 CREATE INDEX idx_products_active     ON products(vendor_id, active);
 CREATE INDEX idx_products_tenant     ON products(tenant_id);
@@ -170,6 +179,7 @@ CREATE INDEX idx_tenants_status      ON tenants(status);
 CREATE INDEX idx_users_tenant        ON users(tenant_id);
 CREATE INDEX idx_sessions_tenant     ON sessions(tenant_id);
 CREATE INDEX idx_sessions_created   ON sessions(created_at DESC);
+CREATE INDEX idx_orders_pending_close ON orders(vendor_id, pending_close);
 
 -- ROW LEVEL SECURITY
 ALTER TABLE tenants     ENABLE ROW LEVEL SECURITY;
@@ -194,6 +204,30 @@ CREATE POLICY pol_orders_select    ON orders    FOR SELECT USING (TRUE);
 CREATE POLICY pol_orders_update    ON orders    FOR UPDATE USING (TRUE);
 CREATE POLICY pol_items_insert     ON order_items FOR INSERT WITH CHECK (TRUE);
 CREATE POLICY pol_items_select     ON order_items FOR SELECT USING (TRUE);
+
+-- OTP persistido para login de cliente
+CREATE TABLE customer_otps (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  phone      TEXT NOT NULL,
+  vendor_id  UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  code       TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_otps_lookup ON customer_otps(vendor_id, phone, used, expires_at);
+
+ALTER TABLE customer_otps ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pol_otps_all ON customer_otps USING (TRUE) WITH CHECK (TRUE);
+
+-- Rate limit persistido para rotas sensiveis
+CREATE TABLE rate_limit_buckets (
+  key        TEXT PRIMARY KEY,
+  count      INTEGER NOT NULL DEFAULT 1,
+  reset_at   TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pol_rate_limit_all ON rate_limit_buckets USING (TRUE) WITH CHECK (TRUE);
 
 -- PRODUCT IMAGE GALLERY (Galeria padrão de imagens por categoria)
 CREATE TABLE product_images (
