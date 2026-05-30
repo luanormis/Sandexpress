@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { getTenantIdFromRequest, enforceTenantScope } from '@/lib/tenant-utils';
+import { verifyAdminCredentials } from '@/lib/admin-auth';
 
 /** Campos que o admin pode atualizar num vendor (whitelist contra mass-assignment) */
 const ALLOWED_VENDOR_FIELDS = new Set([
@@ -90,6 +91,56 @@ export async function PATCH(
     return NextResponse.json(data);
   } catch (err) {
     console.error('Vendor PATCH error:', err);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
+    }
+
+    const { admin_username, admin_password } = await req.json();
+    if (!verifyAdminCredentials(admin_username, admin_password)) {
+      return NextResponse.json({ error: 'Senha de admin invalida para exclusao.' }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const { data: vendor, error: lookupError } = await supabaseAdmin
+      .from('vendors')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (lookupError || !vendor) {
+      return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
+    }
+
+    const { error: vendorError } = await supabaseAdmin
+      .from('vendors')
+      .delete()
+      .eq('id', id);
+
+    if (vendorError) throw vendorError;
+
+    await supabaseAdmin
+      .from('tenants')
+      .delete()
+      .eq('id', id);
+
+    return NextResponse.json({
+      success: true,
+      deleted_vendor_id: id,
+      message: 'Quiosque e dados relacionados removidos do banco.',
+    });
+  } catch (err) {
+    console.error('Vendor DELETE error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }

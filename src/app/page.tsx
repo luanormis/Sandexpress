@@ -13,13 +13,13 @@ export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [form, setForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "", password: "",
   });
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email) return;
+    if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email || form.password.length < 8) return;
     setLoading(true);
     try {
       const res = await fetch("/api/vendors/register", {
@@ -276,6 +276,15 @@ export default function LandingPage() {
                       value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                       className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                       placeholder="Ex: Quiosque do Sol"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Crie sua senha *</label>
+                    <input
+                      type="password" required minLength={8}
+                      value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="Minimo de 8 caracteres"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">

@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { verifyAdminCredentials } from '@/lib/admin-auth';
 
-/**
- * PATCH /api/products/[id]
- * Atualiza um produto existente.
- *
- * DELETE /api/products/[id]
- * Remove um produto.
- */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,12 +11,12 @@ export async function PATCH(
   try {
     const tenantId = getTenantIdFromRequest(req);
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+      return NextResponse.json({ error: 'Tenant nao identificado.' }, { status: 400 });
     }
 
     const session = getRequestSession(req);
     if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+      return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -36,7 +30,7 @@ export async function PATCH(
       tenantId
     ).single();
     if (productLookup.error || !productLookup.data) {
-      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
     if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
       return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
@@ -64,39 +58,32 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Somente admin pode remover produtos.' }, { status: 403 });
     }
 
-    const session = getRequestSession(req);
-    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    const { admin_username, admin_password } = await req.json();
+    if (!verifyAdminCredentials(admin_username, admin_password)) {
+      return NextResponse.json({ error: 'Senha de admin invalida para exclusao.' }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const productLookup = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .select('vendor_id')
-        .eq('id', id),
-      tenantId
-    ).single();
+    const productLookup = await supabaseAdmin
+      .from('products')
+      .select('vendor_id')
+      .eq('id', id)
+      .single();
+
     if (productLookup.error || !productLookup.data) {
-      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
-    }
-    if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
-      return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
+      return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
 
-    const { error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .delete()
-        .eq('id', id),
-      tenantId
-    );
+    const { error } = await supabaseAdmin
+      .from('products')
+      .delete()
+      .eq('id', id);
 
     if (error) throw error;
     return NextResponse.json({ success: true });

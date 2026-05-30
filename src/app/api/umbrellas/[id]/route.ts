@@ -2,20 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { verifyAdminCredentials } from '@/lib/admin-auth';
 
-/** Campos permitidos para atualização de guarda-sol (whitelist contra mass-assignment) */
 const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url']);
 
-/**
- * GET /api/umbrellas/[id]
- * Obtém informações públicas de um guarda-sol (para clientes).
- *
- * PATCH /api/umbrellas/[id]
- * Atualiza um guarda-sol (ex: toggle ativo/inativo).
- *
- * DELETE /api/umbrellas/[id]
- * Remove um guarda-sol.
- */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,7 +13,7 @@ export async function GET(
   try {
     const tenantId = getTenantIdFromRequest(req);
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+      return NextResponse.json({ error: 'Tenant nao identificado.' }, { status: 400 });
     }
 
     const { id } = await params;
@@ -37,7 +27,7 @@ export async function GET(
     ).single();
 
     if (error || !data) {
-      return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Guarda-sol nao encontrado.' }, { status: 404 });
     }
 
     return NextResponse.json(data);
@@ -54,16 +44,15 @@ export async function PATCH(
   try {
     const tenantId = getTenantIdFromRequest(req);
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+      return NextResponse.json({ error: 'Tenant nao identificado.' }, { status: 400 });
     }
 
     const session = getRequestSession(req);
-    if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    if (!session) return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
 
     const { id } = await params;
     const body = await req.json();
 
-    // Whitelist de campos com tipo correto para Supabase
     const safeUpdate: {
       active?: boolean | null;
       label?: string | null;
@@ -78,7 +67,7 @@ export async function PATCH(
       if (field === 'qr_url') safeUpdate.qr_url = body.qr_url as string | null;
     }
     if (Object.keys(safeUpdate).length === 0) {
-      return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
+      return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
 
     const umbrellaLookup = await enforceTenantScope(
@@ -86,10 +75,10 @@ export async function PATCH(
       tenantId
     ).single();
     if (umbrellaLookup.error || !umbrellaLookup.data) {
-      return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Guarda-sol nao encontrado.' }, { status: 404 });
     }
     if (!canAccessVendor(session, umbrellaLookup.data.vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este guarda-sol.' }, { status: 403 });
+      return NextResponse.json({ error: 'Nao autorizado para este guarda-sol.' }, { status: 403 });
     }
 
     const { data, error } = await enforceTenantScope(
@@ -114,37 +103,57 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Somente admin pode remover guarda-sol.' }, { status: 403 });
     }
 
-    const session = getRequestSession(req);
-    if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    const { admin_username, admin_password } = await req.json();
+    if (!verifyAdminCredentials(admin_username, admin_password)) {
+      return NextResponse.json({ error: 'Senha de admin invalida para exclusao.' }, { status: 401 });
+    }
 
     const { id } = await params;
 
-    const umbrellaLookup = await enforceTenantScope(
-      supabaseAdmin.from('umbrellas').select('vendor_id, is_occupied').eq('id', id),
-      tenantId
-    ).single();
+    const umbrellaLookup = await supabaseAdmin
+      .from('umbrellas')
+      .select('vendor_id, is_occupied')
+      .eq('id', id)
+      .single();
+
     if (umbrellaLookup.error || !umbrellaLookup.data) {
-      return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
-    }
-    if (!canAccessVendor(session, umbrellaLookup.data.vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este guarda-sol.' }, { status: 403 });
+      return NextResponse.json({ error: 'Guarda-sol nao encontrado.' }, { status: 404 });
     }
     if (umbrellaLookup.data.is_occupied) {
-      return NextResponse.json({ error: 'Não é possível remover guarda-sol com conta aberta.' }, { status: 409 });
+      return NextResponse.json({ error: 'Nao e possivel remover guarda-sol com conta aberta.' }, { status: 409 });
     }
 
-    const { error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('umbrellas')
+    const { data: relatedOrders, error: ordersLookupError } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('umbrella_id', id);
+
+    if (ordersLookupError) throw ordersLookupError;
+
+    const orderIds = ((relatedOrders || []) as { id: string }[]).map((order) => order.id);
+    if (orderIds.length > 0) {
+      const { error: itemsError } = await supabaseAdmin
+        .from('order_items')
         .delete()
-        .eq('id', id),
-      tenantId
-    );
+        .in('order_id', orderIds);
+      if (itemsError) throw itemsError;
+
+      const { error: ordersError } = await supabaseAdmin
+        .from('orders')
+        .delete()
+        .in('id', orderIds);
+      if (ordersError) throw ordersError;
+    }
+
+    const { error } = await supabaseAdmin
+      .from('umbrellas')
+      .delete()
+      .eq('id', id);
 
     if (error) throw error;
     return NextResponse.json({ success: true });

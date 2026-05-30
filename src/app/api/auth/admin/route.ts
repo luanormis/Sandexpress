@@ -1,30 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth-session';
+import { getAdminUsername, verifyAdminCredentials } from '@/lib/admin-auth';
 
 /**
  * POST /api/auth/admin
- * Login do admin — verifica senha via variável de ambiente.
+ * Login do admin master.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { password } = await req.json();
+    const { username, password } = await req.json();
 
-    if (!password) {
-      return NextResponse.json({ error: 'Senha é obrigatória.' }, { status: 400 });
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Usuario e senha sao obrigatorios.' }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword) {
-      return NextResponse.json({ error: 'ADMIN_PASSWORD não configurada.' }, { status: 500 });
+    if (!verifyAdminCredentials(username, password)) {
+      return NextResponse.json({ error: 'Usuario ou senha invalidos.' }, { status: 401 });
     }
 
-    if (password !== adminPassword) {
-      return NextResponse.json({ error: 'Senha inválida.' }, { status: 401 });
-    }
-
-    const token = createSessionToken({ role: 'admin' }, 12 * 60 * 60);
+    const token = createSessionToken({ role: 'admin', user_id: getAdminUsername() }, 12 * 60 * 60);
     const response = NextResponse.json({
       role: 'admin',
+      username: getAdminUsername(),
       token,
     });
     response.cookies.set({

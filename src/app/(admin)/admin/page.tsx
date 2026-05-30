@@ -29,6 +29,14 @@ interface Vendor {
   created_at: string;
 }
 
+interface Umbrella {
+  id: string;
+  number: number;
+  label: string | null;
+  is_occupied: boolean;
+  active: boolean;
+}
+
 interface PlatformReport {
   gmv: number;
   total_orders: number;
@@ -62,8 +70,14 @@ export default function AdminDashboard() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [platformReport, setPlatformReport] = useState<PlatformReport | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminUsername, setAdminUsername] = useState("luanormis");
   const [adminPassword, setAdminPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteResult, setDeleteResult] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [vendorUmbrellas, setVendorUmbrellas] = useState<Umbrella[]>([]);
   const [resetPassword, setResetPassword] = useState("");
   const [resetResult, setResetResult] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -71,7 +85,7 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "", password: "",
   });
   const [regSuccess, setRegSuccess] = useState(false);
 
@@ -93,7 +107,7 @@ export default function AdminDashboard() {
       const res = await fetch("/api/auth/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
+        body: JSON.stringify({ username: adminUsername, password: adminPassword }),
       });
       if (res.ok) {
         setIsAuthenticated(true);
@@ -181,10 +195,89 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadVendorUmbrellas = async (vendorId: string) => {
+    try {
+      const res = await fetch(`/api/umbrellas?vendor_id=${vendorId}`);
+      if (res.ok) setVendorUmbrellas(await res.json());
+      else setVendorUmbrellas([]);
+    } catch (err) {
+      console.error('Failed to load vendor umbrellas:', err);
+      setVendorUmbrellas([]);
+    }
+  };
+
+  const openVendorDetails = async (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setDeleteError(null);
+    setDeleteResult(null);
+    setDeletePassword("");
+    await loadVendorUmbrellas(vendor.id);
+  };
+
+  const handleDeleteVendor = async (vendorId: string) => {
+    setDeleteError(null);
+    setDeleteResult(null);
+    if (!deletePassword) {
+      setDeleteError('Digite a senha do admin para confirmar.');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/vendors/${vendorId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_username: adminUsername, admin_password: deletePassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data?.error || 'Erro ao excluir quiosque.');
+      } else {
+        setDeleteResult('Quiosque removido com todos os dados relacionados.');
+        setSelectedVendor(null);
+        await loadVendors();
+        await loadPlatformReport();
+      }
+    } catch (err) {
+      console.error('Delete vendor error:', err);
+      setDeleteError('Erro ao conectar ao servidor.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteUmbrella = async (umbrellaId: string) => {
+    setDeleteError(null);
+    setDeleteResult(null);
+    if (!deletePassword) {
+      setDeleteError('Digite a senha do admin para confirmar.');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/umbrellas/${umbrellaId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_username: adminUsername, admin_password: deletePassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data?.error || 'Erro ao excluir guarda-sol.');
+      } else if (selectedVendor) {
+        setDeleteResult('Guarda-sol removido.');
+        await loadVendorUmbrellas(selectedVendor.id);
+      }
+    } catch (err) {
+      console.error('Delete umbrella error:', err);
+      setDeleteError('Erro ao conectar ao servidor.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Register vendor
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone) return;
+    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone || regForm.password.length < 8) return;
 
     try {
       const res = await fetch("/api/vendors/register", {
@@ -210,7 +303,7 @@ export default function AdminDashboard() {
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "" });
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "", password: "" });
       }
     } catch (err) {
       console.error("Register error:", err);
@@ -249,6 +342,13 @@ export default function AdminDashboard() {
           </div>
           <p className="text-gray-400 text-center mb-6 text-sm">Acesso restrito. Informe a senha de administrador.</p>
           <form onSubmit={handleAdminLogin} className="space-y-4">
+            <input
+              type="text"
+              value={adminUsername}
+              onChange={e => setAdminUsername(e.target.value)}
+              placeholder="Usuario admin"
+              className="w-full bg-gray-700 border-2 border-gray-600 rounded-xl p-4 text-white placeholder:text-gray-500 focus:border-[#FF6B00] outline-none"
+            />
             <input
               type="password"
               value={adminPassword}
@@ -458,7 +558,7 @@ export default function AdminDashboard() {
                       <td className="p-4">
                         <div className="flex gap-1">
                           <button
-                            onClick={() => setSelectedVendor(v)}
+                            onClick={() => openVendorDetails(v)}
                             className="text-gray-400 hover:text-white transition-colors bg-gray-700 p-2 rounded-lg hover:bg-gray-600"
                             title="Ver detalhes"
                           >
@@ -618,6 +718,15 @@ export default function AdminDashboard() {
                       placeholder="João Silva"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-1">Senha inicial do quiosque *</label>
+                    <input
+                      type="password" required minLength={8}
+                      value={regForm.password} onChange={e => setRegForm(p => ({ ...p, password: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-[#FF6B00] outline-none"
+                      placeholder="Minimo de 8 caracteres"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-400 mb-1">WhatsApp *</label>
@@ -745,6 +854,50 @@ export default function AdminDashboard() {
                 {resetResult && <p className="text-green-400 text-sm mt-2">{resetResult}</p>}
                 {resetError && <p className="text-red-400 text-sm mt-2">{resetError}</p>}
               </div>
+            </div>
+            <div className="p-6 border-t border-red-900/60 space-y-4">
+              <div>
+                <p className="text-sm text-red-300 font-bold mb-2">Exclusao administrativa</p>
+                <p className="text-xs text-gray-500 mb-3">Somente o admin master pode excluir. A exclusao do quiosque remove os dados relacionados do banco.</p>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  placeholder="Senha do admin para confirmar"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white placeholder:text-gray-500 focus:border-red-500 outline-none"
+                />
+                {deleteError && <p className="text-red-400 text-sm mt-2">{deleteError}</p>}
+                {deleteResult && <p className="text-green-400 text-sm mt-2">{deleteResult}</p>}
+              </div>
+              {vendorUmbrellas.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400 font-bold">Guarda-sois deste quiosque</p>
+                  {vendorUmbrellas.map(umbrella => (
+                    <div key={umbrella.id} className="flex items-center justify-between bg-gray-900/60 rounded-xl p-3">
+                      <span className="text-sm text-gray-300">
+                        #{umbrella.number} {umbrella.label || ""}
+                        {umbrella.is_occupied && <span className="ml-2 text-amber-400">(conta aberta)</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUmbrella(umbrella.id)}
+                        disabled={isDeleting || umbrella.is_occupied}
+                        className="px-3 py-2 bg-red-500/10 text-red-300 rounded-lg text-xs font-bold hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => handleDeleteVendor(selectedVendor.id)}
+                disabled={isDeleting}
+                className="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Excluindo...' : 'Excluir quiosque e dados'}
+              </button>
             </div>
             <div className="p-6 border-t border-gray-700 flex gap-3">
               <a

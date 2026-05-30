@@ -13,7 +13,10 @@ export type SessionPayload = {
   exp: number;
 };
 
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.VENDOR_JWT_SECRET;
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  process.env.VENDOR_JWT_SECRET ||
+  (process.env.NODE_ENV === 'production' ? undefined : 'sandexpress-local-dev-session-secret');
 
 function base64UrlEncode(input: string): string {
   return Buffer.from(input).toString('base64url');

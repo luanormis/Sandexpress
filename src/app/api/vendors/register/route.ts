@@ -14,10 +14,6 @@ async function hashPassword(password: string) {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-function generateTemporaryPassword() {
-  return crypto.randomBytes(10).toString('base64url');
-}
-
 function onlyDigits(value?: string | null) {
   return (value || '').replace(/\D/g, '');
 }
@@ -40,20 +36,11 @@ export async function POST(req: NextRequest) {
     }
 
     const password = body.password?.trim();
-    let passwordToStore: string;
-    let passwordNeedsReset = true;
-
-    if (password) {
-      if (password.length < 8) {
-        return NextResponse.json({ error: 'A senha deve ter ao menos 8 caracteres.' }, { status: 400 });
-      }
-      passwordToStore = password;
-      passwordNeedsReset = false;
-    } else {
-      passwordToStore = generateTemporaryPassword();
+    if (!password || password.length < 8) {
+      return NextResponse.json({ error: 'A senha do quiosque deve ter ao menos 8 caracteres.' }, { status: 400 });
     }
 
-    const passwordHash = await hashPassword(passwordToStore);
+    const passwordHash = await hashPassword(password);
 
     const { data, error } = await supabaseAdmin
       .from('vendors')
@@ -68,7 +55,7 @@ export async function POST(req: NextRequest) {
         city: body.city || null,
         state: body.state || null,
         password_hash: passwordHash,
-        password_needs_reset: passwordNeedsReset,
+        password_needs_reset: false,
         subscription_status: 'trial',
         plan_type: 'trial',
         trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString(),
@@ -96,13 +83,8 @@ export async function POST(req: NextRequest) {
     const responseBody: any = {
       ...data,
       message: 'Conta criada com sucesso.',
-      password_needs_reset: passwordNeedsReset,
+      password_needs_reset: false,
     };
-
-    if (!password) {
-      responseBody.temporary_password = passwordToStore;
-      responseBody.message = 'Conta criada com senha temporaria. Altere a senha no primeiro acesso.';
-    }
 
     return NextResponse.json(responseBody, { status: 201 });
   } catch (err) {

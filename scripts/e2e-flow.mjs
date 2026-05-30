@@ -42,6 +42,7 @@ async function main() {
   const suffix = uniqueDigits(8);
   const documentLogin = `55${suffix}`;
   const phone = `119${suffix}`;
+  const vendorPassword = `Teste${suffix}!`;
 
   const registered = await request('/api/vendors/register', {
     method: 'POST',
@@ -51,18 +52,18 @@ async function main() {
       owner_phone: phone,
       owner_email: `e2e-${suffix}@sandexpress.local`,
       document_login: documentLogin,
+      password: vendorPassword,
       city: 'Santos',
       state: 'SP',
     }),
   });
 
   const vendorId = registered.body.id;
-  const temporaryPassword = registered.body.temporary_password;
-  if (!vendorId || !temporaryPassword) throw new Error('Vendor registration did not return id/password.');
+  if (!vendorId) throw new Error('Vendor registration did not return id.');
 
   const vendorLogin = await request('/api/auth/vendor', {
     method: 'POST',
-    body: JSON.stringify({ document_login: documentLogin, password: temporaryPassword }),
+    body: JSON.stringify({ document_login: documentLogin, password: vendorPassword }),
   });
   const vendorCookies = vendorLogin.cookies;
 
