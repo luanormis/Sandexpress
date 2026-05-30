@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "next/navigation";
-import { MapPin, ShoppingBag, ShoppingCart, UserRound, UtensilsCrossed, Plus, Minus, Home, ListOrdered, Utensils, ChevronRight } from "lucide-react";
+import { MapPin, ShoppingBag, ShoppingCart, UserRound, Plus, Minus, Home, ListOrdered, Utensils, ChevronRight } from "lucide-react";
+import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Product = {
@@ -34,6 +35,14 @@ type Customer = {
   phone: string;
 };
 
+type VendorBrand = {
+  id: string;
+  name: string;
+  primary_color: string;
+  secondary_color: string;
+  logo_url?: string | null;
+};
+
 export default function CustomerApp() {
   const params = useParams();
   const umbrella_id = params.umbrella_id as string;
@@ -42,6 +51,7 @@ export default function CustomerApp() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [vendor, setVendor] = useState<VendorBrand | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [umbrella, setUmbrella] = useState<any>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -54,9 +64,7 @@ export default function CustomerApp() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [otpInput, setOtpInput] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
   const [waiterCalled, setWaiterCalled] = useState(false);
 
   const categories = ["Todos", ...Array.from(new Set(products.map((product) => product.category)))];
@@ -67,26 +75,18 @@ export default function CustomerApp() {
     // Load umbrella and products
     const loadData = async () => {
       try {
-        const umbrellaRes = await fetch(`/api/umbrellas/${umbrella_id}`);
-        if (!umbrellaRes.ok) {
-          const errorBody = await umbrellaRes.json().catch(() => null);
+        const res = await fetch(`/api/public/umbrella/${umbrella_id}`);
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => null);
           setLoadError(errorBody?.error || 'Erro ao carregar guarda-sol.');
           return;
         }
 
-        const umbrellaData = await umbrellaRes.json();
-        setUmbrella(umbrellaData);
-        setVendorId(umbrellaData.vendor_id);
-
-        const productsRes = await fetch(`/api/products?vendor_id=${umbrellaData.vendor_id}`);
-        if (!productsRes.ok) {
-          const errorBody = await productsRes.json().catch(() => null);
-          setLoadError(errorBody?.error || 'Erro ao carregar produtos.');
-          return;
-        }
-
-        const productsData = await productsRes.json();
-        setProducts(productsData);
+        const data = await res.json();
+        setUmbrella(data.umbrella);
+        setVendor(data.vendor);
+        setVendorId(data.vendor.id);
+        setProducts(data.products || []);
       } catch (err) {
         console.error('Failed to load data:', err);
         setLoadError('Erro de rede ao carregar dados do quiosque.');
@@ -128,7 +128,6 @@ export default function CustomerApp() {
         setLoadError(result.error || 'Erro ao solicitar código.');
         return;
       }
-      setOtpSent(true);
       setOtpInput('');
       setOtpModeHint(result.dev_hint || null);
       setStep('verify');
@@ -257,9 +256,9 @@ export default function CustomerApp() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FF6B00] to-[#E56000] flex flex-col items-center justify-center p-6 text-white text-center">
         <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl">
-          <UtensilsCrossed size={48} className="text-[#FF6B00]" />
+          <Image src="/sandexpress-logo.svg" alt="SandExpress" width={76} height={76} priority />
         </div>
-        <h1 className="text-4xl font-display font-bold tracking-tight mb-2">SandExpress</h1>
+        <h1 className="text-4xl font-display font-bold tracking-tight mb-2">{vendor?.name || "SandExpress"}</h1>
         <p className="text-[#F5E1C0] text-lg font-sans mb-12">Leia o QR e inicie sua conta do guarda-sol.</p>
         <div className="bg-white/10 p-4 rounded-xl mb-12 border border-white/20 backdrop-blur-sm">
           <MapPin size={24} className="inline-block mb-2" />
@@ -268,6 +267,7 @@ export default function CustomerApp() {
         </div>
         <button
           onClick={() => setStep("login")}
+          disabled={Boolean(loadError) || !vendorId}
           className="w-full max-w-sm bg-white text-[#FF6B00] font-bold py-4 rounded-full text-xl shadow-lg active:scale-95 transition-transform"
         >
           Começar pedido
@@ -306,9 +306,10 @@ export default function CustomerApp() {
             <button
               type="button"
               onClick={sendWhatsAppCode}
+              disabled={requestingOtp}
               className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-xl text-lg shadow-md hover:bg-[#E56000] active:scale-95 transition-all inline-flex items-center justify-center gap-2"
             >
-              Validar pelo WhatsApp <ChevronRight size={18} />
+              {requestingOtp ? "Enviando..." : "Validar pelo WhatsApp"} <ChevronRight size={18} />
             </button>
           </form>
         </div>
@@ -324,7 +325,7 @@ export default function CustomerApp() {
           <p className="text-gray-500 mb-8">Digite o código recebido no WhatsApp para liberar o pedido.</p>
           <div className="bg-white rounded-3xl border border-gray-200 p-5 mb-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Código gerado para teste</p>
-            <p className="text-3xl font-bold text-[#FF6B00]">{otpCode}</p>
+            <p className="text-3xl font-bold text-[#FF6B00]">{otpModeHint || "WhatsApp"}</p>
             <p className="text-sm text-gray-500 mt-2">Em produção, este código será enviado ao WhatsApp.</p>
           </div>
           <form onSubmit={confirmVerification} className="space-y-4">
@@ -341,6 +342,7 @@ export default function CustomerApp() {
             </div>
             <button
               type="submit"
+              disabled={verifyingOtp}
               className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-xl text-lg shadow-md hover:bg-[#E56000] active:scale-95 transition-all"
             >
               Confirmar código

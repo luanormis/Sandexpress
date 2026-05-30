@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #FFFFFF;
-  --foreground: #3D1A0A;
+  --background: #fff8f6;
+  --foreground: #261812;
+  --surface: #fff8f6;
+  --surface-container: #ffeae1;
+  --surface-container-high: #fee3d8;
+  --surface-container-highest: #f8ddd2;
+  --brand-primary: #ff6b00;
+  --brand-primary-strong: #a04100;
+  --brand-primary-hover: #e56000;
+  --brand-secondary: #82533f;
+  --brand-dark: #3d1a0a;
+  --brand-cream: #fff8f6;
+  --brand-sand: #f8ddd2;
+  --brand-outline: #e2bfb0;
 }
 
 @theme inline {
@@ -10,14 +22,14 @@
   --color-foreground: var(--foreground);
   
   /* Primary & Secondary Brand Colors */
-  --color-primary: #ff6a00bf;
-  --color-primary-hover: #E56000;
-  --color-secondary: #F5E1C0;
-  --color-dark: #3D1A0A;
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-secondary: var(--brand-sand);
+  --color-dark: var(--brand-dark);
 
   /* Fonts */
-  --font-sans: var(--font-nunito), Arial, sans-serif;
-  --font-display: var(--font-poppins), Arial, sans-serif;
+  --font-sans: var(--font-inter), Arial, sans-serif;
+  --font-display: var(--font-lexend), Arial, sans-serif;
 }
 
 @layer base {
@@ -26,6 +38,13 @@
     color: var(--foreground);
     @apply font-sans antialiased;
   }
+}
+
+.brand-card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 191, 176, 0.8);
+  box-shadow: 0 20px 40px rgba(61, 26, 10, 0.08);
+  backdrop-filter: blur(16px);
 }
 
 @layer utilities {

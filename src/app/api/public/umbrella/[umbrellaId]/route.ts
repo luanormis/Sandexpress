@@ -49,7 +49,7 @@ export async function GET(
 
     if (pErr) throw pErr;
 
-    const visible = (products || []).filter((p) => {
+    const visible = ((products || []) as any[]).filter((p) => {
       if (p.blocked_by_stock && (p.stock_quantity ?? 0) <= 0) return false;
       return true;
     });

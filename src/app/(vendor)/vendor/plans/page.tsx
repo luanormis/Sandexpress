@@ -6,6 +6,9 @@ import { useVendorAuth } from "@/hooks/useVendorAuth";
 import { VendorPlan } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Star, Check } from "lucide-react";
+import { PLAN_PRICE_LABELS } from "@/lib/plans";
+
+const db = supabase as any;
 
 export default function VendorPlanPage() {
   const { vendorId, isAuthenticated } = useVendorAuth();
@@ -21,7 +24,7 @@ export default function VendorPlanPage() {
   const fetchVendorPlan = async () => {
     if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("vendor_plans")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -33,7 +36,7 @@ export default function VendorPlanPage() {
         setPlan(data as VendorPlan);
       } else {
         // Criar plano padrão (free)
-        const { data: newPlan, error: insertError } = await supabase
+        const { data: newPlan, error: insertError } = await db
           .from("vendor_plans")
           .insert({
             vendor_id: vendorId,
@@ -59,7 +62,7 @@ export default function VendorPlanPage() {
     if (!vendorId) return;
     setUpgrading(true);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from("vendor_plans")
         .update({
           plan_type: "plus",
@@ -118,7 +121,7 @@ export default function VendorPlanPage() {
             }`}
           >
             <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Plano Free</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Trial</h2>
               <p className="text-gray-600 mt-1">Perfeito para começar</p>
             </div>
 
@@ -168,13 +171,13 @@ export default function VendorPlanPage() {
             </div>
 
             <div className="mb-4 mt-4">
-              <h2 className="text-2xl font-bold text-gray-900">Plano Plus</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Mensal</h2>
               <p className="text-gray-600 mt-1">Imagens personalizadas</p>
             </div>
 
             <div className="mb-6">
               <div className="text-3xl font-bold text-gray-900">
-                R$ <span className="text-4xl">29</span>
+                {PLAN_PRICE_LABELS.monthly}
               </div>
               <p className="text-gray-600 text-sm">por mês</p>
             </div>

@@ -6,6 +6,7 @@ import {
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
 } from "lucide-react";
+import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ---------- TYPES ----------
@@ -184,8 +185,25 @@ export default function VendorDashboard() {
   }, [activeTab, reportPeriod, vendorId]);
 
   // Order management
-  const moveOrder = (id: string, newStatus: string) => {
+  const moveOrder = async (id: string, newStatus: string) => {
+    const previous = orders;
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setOrders(previous);
+        alert(err?.error || 'Erro ao atualizar pedido.');
+      }
+    } catch (err) {
+      console.error('Move order error:', err);
+      setOrders(previous);
+      alert('Erro de rede ao atualizar pedido.');
+    }
   };
 
   // Product management
@@ -307,11 +325,24 @@ export default function VendorDashboard() {
     }
   };
 
-  const generateQR = (umbrella: Umbrella) => {
+  const generateQR = async (umbrella: Umbrella) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const targetUrl = `${baseUrl}/u/${umbrella.id}`;
-    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(targetUrl)}&format=png&margin=20`;
-    setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: qrImg, qr_url: targetUrl } : u));
+    try {
+      const res = await fetch(`/api/qr?umbrella_id=${umbrella.id}&number=${umbrella.number}&format=png&base_url=${encodeURIComponent(baseUrl)}`);
+      if (!res.ok) throw new Error('QR generation failed');
+      const data = await res.json();
+
+      await fetch(`/api/umbrellas/${umbrella.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qr_url: data.target_url }),
+      });
+
+      setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: data.qr_image_url, qr_url: data.target_url } : u));
+    } catch (err) {
+      console.error('Generate QR error:', err);
+      alert('Erro ao gerar QR Code.');
+    }
   };
 
   // Filtered products
@@ -381,7 +412,10 @@ export default function VendorDashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-200 bg-white">
-          <h1 className="font-display font-bold text-xl text-[#FF6B00]">SandExpress</h1>
+          <div className="flex items-center gap-3">
+            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={36} height={36} />
+            <h1 className="font-display font-bold text-xl text-[#3D1A0A]">SandExpress</h1>
+          </div>
           <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">

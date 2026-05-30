@@ -1,17 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Nunito } from "next/font/google";
+import { Inter, Lexend } from "next/font/google";
 import "./globals.css";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const lexend = Lexend({
+  variable: "--font-lexend",
   subsets: ["latin"],
   weight: ["700", "800"],
 });
 
-const nunito = Nunito({
-  variable: "--font-nunito",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -19,13 +19,13 @@ export const metadata: Metadata = {
   description: "Faça seu pedido diretamente da areia, sem enfrentar filas.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-192.png",
+    icon: "/sandexpress-logo.svg",
     apple: "/icon-192.png",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FF6B00",
+  themeColor: "#ff6b00",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${poppins.variable} ${nunito.variable} antialiased`}
+        className={`${lexend.variable} ${inter.variable} antialiased`}
       >
         {children}
       </body>

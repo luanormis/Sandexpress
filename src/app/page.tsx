@@ -6,6 +6,8 @@ import {
   Camera, Clock, Gift, FileText, X, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans";
 
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
@@ -37,13 +39,13 @@ export default function LandingPage() {
   const openModal = () => { setShowModal(true); setRegSuccess(false); };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900 overflow-x-hidden">
+    <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md z-50 border-b border-gray-100">
+      <nav className="fixed top-0 left-0 w-full bg-[#fff8f6]/85 backdrop-blur-md z-50 border-b border-[#e2bfb0]/70">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#FF6B00]">
-            <UtensilsCrossed size={32} />
-            <span className="font-display font-bold text-2xl tracking-tighter text-gray-900">SandExpress</span>
+          <div className="flex items-center gap-3 text-[#FF6B00]">
+            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={42} height={42} priority className="drop-shadow-sm" />
+            <span className="font-display font-bold text-2xl text-[#261812]">SandExpress</span>
           </div>
           <div className="hidden md:flex gap-8 font-bold text-sm text-gray-600">
              <a href="#como-funciona" className="hover:text-[#FF6B00] transition-colors">Como funciona</a>
@@ -53,21 +55,23 @@ export default function LandingPage() {
           <div className="flex items-center gap-4">
              <Link href="/vendor/login" className="font-bold text-sm text-gray-600 hover:text-gray-900 hidden md:block">Login Lojista</Link>
              <button onClick={openModal} className="bg-[#FF6B00] text-white px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-sm">
-                Teste Grátis 7 dias
+                Teste Grátis {TRIAL_DAYS} dias
              </button>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 bg-gradient-to-br from-[#FF6B00] to-[#E56000] text-center text-white relative">
+      <section className="pt-32 pb-20 px-6 bg-[#fff1eb] text-center text-[#261812] relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-br from-[#ff6b00] via-[#ffb693] to-[#fff8f6]" />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sand.png')] opacity-10 mix-blend-overlay"></div>
         <div className="max-w-4xl mx-auto relative z-10 pt-16">
-          <span className="bg-white/20 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-widest backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
+          <Image src="/sandexpress-logo.svg" alt="" width={96} height={96} priority className="mx-auto mb-6 drop-shadow-xl" />
+          <span className="bg-white/45 text-[#572000] px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
           <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
             Seu quiosque vendendo mais, sem esforço.
           </h1>
-          <p className="text-xl md:text-2xl text-[#F5E1C0] mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
+          <p className="text-xl md:text-2xl text-[#572000] mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -81,15 +85,15 @@ export default function LandingPage() {
         </div>
         
         {/* App Mockup in Hero */}
-        <div className="mt-20 max-w-3xl mx-auto bg-white rounded-t-3xl shadow-2xl p-4 overflow-hidden relative" style={{height: 250}}>
-           <div className="w-full h-full bg-gray-100 rounded-2xl border border-gray-200 flex items-center justify-center">
-              <span className="font-display font-bold text-gray-300 text-3xl">App Preview</span>
+        <div className="mt-20 max-w-3xl mx-auto brand-card rounded-t-[40px] p-4 overflow-hidden relative" style={{height: 250}}>
+           <div className="w-full h-full bg-[#fff8f6] rounded-[32px] border border-[#e2bfb0] flex items-center justify-center">
+              <span className="font-display font-bold text-[#a04100] text-3xl">Pedidos por QR</span>
            </div>
         </div>
       </section>
 
       {/* Como Funciona */}
-      <section id="como-funciona" className="py-24 px-6 bg-gray-50 border-b border-gray-100">
+      <section id="como-funciona" className="py-24 px-6 bg-[#fff8f6] border-b border-[#e2bfb0]/70">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
                <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Em 4 passos simples</h2>
@@ -103,11 +107,11 @@ export default function LandingPage() {
                  { i: UtensilsCrossed, t: "Faz o pedido", d: "Escolhe os itens, observa a conta e envia o pedido." },
                  { i: Zap, t: "Você recebe na hora", d: "O pedido apita direto no seu painel ou celular." },
                ].map((step, idx) => (
-                 <div key={idx} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 text-center relative z-10 transition-transform hover:-translate-y-2">
+                 <div key={idx} className="brand-card p-8 rounded-[40px] text-center relative z-10 transition-transform hover:-translate-y-2">
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FF6B00] text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
                       {idx + 1}
                     </div>
-                    <div className="w-16 h-16 bg-[#F5E1C0] rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
+                    <div className="w-16 h-16 bg-[#ffeae1] rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
                       <step.i size={32} className="text-[#FF6B00]" />
                     </div>
                     <h3 className="font-bold text-xl mb-2">{step.t}</h3>
@@ -135,7 +139,7 @@ export default function LandingPage() {
               { icon: TrendingUp, title: "Relatórios Completos", desc: "Faturamento, ticket médio, produtos mais vendidos, melhores clientes. Tudo em um clique." },
               { icon: Gift, title: "Promoções e Combos", desc: "Crie combos, preços promocionais e destaque itens especiais para aumentar o ticket médio." },
             ].map((b, idx) => (
-              <div key={idx} className="bg-gray-50 p-8 rounded-3xl border border-gray-100 transition-all hover:shadow-lg hover:border-[#FF6B00]/20 hover:-translate-y-1 group">
+              <div key={idx} className="bg-[#fff8f6] p-8 rounded-[40px] border border-[#e2bfb0]/70 transition-all hover:shadow-lg hover:border-[#FF6B00]/30 hover:-translate-y-1 group">
                 <div className="w-14 h-14 bg-[#FF6B00]/10 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
                   <b.icon size={28} className="text-[#FF6B00] group-hover:text-white transition-colors" />
                 </div>
@@ -148,19 +152,19 @@ export default function LandingPage() {
       </section>
 
       {/* Planos */}
-      <section id="planos" className="py-24 px-6 bg-gray-50">
+      <section id="planos" className="py-24 px-6 bg-[#fff1eb]">
         <div className="max-w-5xl mx-auto text-center">
            <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Planos que cabem no seu bolso</h2>
-           <p className="text-xl text-gray-500 mb-16">Comece com 7 dias grátis. Sem surpresas.</p>
+           <p className="text-xl text-gray-500 mb-16">Comece com {TRIAL_DAYS} dias grátis. Todos os planos incluem até {PLAN_UMBRELLA_LIMIT} guarda-sóis.</p>
            
            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
               {/* Trial */}
-              <div className="border border-gray-200 p-8 rounded-3xl bg-white">
+              <div className="border border-[#e2bfb0] p-8 rounded-[40px] bg-white">
                  <h3 className="text-2xl font-bold mb-2">Trial</h3>
                  <p className="text-gray-500 mb-6 font-semibold">Para conhecer a plataforma</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">R$0</span><span className="text-gray-500 font-bold">/7 dias</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">R$0</span><span className="text-gray-500 font-bold">/{TRIAL_DAYS} dias</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até 5 guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
@@ -168,12 +172,12 @@ export default function LandingPage() {
               </div>
 
               {/* Mensal */}
-              <div className="border border-gray-200 p-8 rounded-3xl bg-white">
+              <div className="border border-[#e2bfb0] p-8 rounded-[40px] bg-white">
                  <h3 className="text-2xl font-bold mb-2">Mensal</h3>
                  <p className="text-gray-500 mb-6 font-semibold">Ideal para testar a temporada</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">R$149</span><span className="text-gray-500 font-bold">/mês</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">{PLAN_PRICE_LABELS.monthly}</span><span className="text-gray-500 font-bold">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até 50 guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Relatórios completos</li>
                  </ul>
@@ -181,13 +185,13 @@ export default function LandingPage() {
               </div>
 
               {/* Anual */}
-              <div className="bg-gray-900 p-8 rounded-3xl text-white relative shadow-2xl scale-105">
+              <div className="bg-[#3d1a0a] p-8 rounded-[40px] text-white relative shadow-2xl scale-105">
                  <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
                  <h3 className="text-2xl font-bold mb-2">Anual</h3>
                  <p className="text-gray-400 mb-6 font-semibold">Para quem quer faturar o ano todo</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold">R$99</span><span className="text-gray-400 font-bold">/mês</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold">{PLAN_PRICE_LABELS.annualMonthly}</span><span className="text-gray-400 font-bold">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até 100 guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
                  </ul>
@@ -200,7 +204,7 @@ export default function LandingPage() {
       {/* CTA Secundário */}
       <section className="bg-gradient-to-r from-[#3D1A0A] to-gray-900 py-20 px-6 text-center text-white">
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
-        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com 7 dias grátis. Não precisa cartão de crédito.</p>
+        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {TRIAL_DAYS} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
            Seja nosso cliente
         </button>
@@ -220,7 +224,7 @@ export default function LandingPage() {
                   <CheckCircle2 size={32} className="text-green-600" />
                 </div>
                 <h3 className="text-2xl font-display font-bold text-gray-900 mb-2">Cadastro realizado!</h3>
-                <p className="text-gray-500 mb-6">Seu quiosque foi criado com 7 dias grátis. Acesse o painel para configurar seu cardápio.</p>
+                <p className="text-gray-500 mb-6">Seu quiosque foi criado com {TRIAL_DAYS} dias grátis. Acesse o painel para configurar seu cardápio.</p>
                 <Link
                   href="/vendor/login"
                   className="inline-flex items-center gap-2 bg-[#FF6B00] text-white px-8 py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#E56000] active:scale-95 transition-all"
@@ -232,7 +236,7 @@ export default function LandingPage() {
               <>
                 <div className="flex justify-between items-center p-6 border-b border-gray-100">
                   <div>
-                    <h3 className="text-xl font-display font-bold text-gray-900">Teste Grátis 7 dias</h3>
+                    <h3 className="text-xl font-display font-bold text-gray-900">Teste Grátis {TRIAL_DAYS} dias</h3>
                     <p className="text-sm text-gray-500">Sem cartão de crédito</p>
                   </div>
                   <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>

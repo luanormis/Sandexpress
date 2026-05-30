@@ -48,17 +48,18 @@ export default function KioskConfigPage() {
           .getPublicUrl(data.path).data.publicUrl;
       }
 
-      const { error: updateError } = await supabase
-        .from("vendors")
-        .update({
+      const response = await fetch(`/api/vendors/${vendorId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
           logo_url: logoUrl,
-        })
-        .eq("id", vendorId);
+        }),
+      });
 
-      if (updateError) throw updateError;
+      if (!response.ok) throw new Error("Failed to update vendor");
 
       setMessage("Configurações salvas com sucesso!");
     } catch (err) {
