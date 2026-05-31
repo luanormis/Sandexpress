@@ -21,7 +21,7 @@ export default function OpeningDayStockControl() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const vendorId = typeof window !== 'undefined' ? localStorage.getItem('vendor_id') || '' : '';
+  const vendorId = typeof window !== 'undefined' ? sessionStorage.getItem('vendor_id') || localStorage.getItem('vendor_id') || '' : '';
 
   // Carrega produtos ao abrir
   useEffect(() => {

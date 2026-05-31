@@ -35,6 +35,9 @@ CREATE TABLE vendors (
   logo_url TEXT,
   primary_color TEXT DEFAULT '#FF6B00',
   secondary_color TEXT DEFAULT '#82533F',
+  pix_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  pix_key TEXT,
+  pix_account_name TEXT,
   password_hash TEXT,
   password_needs_reset BOOLEAN NOT NULL DEFAULT TRUE,
   password_reset_token TEXT,
@@ -151,6 +154,9 @@ CREATE TABLE orders (
   paid BOOLEAN DEFAULT FALSE,
   payment_method TEXT,
   pending_close BOOLEAN NOT NULL DEFAULT FALSE,
+  close_requested_at TIMESTAMPTZ,
+  pix_payload TEXT,
+  paid_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

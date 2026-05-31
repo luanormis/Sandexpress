@@ -5,10 +5,12 @@ import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
+  Wallet, Map as MapIcon, PackageOpen,
 } from "lucide-react";
 import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 // ---------- TYPES ----------
 interface Product {
@@ -27,11 +29,16 @@ interface Product {
 interface OrderItem { q: number; n: string; }
 interface Order {
   id: string;
+  umbrella_id?: string;
   umbrella: number;
   customer: string;
   phone: string;
   total: number;
   status: string;
+  raw_status: string;
+  paid: boolean;
+  payment_method?: string | null;
+  pending_close: boolean;
   time: string;
   items: OrderItem[];
   notes?: string;
@@ -47,6 +54,9 @@ type OrderRow = {
   order_items?: { quantity: number; products?: { name?: string } | null }[];
   customers?: { name?: string; phone?: string } | null;
   umbrellas?: { number?: number } | null;
+  paid?: boolean | null;
+  payment_method?: string | null;
+  pending_close?: boolean | null;
 };
 
 interface Umbrella {
@@ -81,10 +91,17 @@ interface Customer {
   last_visit_at: string;
 }
 
+interface PaymentSettings {
+  pix_enabled: boolean;
+  pix_key: string;
+  pix_account_name: string;
+}
+
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
 const TABS = [
   { id: "orders", label: "Pedidos", icon: ShoppingBag },
+  { id: "opening", label: "Abertura", icon: PackageOpen },
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
@@ -115,6 +132,8 @@ export default function VendorDashboard() {
   const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
   const [showAddUmbrella, setShowAddUmbrella] = useState(false);
   const [newUmbrellaNumber, setNewUmbrellaNumber] = useState("");
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({ pix_enabled: false, pix_key: "", pix_account_name: "" });
+  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
 
   // --- Reports State ---
   const [reportPeriod, setReportPeriod] = useState("month");
@@ -127,22 +146,38 @@ export default function VendorDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Data loading functions
-  const mapOrder = (row: OrderRow): Order => ({
-    id: row.id,
-    umbrella: row.umbrellas?.number || 0,
-    customer: row.customers?.name || "Cliente",
-    phone: row.customers?.phone || "",
-    total: Number(row.total || 0),
-    status: row.status,
-    time: row.created_at
-      ? new Date(row.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-      : "--:--",
-    items: (row.order_items || []).map((item) => ({
-      q: item.quantity,
-      n: item.products?.name || "Produto",
-    })),
-    notes: row.notes || undefined,
-  });
+  const mapOrder = (row: OrderRow): Order => {
+    const paid = Boolean(row.paid);
+    const pendingClose = Boolean(row.pending_close);
+    const paymentMethod = row.payment_method || null;
+    const displayStatus = paid && paymentMethod === "pix"
+      ? "paid_pix"
+      : pendingClose && !paid
+      ? "closing"
+      : row.status;
+
+    return {
+      id: row.id,
+      umbrella_id: row.umbrella_id,
+      umbrella: row.umbrellas?.number || 0,
+      customer: row.customers?.name || "Cliente",
+      phone: row.customers?.phone || "",
+      total: Number(row.total || 0),
+      status: displayStatus,
+      raw_status: row.status,
+      paid,
+      payment_method: paymentMethod,
+      pending_close: pendingClose,
+      time: row.created_at
+        ? new Date(row.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : "--:--",
+      items: (row.order_items || []).map((item) => ({
+        q: item.quantity,
+        n: item.products?.name || "Produto",
+      })),
+      notes: row.notes || undefined,
+    };
+  };
 
   const playNewOrderSound = () => {
     if (!audioContext.current) return;
@@ -216,6 +251,47 @@ export default function VendorDashboard() {
     }
   };
 
+  const loadPaymentSettings = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/vendors/${vid}/payment-settings`);
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentSettings({
+          pix_enabled: Boolean(data.pix_enabled),
+          pix_key: data.pix_key || "",
+          pix_account_name: data.pix_account_name || "",
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load payment settings:', err);
+    }
+  };
+
+  const savePaymentSettings = async () => {
+    if (!vendorId) return;
+    setSavingPaymentSettings(true);
+    try {
+      const res = await fetch(`/api/vendors/${vendorId}/payment-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentSettings),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return alert(data?.error || 'Erro ao salvar PIX.');
+      setPaymentSettings({
+        pix_enabled: Boolean(data.pix_enabled),
+        pix_key: data.pix_key || "",
+        pix_account_name: data.pix_account_name || "",
+      });
+      alert('Configuracao PIX salva.');
+    } catch (err) {
+      console.error('Save payment settings error:', err);
+      alert('Erro de rede ao salvar PIX.');
+    } finally {
+      setSavingPaymentSettings(false);
+    }
+  };
+
   const loadCustomers = async (vid: string) => {
     try {
       const res = await fetch(`/api/customers?vendor_id=${vid}`);
@@ -237,6 +313,7 @@ export default function VendorDashboard() {
       loadOrders(vid);
       loadProducts(vid);
       loadUmbrellas(vid);
+      loadPaymentSettings(vid);
       loadCustomers(vid);
     }
   }, []);
@@ -301,6 +378,35 @@ export default function VendorDashboard() {
       console.error('Move order error:', err);
       setOrders(previous);
       alert('Erro de rede ao atualizar pedido.');
+    }
+  };
+
+  const confirmAccountPayment = async (order: Order) => {
+    if (!vendorId || !order.umbrella_id) return;
+    const previous = orders;
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: order.payment_method === 'pix' ? 'paid_pix' : 'completed', paid: true, pending_close: false } : o));
+    try {
+      const res = await fetch('/api/close-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          umbrella_id: order.umbrella_id,
+          payment_method: order.payment_method === 'pix' ? 'pix' : 'cash',
+          notes: order.notes || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setOrders(previous);
+        return alert(err?.error || 'Erro ao confirmar pagamento.');
+      }
+      await loadOrders(vendorId);
+      await loadUmbrellas(vendorId);
+    } catch (err) {
+      console.error('Confirm account payment error:', err);
+      setOrders(previous);
+      alert('Erro de rede ao confirmar pagamento.');
     }
   };
 
@@ -469,6 +575,24 @@ export default function VendorDashboard() {
                   📝 {order.notes}
                 </div>
               )}
+              {order.status === "closing" && (
+                <div className="mb-2 rounded-lg border border-orange-100 bg-orange-50 p-2 text-xs text-orange-700">
+                  Cliente pediu a conta{order.payment_method === "pix" ? " e informou pagamento via PIX." : "."}
+                </div>
+              )}
+              {order.status === "paid_pix" && (
+                <div className="mb-2 rounded-lg border border-green-100 bg-green-50 p-2 text-xs font-bold text-green-700">
+                  Conta paga via PIX. Guarda-sol liberado.
+                </div>
+              )}
+              {order.status === "closing" && (
+                <button
+                  onClick={() => confirmAccountPayment(order)}
+                  className="mb-2 w-full bg-[#3D1A0A] hover:bg-[#2b1207] text-white font-bold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-1"
+                >
+                  <Wallet size={16} /> Confirmar pagamento e liberar
+                </button>
+              )}
               {nextStatus && (
                 <button
                   onClick={() => moveOrder(order.id, nextStatus)}
@@ -558,13 +682,19 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
-            <div className="grid grid-cols-1 md:flex gap-4 overflow-x-auto pb-4 h-full">
-              {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
-              {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
-              {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
-              {renderKanbanColumn("Entregue", "completed", "", "", "bg-green-500")}
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4 h-full">
+              <div className="grid grid-cols-1 md:flex gap-4 overflow-x-auto pb-4 h-full">
+                {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
+                {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
+                {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
+                {renderKanbanColumn("Conta solicitada", "closing", "", "", "bg-orange-500")}
+                {renderKanbanColumn("Conta paga PIX", "paid_pix", "", "", "bg-green-500")}
+              </div>
+              <BeachMap orders={orders} umbrellas={umbrellas} />
             </div>
           )}
+
+          {activeTab === "opening" && <OpeningDayStockControl />}
 
           {/* ========== ABA 2: CARDÁPIO ========== */}
           {activeTab === "menu" && (
@@ -664,6 +794,44 @@ export default function VendorDashboard() {
           {/* ========== ABA 3: GUARDA-SÓIS / QR CODES ========== */}
           {activeTab === "qr" && (
             <div className="space-y-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Wallet size={18} className="text-[#FF6B00]" /> Pagamento PIX</h3>
+                    <p className="text-gray-500 text-sm">Quando ativado, o cliente gera o QR Code da conta ao pedir fechamento.</p>
+                  </div>
+                  <label className="flex items-center gap-2 font-bold text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={paymentSettings.pix_enabled}
+                      onChange={e => setPaymentSettings(prev => ({ ...prev, pix_enabled: e.target.checked }))}
+                      className="h-5 w-5 accent-[#FF6B00]"
+                    />
+                    Liberar PIX para clientes
+                  </label>
+                </div>
+                <div className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3">
+                  <input
+                    value={paymentSettings.pix_key}
+                    onChange={e => setPaymentSettings(prev => ({ ...prev, pix_key: e.target.value }))}
+                    placeholder="Chave PIX do quiosque"
+                    className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-[#FF6B00] outline-none"
+                  />
+                  <input
+                    value={paymentSettings.pix_account_name}
+                    onChange={e => setPaymentSettings(prev => ({ ...prev, pix_account_name: e.target.value }))}
+                    placeholder="Nome que aparece no pagamento"
+                    className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-[#FF6B00] outline-none"
+                  />
+                  <button
+                    onClick={savePaymentSettings}
+                    disabled={savingPaymentSettings}
+                    className="bg-[#FF6B00] text-white px-5 py-3 rounded-xl font-bold shadow-sm hover:bg-[#E56000] disabled:opacity-60"
+                  >
+                    {savingPaymentSettings ? "Salvando..." : "Salvar PIX"}
+                  </button>
+                </div>
+              </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex justify-between items-center mb-6">
                   <div>
@@ -983,6 +1151,57 @@ export default function VendorDashboard() {
         />
       )}
     </div>
+  );
+}
+
+function BeachMap({ orders, umbrellas }: { orders: Order[]; umbrellas: Umbrella[] }) {
+  const activeByUmbrella = new Map<number, Order>();
+  orders
+    .filter(order => !order.paid && order.status !== "paid_pix")
+    .forEach(order => activeByUmbrella.set(order.umbrella, order));
+
+  return (
+    <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit xl:sticky xl:top-6">
+      <div className="flex items-center gap-2 mb-4">
+        <MapIcon size={18} className="text-[#FF6B00]" />
+        <h3 className="font-bold text-gray-900">Mapa da praia</h3>
+      </div>
+      <div className="rounded-2xl overflow-hidden border border-[#F5E1C0] bg-[#FFF7EB]">
+        <div className="h-16 bg-[#76B7C8]" />
+        <div className="h-5 bg-[#F5E1C0]" />
+        <div className="grid grid-cols-4 gap-3 p-4">
+          {umbrellas.slice(0, 16).map((umbrella) => {
+            const order = activeByUmbrella.get(umbrella.number);
+            const closing = order?.status === "closing";
+            return (
+              <div key={umbrella.id} className="flex flex-col items-center gap-1">
+                <div className={cn(
+                  "h-9 w-9 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                  !umbrella.active
+                    ? "bg-gray-100 border-gray-200 text-gray-400"
+                    : closing
+                    ? "bg-orange-100 border-orange-400 text-orange-700"
+                    : order
+                    ? "bg-[#FF6B00] border-[#E56000] text-white"
+                    : "bg-green-50 border-green-400 text-green-700"
+                )}>
+                  {umbrella.number}
+                </div>
+                <span className="text-[10px] text-gray-500">
+                  {!umbrella.active ? "off" : closing ? "conta" : order ? "uso" : "livre"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-green-50 p-2 text-green-700">Livres: {umbrellas.filter(u => u.active && !activeByUmbrella.has(u.number)).length}</div>
+        <div className="rounded-lg bg-orange-50 p-2 text-orange-700">Fechando: {orders.filter(o => o.status === "closing").length}</div>
+        <div className="rounded-lg bg-[#FFF7EB] p-2 text-[#8A5D12]">Ocupados: {orders.filter(o => !o.paid && o.status !== "closing").length}</div>
+        <div className="rounded-lg bg-gray-50 p-2 text-gray-600">Inativos: {umbrellas.filter(u => !u.active).length}</div>
+      </div>
+    </aside>
   );
 }
 

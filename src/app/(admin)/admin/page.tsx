@@ -48,6 +48,8 @@ interface PlatformReport {
   blocked_vendors: number;
   retention_rate: number;
   top_vendors: { name: string; city: string; revenue: number }[];
+  beach_revenue: { beach: string; revenue: number; orders: number }[];
+  top_products: { name: string; category: string; quantity: number; revenue: number }[];
   monthly_received: number;
   next_cycle_receivable: number;
   overdue_amount: number;
@@ -651,6 +653,43 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Praias que mais faturam</h3>
+                <div className="space-y-3">
+                  {platformReport.beach_revenue.map((beach, i) => {
+                    const maxRev = Math.max(...platformReport.beach_revenue.map(x => x.revenue), 1);
+                    return (
+                      <div key={beach.beach} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-bold text-white">{i + 1}. {beach.beach}</span>
+                          <span className="text-gray-400">{beach.orders} pedidos · {formatCurrency(beach.revenue)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-700">
+                          <div className="h-2 rounded-full bg-[#ffb693]" style={{ width: `${(beach.revenue / maxRev) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Produtos que mais faturam</h3>
+                <div className="space-y-3">
+                  {platformReport.top_products.map((product, i) => (
+                    <div key={`${product.name}-${i}`} className="flex items-center justify-between gap-3 border-b border-gray-700/60 pb-2 last:border-0">
+                      <div>
+                        <p className="font-bold text-white text-sm">{i + 1}. {product.name}</p>
+                        <p className="text-xs text-gray-500">{product.category} · {product.quantity} un</p>
+                      </div>
+                      <span className="font-bold text-[#ffb693]">{formatCurrency(product.revenue)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "next/navigation";
-import { MapPin, ShoppingBag, ShoppingCart, UserRound, Plus, Minus, Home, ListOrdered, Utensils, ChevronRight } from "lucide-react";
+import { MapPin, ShoppingBag, ShoppingCart, UserRound, Home, ListOrdered, Utensils, ChevronRight, ReceiptText } from "lucide-react";
 import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -41,6 +41,7 @@ type VendorBrand = {
   primary_color: string;
   secondary_color: string;
   logo_url?: string | null;
+  pix_enabled?: boolean;
 };
 
 export default function CustomerApp() {
@@ -61,6 +62,13 @@ export default function CustomerApp() {
   const [otpModeHint, setOtpModeHint] = useState<string | null>(null);
   const [requestingOtp, setRequestingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [closingAccount, setClosingAccount] = useState(false);
+  const [closeAccountResult, setCloseAccountResult] = useState<{
+    total: number;
+    payment_method: string;
+    pix_qr_image_url?: string | null;
+    message: string;
+  } | null>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -244,6 +252,40 @@ export default function CustomerApp() {
     }
   };
 
+  const requestCloseAccount = async () => {
+    if (!vendorId || !customerId || !umbrella_id) {
+      return alert('Entre com seu WhatsApp antes de fechar a conta.');
+    }
+    if (orders.length === 0) {
+      return alert('Nenhum pedido aberto encontrado para fechar.');
+    }
+
+    setClosingAccount(true);
+    try {
+      const response = await fetch('/api/request-close-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          customer_id: customerId,
+          umbrella_id,
+          payment_method: vendor?.pix_enabled ? 'pix' : 'cash',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return alert(result.error || 'Erro ao solicitar fechamento da conta.');
+      }
+      setCloseAccountResult(result);
+      setStep('orders');
+    } catch (err) {
+      console.error('Request close account error:', err);
+      alert('Erro de rede ao solicitar fechamento.');
+    } finally {
+      setClosingAccount(false);
+    }
+  };
+
   const callWaiter = () => {
     setWaiterCalled(true);
     const timeoutId = window.setTimeout(() => setWaiterCalled(false), 5000);
@@ -364,11 +406,18 @@ export default function CustomerApp() {
     <div className="min-h-screen bg-gray-50 pb-32 font-sans">
       <header className="bg-white shadow-sm sticky top-0 z-20">
         <div className="p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Guarda-sol</p>
               <h1 className="font-display font-bold text-xl text-gray-900">{customer?.name || "Cliente"}</h1>
             </div>
+            <button
+              onClick={requestCloseAccount}
+              disabled={closingAccount || orders.length === 0}
+              className="bg-[#3D1A0A] text-white px-4 py-2 rounded-full font-semibold text-sm shadow-md hover:bg-[#2b1207] transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <ReceiptText size={16} /> {closingAccount ? "Enviando..." : "Fechar conta"}
+            </button>
             <button
               onClick={callWaiter}
               className="bg-[#FF6B00] text-white px-4 py-2 rounded-full font-semibold text-sm shadow-md hover:bg-[#E56000] transition-colors flex items-center gap-2"
@@ -514,8 +563,29 @@ export default function CustomerApp() {
             <div className="bg-[#FF6B00] text-white rounded-3xl p-6 shadow-lg">
               <p className="text-xs uppercase tracking-[0.2em] opacity-80">Total acumulado</p>
               <p className="text-4xl font-display font-bold mt-3">{formatCurrency(totalOwed)}</p>
+              <button
+                type="button"
+                onClick={requestCloseAccount}
+                disabled={closingAccount || orders.length === 0}
+                className="mt-5 w-full rounded-3xl bg-white py-4 text-[#FF6B00] font-bold shadow-md hover:bg-[#FFF7EB] transition disabled:opacity-60"
+              >
+                {closingAccount ? "Enviando conta..." : vendor?.pix_enabled ? "Fechar conta e gerar PIX" : "Pedir fechamento da conta"}
+              </button>
               <p className="mt-2 text-sm opacity-90">Pague ao garçom no final da visita.</p>
             </div>
+            {closeAccountResult && (
+              <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Fechamento solicitado</p>
+                <h2 className="text-2xl font-bold text-gray-900 mt-2">{formatCurrency(closeAccountResult.total)}</h2>
+                <p className="text-sm text-gray-600 mt-2">{closeAccountResult.message}</p>
+                {closeAccountResult.pix_qr_image_url && (
+                  <div className="mt-4 flex flex-col items-center rounded-3xl bg-gray-50 border border-gray-100 p-4">
+                    <img src={closeAccountResult.pix_qr_image_url} alt="QR Code PIX da conta" className="w-56 h-56 rounded-2xl border border-gray-200 bg-white" />
+                    <p className="mt-3 text-center text-sm text-gray-500">Depois do pagamento, o quiosque confirma no Kanban e libera o guarda-sol.</p>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="space-y-4">
               {orders.length === 0 ? (
                 <div className="bg-white rounded-3xl border border-gray-100 p-8 text-center text-gray-500 shadow-sm">

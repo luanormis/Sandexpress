@@ -26,11 +26,21 @@ export async function GET(
       return NextResponse.json({ error: 'Este guarda-sol está inativo.' }, { status: 403 });
     }
 
-    const { data: vendor, error: vErr } = await supabaseAdmin
+    let { data: vendor, error: vErr } = await supabaseAdmin
       .from('vendors')
-      .select('id, name, primary_color, secondary_color, logo_url, is_active, subscription_status')
+      .select('id, name, primary_color, secondary_color, logo_url, is_active, subscription_status, pix_enabled')
       .eq('id', umbrella.vendor_id)
       .single();
+
+    if (vErr && String(vErr.message || '').includes('pix_enabled')) {
+      const fallback = await supabaseAdmin
+        .from('vendors')
+        .select('id, name, primary_color, secondary_color, logo_url, is_active, subscription_status')
+        .eq('id', umbrella.vendor_id)
+        .single();
+      vendor = fallback.data as any;
+      vErr = fallback.error;
+    }
 
     if (vErr || !vendor) {
       return NextResponse.json({ error: 'Quiosque não encontrado.' }, { status: 404 });
@@ -66,6 +76,7 @@ export async function GET(
         primary_color: vendor.primary_color || '#FF6B00',
         secondary_color: vendor.secondary_color || '#394E59',
         logo_url: vendor.logo_url,
+        pix_enabled: Boolean(vendor.pix_enabled),
       },
       products: visible,
     });

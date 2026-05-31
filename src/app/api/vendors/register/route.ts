@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from '@/lib/plans';
+import { DEFAULT_MENU_PRODUCTS } from '@/lib/default-menu';
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -79,6 +80,26 @@ export async function POST(req: NextRequest) {
       });
 
     if (tenantError) throw tenantError;
+
+    const { error: productsError } = await supabaseAdmin
+      .from('products')
+      .insert(
+        DEFAULT_MENU_PRODUCTS.map((product) => ({
+          tenant_id: data.id,
+          vendor_id: data.id,
+          category: product.category,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          active: true,
+          is_combo: false,
+          sort_order: product.sort_order,
+          stock_quantity: product.stock_quantity,
+          blocked_by_stock: product.stock_quantity <= 0,
+        }))
+      );
+
+    if (productsError) throw productsError;
 
     const responseBody: any = {
       ...data,

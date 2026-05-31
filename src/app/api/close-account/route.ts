@@ -86,19 +86,36 @@ export async function POST(req: NextRequest) {
     const firstOrder = selectedOrders[0];
     const total = selectedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
 
-    const { error: updateErr } = await enforceTenantScope(
+    const closeUpdate = {
+      status: 'completed',
+      paid: true,
+      payment_method: payment_method || 'cash',
+      pending_close: false,
+      paid_at: new Date().toISOString(),
+      notes: notes || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { error: updateErr } = await enforceTenantScope(
       supabaseAdmin
         .from('orders')
-        .update({
-          status: 'completed',
-          paid: true,
-          payment_method: payment_method || 'cash',
-          notes: notes || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(closeUpdate)
         .in('id', orderIds),
       tenantId
     );
+
+    if (updateErr && String(updateErr.message || '').includes('paid_at')) {
+      const legacyCloseUpdate: Partial<typeof closeUpdate> = { ...closeUpdate };
+      delete legacyCloseUpdate.paid_at;
+      const fallback = await enforceTenantScope(
+        supabaseAdmin
+          .from('orders')
+          .update(legacyCloseUpdate)
+          .in('id', orderIds),
+        tenantId
+      );
+      updateErr = fallback.error;
+    }
 
     if (updateErr) throw updateErr;
 
