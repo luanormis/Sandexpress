@@ -1,0 +1,42 @@
+{
+  "vendorId": "7fbdb72e-9f8f-4ef0-8f62-9623e38cfeef",
+  "documentLogin": "9980545666",
+  "vendorPassword": "TesteReal80545666!",
+  "ownerPhone": "11980545666",
+  "products": [
+    {
+      "id": "dd57a99e-3535-4a41-a5a2-dc52068378ad",
+      "name": "Agua Mineral 80545666"
+    },
+    {
+      "id": "188eadd8-a297-48ea-b8cc-eab8a0412e99",
+      "name": "Suco Natural 80545666"
+    },
+    {
+      "id": "7a69336f-6056-4713-aa51-bb49cd827fe7",
+      "name": "Batata Frita 80545666"
+    },
+    {
+      "id": "15541157-ae8a-4242-aa0b-fcc9b6819f53",
+      "name": "Combo Praia 80545666"
+    }
+  ],
+  "umbrellas": [
+    {
+      "id": "cb3da658-a518-4e1c-b9c0-aef2713c7dc1",
+      "number": 1,
+      "url": "http://127.0.0.1:3002/u/cb3da658-a518-4e1c-b9c0-aef2713c7dc1"
+    },
+    {
+      "id": "c63910ec-c03b-45a0-a5fb-1ca2b02bce70",
+      "number": 2,
+      "url": "http://127.0.0.1:3002/u/c63910ec-c03b-45a0-a5fb-1ca2b02bce70"
+    },
+    {
+      "id": "9cfec170-60e2-415a-bcbe-b5832033b4c0",
+      "number": 3,
+      "url": "http://127.0.0.1:3002/u/9cfec170-60e2-415a-bcbe-b5832033b4c0"
+    }
+  ],
+  "testPage": "http://127.0.0.1:3002/test-real/"
+}

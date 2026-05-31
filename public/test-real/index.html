@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SandExpress - Teste Real Pre Deploy</title>
+  <style>
+    :root { color-scheme: light; --orange:#ff6b00; --brown:#3d1a0a; --paper:#fff8f6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, sans-serif; background:var(--paper); color:#24140e; }
+    header { padding:28px 20px; background:linear-gradient(135deg,var(--orange),#ffb693); color:white; }
+    main { max-width:1080px; margin:0 auto; padding:20px; display:grid; gap:18px; }
+    section { background:white; border:1px solid #efd6cc; border-radius:14px; padding:18px; box-shadow:0 8px 24px #00000010; }
+    h1, h2 { margin:0 0 10px; }
+    p { line-height:1.45; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+    .card { border:1px solid #f0d9ce; border-radius:12px; padding:14px; background:#fffdfc; }
+    a.button { display:inline-block; margin:6px 6px 6px 0; padding:11px 14px; border-radius:10px; background:var(--orange); color:white; text-decoration:none; font-weight:700; }
+    code { background:#fff1eb; border:1px solid #ffd7c4; border-radius:7px; padding:2px 6px; }
+    img.qr { width:150px; height:150px; image-rendering:pixelated; border:1px solid #eee; border-radius:10px; }
+    ol li { margin:8px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SandExpress - Teste Real Pre Deploy</h1>
+    <p>Ambiente local para validar admin, vendor, cliente, QR, pedido, realtime, Kanban e fechamento.</p>
+  </header>
+  <main>
+    <section>
+      <h2>1. Acessos</h2>
+      <p><strong>Admin:</strong> usuario <code>luanormis</code>, senha <code>95732</code></p>
+      <p><strong>Vendor teste:</strong> CPF/CNPJ <code>9980545666</code>, senha <code>TesteReal80545666!</code></p>
+      <a class="button" href="/admin" target="_blank">Abrir Admin</a>
+      <a class="button" href="/vendor/login" target="_blank">Abrir Login Vendor</a>
+      <a class="button" href="/vendor/dashboard" target="_blank">Abrir Painel Vendor</a>
+    </section>
+    <section>
+      <h2>2. Guarda-sois e cardapios por QR</h2>
+      <div class="grid">
+        <div class="card"><h3>Guarda-sol 1</h3><img class="qr" src="/test-real/qr-guarda-sol-1.png" alt="QR Guarda-sol 1" /><p><a class="button" href="http://127.0.0.1:3002/u/cb3da658-a518-4e1c-b9c0-aef2713c7dc1" target="_blank">Abrir cardapio</a></p><p><code>http://127.0.0.1:3002/u/cb3da658-a518-4e1c-b9c0-aef2713c7dc1</code></p></div><div class="card"><h3>Guarda-sol 2</h3><img class="qr" src="/test-real/qr-guarda-sol-2.png" alt="QR Guarda-sol 2" /><p><a class="button" href="http://127.0.0.1:3002/u/c63910ec-c03b-45a0-a5fb-1ca2b02bce70" target="_blank">Abrir cardapio</a></p><p><code>http://127.0.0.1:3002/u/c63910ec-c03b-45a0-a5fb-1ca2b02bce70</code></p></div><div class="card"><h3>Guarda-sol 3</h3><img class="qr" src="/test-real/qr-guarda-sol-3.png" alt="QR Guarda-sol 3" /><p><a class="button" href="http://127.0.0.1:3002/u/9cfec170-60e2-415a-bcbe-b5832033b4c0" target="_blank">Abrir cardapio</a></p><p><code>http://127.0.0.1:3002/u/9cfec170-60e2-415a-bcbe-b5832033b4c0</code></p></div>
+      </div>
+    </section>
+    <section>
+      <h2>3. Roteiro de validacao em tempo real</h2>
+      <ol>
+        <li>Abra o Painel Vendor em um tablet/notebook e faca login com as credenciais acima.</li>
+        <li>No painel, clique em Ativar som. O navegador precisa desse toque para liberar o apito.</li>
+        <li>No celular, abra um dos cardapios acima ou leia o QR.</li>
+        <li>Digite nome e WhatsApp. No modo teste, o OTP aparece na propria tela.</li>
+        <li>Adicione um produto ao carrinho e clique em Confirmar e enviar.</li>
+        <li>O pedido deve aparecer no Kanban do quiosque em Recebido e emitir apito.</li>
+        <li>Mova o pedido: Iniciar Preparo, Saiu para Entrega, Confirmar Entrega.</li>
+        <li>Feche a conta e confirme que o guarda-sol fica liberado para o proximo cliente.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>4. Produtos criados</h2>
+      <ul><li><strong>Agua Mineral 80545666</strong></li><li><strong>Suco Natural 80545666</strong></li><li><strong>Batata Frita 80545666</strong></li><li><strong>Combo Praia 80545666</strong></li></ul>
+    </section>
+  </main>
+</body>
+</html>
