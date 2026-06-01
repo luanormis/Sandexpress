@@ -62,20 +62,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
-    const { data, error } = await enforceTenantScope(
+    const mapX = body.map_x === undefined ? Math.min(92, 12 + ((Number(body.number) - 1) % 4) * 24) : Math.min(100, Math.max(0, Number(body.map_x)));
+    const mapY = body.map_y === undefined ? Math.min(88, 24 + Math.floor((Number(body.number) - 1) / 4) * 18) : Math.min(100, Math.max(0, Number(body.map_y)));
+    const insertPayload = {
+      vendor_id: body.vendor_id,
+      number: body.number,
+      label: body.label || `Barraca ${body.number}`,
+      active: true,
+      tenant_id: tenantId,
+      map_x: mapX,
+      map_y: mapY,
+    };
+
+    let { data, error } = await enforceTenantScope(
       supabaseAdmin
         .from('umbrellas')
-        .insert({
-          vendor_id: body.vendor_id,
-          number: body.number,
-          label: body.label || `Barraca ${body.number}`,
-          active: true,
-          tenant_id: tenantId,
-        }),
+        .insert(insertPayload),
       tenantId
     )
       .select()
       .single();
+
+    if (error && /map_x|map_y/.test(String(error.message || ''))) {
+      const legacyInsert: Partial<typeof insertPayload> = { ...insertPayload };
+      delete legacyInsert.map_x;
+      delete legacyInsert.map_y;
+      const fallback = await enforceTenantScope(
+        supabaseAdmin
+          .from('umbrellas')
+          .insert(legacyInsert),
+        tenantId
+      )
+        .select()
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data, { status: 201 });

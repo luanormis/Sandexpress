@@ -80,8 +80,22 @@ CREATE TABLE umbrellas (
   is_occupied BOOLEAN NOT NULL DEFAULT FALSE,
   current_order_id UUID,
   qr_url TEXT,
+  map_x NUMERIC(5,2),
+  map_y NUMERIC(5,2),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(vendor_id, number)
+);
+
+CREATE TABLE service_calls (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  umbrella_id UUID NOT NULL REFERENCES umbrellas(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','cancelled')),
+  message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ
 );
 
 CREATE TABLE products (

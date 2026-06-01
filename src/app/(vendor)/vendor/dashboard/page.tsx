@@ -66,6 +66,8 @@ interface Umbrella {
   active: boolean;
   qr_url: string | null;
   qr_image_url?: string;
+  map_x?: number | null;
+  map_y?: number | null;
 }
 
 interface ReportData {
@@ -96,6 +98,15 @@ interface PaymentSettings {
   pix_key: string;
   pix_account_name: string;
 }
+
+type ServiceCall = {
+  id: string;
+  umbrella_id: string;
+  status: string;
+  message?: string | null;
+  created_at?: string;
+  umbrellas?: { number?: number } | null;
+};
 
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
@@ -132,6 +143,8 @@ export default function VendorDashboard() {
   const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
   const [showAddUmbrella, setShowAddUmbrella] = useState(false);
   const [newUmbrellaNumber, setNewUmbrellaNumber] = useState("");
+  const [serviceCalls, setServiceCalls] = useState<ServiceCall[]>([]);
+  const [editingMap, setEditingMap] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({ pix_enabled: false, pix_key: "", pix_account_name: "" });
   const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
 
@@ -267,6 +280,47 @@ export default function VendorDashboard() {
     }
   };
 
+  const loadServiceCalls = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/service-calls?vendor_id=${vid}`);
+      if (res.ok) setServiceCalls(await res.json());
+    } catch (err) {
+      console.error('Failed to load service calls:', err);
+    }
+  };
+
+  const resolveServiceCall = async (callId: string) => {
+    if (!vendorId) return;
+    const previous = serviceCalls;
+    setServiceCalls(prev => prev.filter(call => call.id !== callId));
+    try {
+      const res = await fetch('/api/service-calls', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: callId, vendor_id: vendorId, status: 'resolved' }),
+      });
+      if (!res.ok) setServiceCalls(previous);
+    } catch (err) {
+      console.error('Resolve service call error:', err);
+      setServiceCalls(previous);
+    }
+  };
+
+  const moveUmbrellaOnMap = async (umbrellaId: string, map_x: number, map_y: number) => {
+    if (!vendorId) return;
+    setUmbrellas(prev => prev.map(u => u.id === umbrellaId ? { ...u, map_x, map_y } : u));
+    try {
+      await fetch(`/api/umbrellas/${umbrellaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ map_x, map_y }),
+      });
+    } catch (err) {
+      console.error('Move umbrella map error:', err);
+      loadUmbrellas(vendorId);
+    }
+  };
+
   const savePaymentSettings = async () => {
     if (!vendorId) return;
     setSavingPaymentSettings(true);
@@ -314,6 +368,7 @@ export default function VendorDashboard() {
       loadProducts(vid);
       loadUmbrellas(vid);
       loadPaymentSettings(vid);
+      loadServiceCalls(vid);
       loadCustomers(vid);
     }
   }, []);
@@ -338,9 +393,17 @@ export default function VendorDashboard() {
         { event: "*", schema: "public", table: "order_items" },
         () => loadOrders(vendorId)
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "service_calls" },
+        () => loadServiceCalls(vendorId)
+      )
       .subscribe();
 
-    const interval = window.setInterval(() => loadOrders(vendorId, { notifyNew: true }), 5000);
+    const interval = window.setInterval(() => {
+      loadOrders(vendorId, { notifyNew: true });
+      loadServiceCalls(vendorId);
+    }, 5000);
 
     return () => {
       window.clearInterval(interval);
@@ -690,7 +753,15 @@ export default function VendorDashboard() {
                 {renderKanbanColumn("Conta solicitada", "closing", "", "", "bg-orange-500")}
                 {renderKanbanColumn("Conta paga PIX", "paid_pix", "", "", "bg-green-500")}
               </div>
-              <BeachMap orders={orders} umbrellas={umbrellas} />
+              <BeachMap
+                orders={orders}
+                umbrellas={umbrellas}
+                serviceCalls={serviceCalls}
+                editing={editingMap}
+                onToggleEditing={() => setEditingMap(prev => !prev)}
+                onMoveUmbrella={moveUmbrellaOnMap}
+                onResolveServiceCall={resolveServiceCall}
+              />
             </div>
           )}
 
@@ -1154,52 +1225,125 @@ export default function VendorDashboard() {
   );
 }
 
-function BeachMap({ orders, umbrellas }: { orders: Order[]; umbrellas: Umbrella[] }) {
+function BeachMap({
+  orders,
+  umbrellas,
+  serviceCalls,
+  editing,
+  onToggleEditing,
+  onMoveUmbrella,
+  onResolveServiceCall,
+}: {
+  orders: Order[];
+  umbrellas: Umbrella[];
+  serviceCalls: ServiceCall[];
+  editing: boolean;
+  onToggleEditing: () => void;
+  onMoveUmbrella: (umbrellaId: string, map_x: number, map_y: number) => void;
+  onResolveServiceCall: (callId: string) => void;
+}) {
   const activeByUmbrella = new Map<number, Order>();
   orders
-    .filter(order => !order.paid && order.status !== "paid_pix")
+    .filter(order => !order.paid && order.status !== "paid_pix" && order.status !== "completed")
     .forEach(order => activeByUmbrella.set(order.umbrella, order));
+  const callsByUmbrella = new Map<number, ServiceCall>();
+  serviceCalls.forEach((call) => {
+    const number = call.umbrellas?.number;
+    if (number) callsByUmbrella.set(number, call);
+  });
+
+  const defaultPosition = (index: number) => ({
+    x: Math.min(92, 12 + (index % 4) * 24),
+    y: Math.min(88, 24 + Math.floor(index / 4) * 18),
+  });
 
   return (
-    <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit xl:sticky xl:top-6">
-      <div className="flex items-center gap-2 mb-4">
-        <MapIcon size={18} className="text-[#FF6B00]" />
-        <h3 className="font-bold text-gray-900">Mapa da praia</h3>
+    <aside className="bg-white rounded-2xl border border-[var(--brand-outline)] shadow-sm p-5 h-fit xl:sticky xl:top-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <MapIcon size={18} className="text-[var(--brand-primary)]" />
+          <h3 className="font-bold text-gray-900">Mapa da praia</h3>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleEditing}
+          className={cn(
+            "rounded-full px-3 py-1 text-xs font-bold border",
+            editing ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white" : "border-[var(--brand-outline)] text-[var(--brand-dark)]"
+          )}
+        >
+          {editing ? "Editando" : "Editar"}
+        </button>
       </div>
-      <div className="rounded-2xl overflow-hidden border border-[#F5E1C0] bg-[#FFF7EB]">
-        <div className="h-16 bg-[#76B7C8]" />
-        <div className="h-5 bg-[#F5E1C0]" />
-        <div className="grid grid-cols-4 gap-3 p-4">
-          {umbrellas.slice(0, 16).map((umbrella) => {
+      <div
+        className="relative h-[360px] rounded-2xl overflow-hidden border border-[var(--brand-outline)] bg-[var(--brand-cream)]"
+        onDragOver={(event) => {
+          if (editing) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (!editing) return;
+          event.preventDefault();
+          const umbrellaId = event.dataTransfer.getData('umbrella-id');
+          const rect = event.currentTarget.getBoundingClientRect();
+          const map_x = Math.min(100, Math.max(0, ((event.clientX - rect.left) / rect.width) * 100));
+          const map_y = Math.min(100, Math.max(0, ((event.clientY - rect.top) / rect.height) * 100));
+          if (umbrellaId) onMoveUmbrella(umbrellaId, map_x, map_y);
+        }}
+      >
+        <div className="absolute inset-x-0 top-0 h-20 bg-[#76B7C8]" />
+        <div className="absolute inset-x-0 top-20 h-8 bg-[var(--brand-sand)]" />
+        <div className="absolute inset-x-0 bottom-0 top-28 bg-[var(--brand-cream)]" />
+        {umbrellas.slice(0, 24).map((umbrella, index) => {
             const order = activeByUmbrella.get(umbrella.number);
+            const call = callsByUmbrella.get(umbrella.number);
             const closing = order?.status === "closing";
+            const activeOrder = Boolean(order && !closing);
+            const pos = defaultPosition(index);
+            const x = umbrella.map_x ?? pos.x;
+            const y = umbrella.map_y ?? pos.y;
             return (
-              <div key={umbrella.id} className="flex flex-col items-center gap-1">
+              <div
+                key={umbrella.id}
+                draggable={editing}
+                onDragStart={(event) => event.dataTransfer.setData('umbrella-id', umbrella.id)}
+                className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+                style={{ left: `${x}%`, top: `${y}%`, cursor: editing ? 'grab' : 'default' }}
+              >
                 <div className={cn(
-                  "h-9 w-9 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                  "h-10 w-10 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-sm",
                   !umbrella.active
                     ? "bg-gray-100 border-gray-200 text-gray-400"
+                    : call
+                    ? "bg-red-100 border-red-500 text-red-700 animate-pulse"
                     : closing
                     ? "bg-orange-100 border-orange-400 text-orange-700"
-                    : order
-                    ? "bg-[#FF6B00] border-[#E56000] text-white"
+                    : activeOrder
+                    ? "bg-[var(--brand-primary)] border-[var(--brand-primary-hover)] text-white animate-pulse"
                     : "bg-green-50 border-green-400 text-green-700"
                 )}>
                   {umbrella.number}
                 </div>
                 <span className="text-[10px] text-gray-500">
-                  {!umbrella.active ? "off" : closing ? "conta" : order ? "uso" : "livre"}
+                  {!umbrella.active ? "off" : call ? "garcom" : closing ? "conta" : activeOrder ? "pedido" : "livre"}
                 </span>
+                {call && (
+                  <button
+                    type="button"
+                    onClick={() => onResolveServiceCall(call.id)}
+                    className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow"
+                  >
+                    atender
+                  </button>
+                )}
               </div>
             );
           })}
-        </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-lg bg-green-50 p-2 text-green-700">Livres: {umbrellas.filter(u => u.active && !activeByUmbrella.has(u.number)).length}</div>
+        <div className="rounded-lg bg-red-50 p-2 text-red-700">Garçom: {serviceCalls.length}</div>
         <div className="rounded-lg bg-orange-50 p-2 text-orange-700">Fechando: {orders.filter(o => o.status === "closing").length}</div>
-        <div className="rounded-lg bg-[#FFF7EB] p-2 text-[#8A5D12]">Ocupados: {orders.filter(o => !o.paid && o.status !== "closing").length}</div>
-        <div className="rounded-lg bg-gray-50 p-2 text-gray-600">Inativos: {umbrellas.filter(u => !u.active).length}</div>
+        <div className="rounded-lg bg-[var(--brand-cream)] p-2 text-[var(--brand-dark)]">Pedidos: {orders.filter(o => !o.paid && o.status !== "closing" && o.status !== "completed").length}</div>
       </div>
     </aside>
   );

@@ -342,6 +342,11 @@ export default function CustomerApp() {
 
   const callWaiter = () => {
     setWaiterCalled(true);
+    fetch('/api/service-calls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ umbrella_id }),
+    }).catch((err) => console.error('Service call error:', err));
     const timeoutId = window.setTimeout(() => setWaiterCalled(false), 5000);
     timeouts.current.push(timeoutId);
   };

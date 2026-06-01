@@ -4,7 +4,7 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 import { verifyAdminCredentials } from '@/lib/admin-auth';
 
-const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url']);
+const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url', 'map_x', 'map_y']);
 
 export async function GET(
   req: NextRequest,
@@ -58,6 +58,8 @@ export async function PATCH(
       label?: string | null;
       location_hint?: string | null;
       qr_url?: string | null;
+      map_x?: number | null;
+      map_y?: number | null;
     } = {};
     for (const field of ALLOWED_UMBRELLA_FIELDS) {
       if (!(field in body)) continue;
@@ -65,6 +67,8 @@ export async function PATCH(
       if (field === 'label') safeUpdate.label = body.label as string | null;
       if (field === 'location_hint') safeUpdate.location_hint = body.location_hint as string | null;
       if (field === 'qr_url') safeUpdate.qr_url = body.qr_url as string | null;
+      if (field === 'map_x') safeUpdate.map_x = Math.min(100, Math.max(0, Number(body.map_x)));
+      if (field === 'map_y') safeUpdate.map_y = Math.min(100, Math.max(0, Number(body.map_y)));
     }
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
@@ -81,7 +85,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nao autorizado para este guarda-sol.' }, { status: 403 });
     }
 
-    const { data, error } = await enforceTenantScope(
+    let { data, error } = await enforceTenantScope(
       supabaseAdmin
         .from('umbrellas')
         .update(safeUpdate)
@@ -89,6 +93,22 @@ export async function PATCH(
         .select(),
       tenantId
     ).single();
+
+    if (error && /map_x|map_y/.test(String(error.message || ''))) {
+      const legacyUpdate = { ...safeUpdate };
+      delete legacyUpdate.map_x;
+      delete legacyUpdate.map_y;
+      const fallback = await enforceTenantScope(
+        supabaseAdmin
+          .from('umbrellas')
+          .update(legacyUpdate)
+          .eq('id', id)
+          .select(),
+        tenantId
+      ).single();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data);

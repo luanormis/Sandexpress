@@ -16,6 +16,25 @@ ALTER TABLE orders
 ALTER TABLE customers
   ADD COLUMN IF NOT EXISTS party_size INTEGER NOT NULL DEFAULT 1 CHECK (party_size BETWEEN 1 AND 50);
 
+ALTER TABLE umbrellas
+  ADD COLUMN IF NOT EXISTS map_x NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS map_y NUMERIC(5,2);
+
+CREATE TABLE IF NOT EXISTS service_calls (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  umbrella_id UUID NOT NULL REFERENCES umbrellas(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','cancelled')),
+  message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_calls_open
+  ON service_calls(vendor_id, status, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_orders_close_flow
   ON orders(vendor_id, umbrella_id, customer_id, pending_close, paid);
 
@@ -37,5 +56,12 @@ BEGIN
     WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'order_items'
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'service_calls'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE service_calls;
   END IF;
 END $$;
