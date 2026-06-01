@@ -18,6 +18,10 @@ const SESSION_SECRET =
   process.env.VENDOR_JWT_SECRET ||
   (process.env.NODE_ENV === 'production' ? undefined : 'sandexpress-local-dev-session-secret');
 
+if (process.env.NODE_ENV === 'production' && SESSION_SECRET && SESSION_SECRET.length < 32) {
+  throw new Error('SESSION_SECRET deve ter pelo menos 32 caracteres em producao.');
+}
+
 function base64UrlEncode(input: string): string {
   return Buffer.from(input).toString('base64url');
 }
@@ -41,15 +45,27 @@ export function createSessionToken(payload: Omit<SessionPayload, 'exp'>, ttlSeco
 }
 
 export function verifySessionToken(token?: string | null): SessionPayload | null {
-  if (!token) return null;
-  const [body, signature] = token.split('.');
-  if (!body || !signature) return null;
-  if (sign(body) !== signature) return null;
+  try {
+    if (!token || token.length > 4096) return null;
+    const [body, signature] = token.split('.');
+    if (!body || !signature) return null;
+    const expected = sign(body);
+    const expectedBuffer = Buffer.from(expected);
+    const signatureBuffer = Buffer.from(signature);
+    if (
+      expectedBuffer.length !== signatureBuffer.length ||
+      !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
+    ) {
+      return null;
+    }
 
-  const parsed = JSON.parse(base64UrlDecode(body)) as SessionPayload;
-  if (!parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000)) return null;
-  if (!parsed.role) return null;
-  return parsed;
+    const parsed = JSON.parse(base64UrlDecode(body)) as SessionPayload;
+    if (!parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (!parsed.role) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export function getRequestSession(req: NextRequest): SessionPayload | null {
