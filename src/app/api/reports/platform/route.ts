@@ -41,14 +41,32 @@ export async function GET() {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
-    const { data: orders } = await supabaseAdmin
+    let { data: orders, error: ordersError } = await supabaseAdmin
       .from('orders')
-      .select('total, vendor_id, vendors(name, city, state)')
+      .select('total, party_size, vendor_id, vendors(name, city, state)')
       .gte('created_at', monthStart.toISOString());
+
+    if (ordersError && String(ordersError.message || '').includes('party_size')) {
+      const fallback = await supabaseAdmin
+        .from('orders')
+        .select('total, vendor_id, vendors(name, city, state)')
+        .gte('created_at', monthStart.toISOString());
+      orders = fallback.data as any;
+      ordersError = fallback.error;
+    }
+
+    if (ordersError) throw ordersError;
 
     const allOrders: any[] = orders || [];
     const gmv = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
-    const { data: customers } = await supabaseAdmin.from('customers').select('id, phone');
+    let { data: customers, error: customersError } = await supabaseAdmin.from('customers').select('id, phone, party_size');
+    if (customersError && String(customersError.message || '').includes('party_size')) {
+      const fallback = await supabaseAdmin.from('customers').select('id, phone');
+      customers = fallback.data as any;
+      customersError = fallback.error;
+    }
+    if (customersError) throw customersError;
+    const totalPeople = allOrders.reduce((acc, o) => acc + Number(o.party_size || 1), 0);
 
     const vendorRevenue = new Map<string, { name: string; city: string; revenue: number }>();
     for (const order of allOrders) {
@@ -110,6 +128,8 @@ export async function GET() {
       gmv,
       total_orders: allOrders.length,
       total_customers: new Set((customers || []).map((c: any) => c.phone || c.id)).size,
+      total_people: totalPeople,
+      avg_party_size: allOrders.length > 0 ? totalPeople / allOrders.length : 0,
       avg_ticket: allOrders.length > 0 ? gmv / allOrders.length : 0,
       active_vendors,
       trial_vendors,

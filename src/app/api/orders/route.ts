@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
     }
 
-    const { vendor_id, customer_id, umbrella_id, items, notes } = await req.json();
+    const { vendor_id, customer_id, umbrella_id, items, notes, party_size } = await req.json();
+    const partySize = Math.min(50, Math.max(1, Number(party_size || 1)));
 
     if (!vendor_id || !customer_id || !umbrella_id || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Dados de pedido incompletos.' }, { status: 400 });
@@ -135,14 +136,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Criar pedido
-    const { data: order, error: orderErr } = await enforceTenantScope(
+    const orderInsert = { vendor_id, customer_id, umbrella_id, total, notes: notes || null, tenant_id: tenantId, party_size: partySize };
+    let { data: order, error: orderErr } = await enforceTenantScope(
       supabaseAdmin
         .from('orders')
-        .insert({ vendor_id, customer_id, umbrella_id, total, notes: notes || null, tenant_id: tenantId }),
+        .insert(orderInsert),
       tenantId
     )
       .select()
       .single();
+
+    if (orderErr && String(orderErr.message || '').includes('party_size')) {
+      const legacyOrderInsert: Partial<typeof orderInsert> = { ...orderInsert };
+      delete legacyOrderInsert.party_size;
+      const fallback = await enforceTenantScope(
+        supabaseAdmin
+          .from('orders')
+          .insert(legacyOrderInsert),
+        tenantId
+      )
+        .select()
+        .single();
+      order = fallback.data;
+      orderErr = fallback.error;
+    }
 
     if (orderErr) throw orderErr;
 

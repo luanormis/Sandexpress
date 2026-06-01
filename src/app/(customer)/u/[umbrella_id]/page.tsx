@@ -33,6 +33,7 @@ type Order = {
 type Customer = {
   name: string;
   phone: string;
+  party_size: number;
 };
 
 type VendorBrand = {
@@ -72,8 +73,12 @@ export default function CustomerApp() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [partySize, setPartySize] = useState(2);
   const [otpInput, setOtpInput] = useState("");
   const [waiterCalled, setWaiterCalled] = useState(false);
+  const [quickProduct, setQuickProduct] = useState<Product | null>(null);
+  const [quickNotes, setQuickNotes] = useState("");
+  const [submittingOrder, setSubmittingOrder] = useState(false);
 
   const categories = ["Todos", ...Array.from(new Set(products.map((product) => product.category)))];
   const [activeCategory, setActiveCategory] = useState("Todos");
@@ -163,14 +168,14 @@ export default function CustomerApp() {
       const response = await fetch('/api/customers/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone: phone.replace(/\D/g, ''), vendor_id: vendorId, otp_code: otpInput }),
+        body: JSON.stringify({ name, phone: phone.replace(/\D/g, ''), vendor_id: vendorId, otp_code: otpInput, party_size: partySize }),
       });
       const result = await response.json();
       if (!response.ok) {
         setLoadError(result.error || 'Código inválido.');
         return;
       }
-      const user: Customer = { name: result.name || name, phone: result.phone || phone };
+      const user: Customer = { name: result.name || name, phone: result.phone || phone, party_size: result.party_size || partySize };
       setCustomer(user);
       setCustomerId(result.id || result.customer_id || null);
       sessionStorage.setItem(`sandexpress_user_${umbrella_id}`, JSON.stringify(user));
@@ -228,6 +233,7 @@ export default function CustomerApp() {
           umbrella_id,
           items: cart.map(item => ({ product_id: item.product.id, quantity: item.quantity })),
           notes,
+          party_size: customer?.party_size || partySize,
         }),
       });
       const result = await response.json();
@@ -249,6 +255,54 @@ export default function CustomerApp() {
     } catch (err) {
       console.error('Create order error:', err);
       alert('Erro de rede ao enviar pedido.');
+    }
+  };
+
+  const needsObservation = (product: Product) => {
+    const text = `${product.category} ${product.name}`.toLowerCase();
+    if (/cerveja|lata|latao|latão|agua|água|refrigerante|coca|guarana|sprite|fanta/.test(text)) return false;
+    return /drink|caip|batida|petisco|porcao|porção|pastel|suco|comida|alimento/.test(text);
+  };
+
+  const orderProductNow = async (product: Product, orderNotes = "") => {
+    if (!vendorId || !customerId || !umbrella_id) {
+      return alert('Entre com seu WhatsApp antes de pedir.');
+    }
+
+    setSubmittingOrder(true);
+    try {
+      const price = product.promotional_price || product.price;
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          customer_id: customerId,
+          umbrella_id,
+          items: [{ product_id: product.id, quantity: 1 }],
+          notes: orderNotes,
+          party_size: customer?.party_size || partySize,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return alert(result.error || 'Erro ao criar pedido.');
+      }
+      setOrders((prev) => [{
+        id: result.id,
+        items: [{ product, quantity: 1 }],
+        total: price,
+        status: 'received',
+        created_at: result.created_at || new Date().toISOString(),
+      }, ...prev]);
+      setQuickProduct(null);
+      setQuickNotes("");
+      setStep("orders");
+    } catch (err) {
+      console.error('Quick order error:', err);
+      alert('Erro de rede ao enviar pedido.');
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -343,6 +397,17 @@ export default function CustomerApp() {
                 onChange={(event) => setPhone(event.target.value.replace(/\D/g, ""))}
                 className="w-full border-2 border-gray-200 rounded-xl p-4 text-lg focus:border-[#FF6B00] focus:ring-0 outline-none transition-colors"
                 placeholder="11999999999"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Quantas pessoas estao neste guarda-sol?</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={partySize}
+                onChange={(event) => setPartySize(Math.min(50, Math.max(1, Number(event.target.value) || 1)))}
+                className="w-full border-2 border-gray-200 rounded-xl p-4 text-lg focus:border-[#FF6B00] focus:ring-0 outline-none transition-colors"
               />
             </div>
             <button
@@ -490,9 +555,23 @@ export default function CustomerApp() {
                         <div className="mt-4 flex items-center gap-2">
                           <button
                             onClick={() => addToCart(product)}
-                            className="rounded-full bg-[#FF6B00] px-4 py-2 text-white font-semibold shadow-sm hover:bg-[#E56000] transition"
+                            className="rounded-full border border-[#FF6B00] px-4 py-2 text-[#FF6B00] font-semibold hover:bg-[#FFF7EB] transition"
                           >
-                            Adicionar
+                            Carrinho
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (needsObservation(product)) {
+                                setQuickProduct(product);
+                                setQuickNotes("");
+                              } else {
+                                void orderProductNow(product);
+                              }
+                            }}
+                            disabled={submittingOrder}
+                            className="rounded-full bg-[#FF6B00] px-4 py-2 text-white font-semibold shadow-sm hover:bg-[#E56000] transition disabled:opacity-60"
+                          >
+                            Pedir agora
                           </button>
                           {inCart ? <span className="text-sm text-gray-500">{inCart.quantity} no carrinho</span> : null}
                         </div>
@@ -547,9 +626,10 @@ export default function CustomerApp() {
                 </div>
                 <button
                   onClick={createOrder}
-                  className="w-full rounded-3xl bg-[#FF6B00] py-4 text-white font-bold text-lg shadow-md hover:bg-[#E56000] transition"
+                  disabled={submittingOrder}
+                  className="w-full rounded-3xl bg-[#FF6B00] py-4 text-white font-bold text-lg shadow-md hover:bg-[#E56000] transition disabled:opacity-60"
                 >
-                  Confirmar e enviar
+                  {submittingOrder ? "Enviando..." : "Confirmar e enviar"}
                 </button>
               </div>
             )}
@@ -626,6 +706,47 @@ export default function CustomerApp() {
             </div>
           </div>
         </main>
+      )}
+
+      {cart.length > 0 && step !== "cart" && (
+        <div className="fixed bottom-[72px] left-0 z-30 w-full px-4">
+          <button
+            type="button"
+            onClick={() => setStep("cart")}
+            className="mx-auto flex w-full max-w-md items-center justify-between rounded-3xl bg-[#3D1A0A] px-5 py-4 text-white shadow-xl"
+          >
+            <span className="font-bold">Fechar pedido</span>
+            <span className="text-sm">{cart.reduce((total, item) => total + item.quantity, 0)} itens · {formatCurrency(cartTotal)}</span>
+          </button>
+        </div>
+      )}
+
+      {quickProduct && (
+        <div className="fixed inset-0 z-40 flex items-end bg-black/40 p-4" onClick={() => setQuickProduct(null)}>
+          <div className="w-full rounded-3xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Observacao do item</p>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900">{quickProduct.name}</h2>
+            <textarea
+              value={quickNotes}
+              onChange={(event) => setQuickNotes(event.target.value)}
+              placeholder="Ex: sem cebola, pouco gelo, ponto da porcao..."
+              className="mt-4 w-full rounded-3xl border border-gray-200 p-4 text-sm outline-none focus:border-[#FF6B00]"
+              rows={4}
+            />
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setQuickProduct(null)} className="flex-1 rounded-2xl border border-gray-200 py-3 font-bold text-gray-600">
+                Cancelar
+              </button>
+              <button
+                onClick={() => orderProductNow(quickProduct, quickNotes)}
+                disabled={submittingOrder}
+                className="flex-1 rounded-2xl bg-[#FF6B00] py-3 font-bold text-white disabled:opacity-60"
+              >
+                {submittingOrder ? "Enviando..." : "Enviar pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 pb-safe">

@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
     }
 
-    const { name, phone, vendor_id, otp_code } = await req.json();
+    const body = await req.json();
+    const { name, phone, vendor_id, otp_code } = body;
+    const partySize = Math.min(50, Math.max(1, Number(body.party_size || 1)));
 
     if (!name || !phone || !vendor_id) {
       return NextResponse.json({ error: 'name, phone e vendor_id são obrigatórios.' }, { status: 400 });
@@ -50,17 +52,33 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       // Atualizar nome e incrementar visitas
-      const { data: updated, error } = await pgAdmin
+      const customerUpdate = {
+        name,
+        party_size: partySize,
+        visit_count: existing.visit_count + 1,
+        last_visit_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      let { data: updated, error } = await pgAdmin
         .from('customers')
-        .update({
-          name,
-          visit_count: existing.visit_count + 1,
-          last_visit_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .update(customerUpdate)
         .eq('id', existing.id)
         .select()
         .single();
+
+      if (error && String(error.message || '').includes('party_size')) {
+        const legacyUpdate: Partial<typeof customerUpdate> = { ...customerUpdate };
+        delete legacyUpdate.party_size;
+        const fallback = await pgAdmin
+          .from('customers')
+          .update(legacyUpdate)
+          .eq('id', existing.id)
+          .select()
+          .single();
+        updated = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw error;
       const token = createSessionToken(
@@ -81,11 +99,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Criar novo cliente
-    const { data: newCustomer, error } = await pgAdmin
+    const customerInsert = { name, phone: phone.replace(/\D/g, ''), vendor_id, tenant_id: vendor_id, party_size: partySize };
+    let { data: newCustomer, error } = await pgAdmin
       .from('customers')
-      .insert({ name, phone: phone.replace(/\D/g, ''), vendor_id, tenant_id: vendor_id })
+      .insert(customerInsert)
       .select()
       .single();
+
+    if (error && String(error.message || '').includes('party_size')) {
+      const legacyInsert: Partial<typeof customerInsert> = { ...customerInsert };
+      delete legacyInsert.party_size;
+      const fallback = await pgAdmin
+        .from('customers')
+        .insert(legacyInsert)
+        .select()
+        .single();
+      newCustomer = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     const token = createSessionToken(

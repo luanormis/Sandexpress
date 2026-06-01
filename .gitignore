@@ -30,6 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 codex-*.log
+test-db*.js
+test-db*.ts
+public/test-real.html
+public/test-real/
 
 # env files (can opt-in for committing if needed)
 .env*

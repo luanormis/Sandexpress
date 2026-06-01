@@ -10,7 +10,11 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS pending_close BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS close_requested_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS pix_payload TEXT,
-  ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS party_size INTEGER NOT NULL DEFAULT 1 CHECK (party_size BETWEEN 1 AND 50);
+
+ALTER TABLE customers
+  ADD COLUMN IF NOT EXISTS party_size INTEGER NOT NULL DEFAULT 1 CHECK (party_size BETWEEN 1 AND 50);
 
 CREATE INDEX IF NOT EXISTS idx_orders_close_flow
   ON orders(vendor_id, umbrella_id, customer_id, pending_close, paid);

@@ -60,6 +60,7 @@ CREATE TABLE customers (
   vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
+  party_size INTEGER NOT NULL DEFAULT 1 CHECK (party_size BETWEEN 1 AND 50),
   visit_count INTEGER NOT NULL DEFAULT 1,
   total_spent NUMERIC(12,2) NOT NULL DEFAULT 0,
   last_visit_at TIMESTAMPTZ DEFAULT NOW(),
@@ -138,6 +139,7 @@ CREATE TABLE orders (
   status TEXT NOT NULL DEFAULT 'received'
     CHECK (status IN ('received','preparing','delivering','completed','cancelled')),
   total NUMERIC(10,2) NOT NULL DEFAULT 0,
+  party_size INTEGER NOT NULL DEFAULT 1 CHECK (party_size BETWEEN 1 AND 50),
   notes TEXT,
   paid BOOLEAN DEFAULT FALSE,
   payment_method TEXT,

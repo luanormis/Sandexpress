@@ -41,6 +41,8 @@ interface PlatformReport {
   gmv: number;
   total_orders: number;
   total_customers: number;
+  total_people: number;
+  avg_party_size: number;
   avg_ticket: number;
   active_vendors: number;
   trial_vendors: number;
@@ -609,8 +611,9 @@ export default function AdminDashboard() {
                 <p className="text-3xl font-display font-bold text-purple-400">{platformReport.total_customers.toLocaleString()}</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
-                <p className="text-gray-400 font-bold text-sm mb-2">Ticket Médio</p>
-                <p className="text-3xl font-display font-bold text-amber-400">{formatCurrency(platformReport.avg_ticket)}</p>
+                <p className="text-gray-400 font-bold text-sm mb-2">Pessoas atendidas</p>
+                <p className="text-3xl font-display font-bold text-amber-400">{Math.round(platformReport.total_people || 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Média {Number(platformReport.avg_party_size || 0).toFixed(1)} por guarda-sol</p>
               </div>
             </div>
 
