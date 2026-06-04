@@ -184,8 +184,23 @@ export default function VendorDashboard() {
   }, [activeTab, reportPeriod, vendorId]);
 
   // Order management
-  const moveOrder = (id: string, newStatus: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+  const moveOrder = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Erro ao atualizar pedido.');
+        return;
+      }
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    } catch (err) {
+      console.error('Move order error:', err);
+      alert('Erro de rede ao atualizar pedido.');
+    }
   };
 
   // Product management
@@ -348,7 +363,7 @@ export default function VendorDashboard() {
                 </div>
               </div>
               <div className="text-sm text-gray-600 mb-2 border-t border-gray-50 pt-2">
-                {order.items.map((i, idx) => <div key={idx}>{i.q}x {i.n}</div>)}
+                {(order.items || []).map((i, idx) => <div key={idx}>{i.q}x {i.n}</div>)}
               </div>
               {order.notes && (
                 <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg mb-2 border border-amber-100">
@@ -435,6 +450,7 @@ export default function VendorDashboard() {
               {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
               {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
               {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
+              {renderKanbanColumn("Conta Solicitada", "closing_requested", "Confirmar Pagamento", "completed", "bg-orange-500")}
               {renderKanbanColumn("Entregue", "completed", "", "", "bg-green-500")}
             </div>
           )}

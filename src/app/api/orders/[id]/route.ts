@@ -45,6 +45,13 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+    if ((safeUpdate.status === 'completed' || safeUpdate.status === 'cancelled') && (data as any)?.umbrella_id) {
+      await supabaseAdmin
+        .from('umbrellas')
+        .update({ is_occupied: false, current_order_id: null })
+        .eq('id', (data as any).umbrella_id)
+        .eq('vendor_id', orderLookup.data.vendor_id);
+    }
     return NextResponse.json(data);
   } catch (err) {
     console.error('Order PATCH error:', err);

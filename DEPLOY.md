@@ -70,15 +70,15 @@ Acesse: [http://localhost:3000](http://localhost:3000)
 ### Login do Quiosque
 - **Credencial**: CPF ou CNPJ (único por quiosque)
 - **Senha**: Hash com Scrypt (seguro)
-- **Padrão**: `senha123@`
-- **Mudança obrigatória**: No primeiro acesso
+- **Senha inicial**: criada pelo vendor ou gerada temporariamente no cadastro
+- **Mudança obrigatória**: quando o cadastro gerar senha temporaria
 
 ### Query Login:
 ```bash
 POST /api/auth/vendor
 Body: {
   "document_login": "12345678901", // CPF ou CNPJ
-  "password": "senha123@"
+  "password": "senha-inicial-do-vendor"
 }
 ```
 

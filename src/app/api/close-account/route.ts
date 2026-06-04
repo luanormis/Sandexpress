@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * POST /api/close-account
@@ -15,13 +16,25 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { vendor_id, umbrella_id, customer_phone, payment_method, notes } = body;
+    const { vendor_id, umbrella_id, customer_phone, payment_method, notes, request_only } = body;
 
     if (!vendor_id || (!umbrella_id && !customer_phone)) {
       return NextResponse.json(
         { error: 'vendor_id e (umbrella_id ou customer_phone) são obrigatórios' },
         { status: 400 }
       );
+    }
+
+    const session = getRequestSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
+    }
+    if (session.role === 'vendor' || session.role === 'admin') {
+      if (!canAccessVendor(session, vendor_id)) {
+        return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+      }
+    } else if (session.role === 'customer' && session.vendor_id !== vendor_id) {
+      return NextResponse.json({ error: 'Sessao de cliente invalida para este quiosque.' }, { status: 403 });
     }
 
     // 1. Encontrar a ordem aberta
@@ -60,6 +73,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (session.role === 'customer' && selectedOrder.customer_id !== session.customer_id) {
+      return NextResponse.json({ error: 'Conta nao pertence a este cliente.' }, { status: 403 });
+    }
+
+    if (request_only) {
+      const { data: requested, error: requestErr } = await supabaseAdmin
+        .from('orders')
+        .update({
+          status: 'closing_requested',
+          close_requested_at: new Date().toISOString(),
+          notes: notes || 'Fechamento solicitado pelo cliente',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', selectedOrder.id)
+        .select()
+        .single();
+
+      if (requestErr) throw requestErr;
+      return NextResponse.json({
+        success: true,
+        order: requested,
+        message: 'Pedido de fechamento enviado ao quiosque.',
+      });
+    }
+
     // 2. Atualizar ordem para completed e pago
     const { error: updateErr } = await supabaseAdmin
       .from('orders')
@@ -73,6 +111,19 @@ export async function POST(req: NextRequest) {
       .eq('id', selectedOrder.id);
 
     if (updateErr) throw updateErr;
+
+    if (selectedOrder.umbrella_id) {
+      const { error: umbrellaErr } = await supabaseAdmin
+        .from('umbrellas')
+        .update({
+          is_occupied: false,
+          current_order_id: null,
+        })
+        .eq('id', selectedOrder.umbrella_id)
+        .eq('vendor_id', vendor_id);
+
+      if (umbrellaErr) throw umbrellaErr;
+    }
 
     // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
     const { error: customerErr } = await supabaseAdmin
@@ -128,6 +179,11 @@ export async function GET(req: NextRequest) {
 
     if (!umbrella_id && !customer_phone) {
       return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
+    }
+
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
 
     // Buscar ordem aberta

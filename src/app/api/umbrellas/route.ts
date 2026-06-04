@@ -4,10 +4,10 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
- * Lista todos os guarda-sóis de um vendor.
+ * Lista todos os guarda-sois de um vendor.
  *
  * POST /api/umbrellas
- * Cria um novo guarda-sol.
+ * Cria um novo guarda-sol dentro do tenant do vendor.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +15,11 @@ export async function GET(req: NextRequest) {
     const vendor_id = searchParams.get('vendor_id');
 
     if (!vendor_id) {
-      return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
     }
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
@@ -41,20 +41,31 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (!body.vendor_id || body.number === undefined) {
-      return NextResponse.json({ error: 'vendor_id e number são obrigatórios.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id e number sao obrigatorios.' }, { status: 400 });
     }
     const session = getRequestSession(req);
     if (!canAccessVendor(session, body.vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('umbrellas')
+    const { data: vendor, error: vendorErr } = await (supabaseAdmin.from('vendors') as any)
+      .select('tenant_id')
+      .eq('id', body.vendor_id)
+      .single();
+    if (vendorErr || !vendor?.tenant_id) {
+      return NextResponse.json({ error: 'Vendor sem tenant configurado. Execute a migracao de producao.' }, { status: 400 });
+    }
+
+    const { data, error } = await (supabaseAdmin.from('umbrellas') as any)
       .insert({
+        tenant_id: vendor.tenant_id,
         vendor_id: body.vendor_id,
         number: body.number,
-        label: body.label || `Barraca ${body.number}`,
+        label: body.label || `Guarda-sol ${body.number}`,
         active: true,
+        is_occupied: false,
+        map_x: body.map_x ?? null,
+        map_y: body.map_y ?? null,
       })
       .select()
       .single();

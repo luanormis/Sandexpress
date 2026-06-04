@@ -259,7 +259,7 @@ async function summary() {
       vendor_login: TEST_VENDOR_LOGIN,
       vendor_password: TEST_VENDOR_PASSWORD,
       admin: 'Use ADMIN_PASSWORD do .env.local ou 95732 em local sem variavel.',
-      customer_otp: '000000 quando CUSTOMER_OTP_MODE=dev',
+      customer_otp: 'desativado no MVP',
     },
   };
 }

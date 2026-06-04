@@ -37,7 +37,18 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const mapped = (data || []).map((order: any) => ({
+      ...order,
+      umbrella: order.umbrellas?.number ?? 0,
+      customer: order.customers?.name ?? 'Cliente',
+      phone: order.customers?.phone ?? '',
+      time: order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      items: (order.order_items || []).map((item: any) => ({
+        q: item.quantity,
+        n: item.products?.name || 'Produto',
+      })),
+    }));
+    return NextResponse.json(mapped);
   } catch (err) {
     console.error('Orders GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -65,9 +76,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar guarda-sol pertence ao vendor
-    const { data: umbrella, error: umbrellaErr } = await supabaseAdmin
-      .from('umbrellas')
-      .select('id, vendor_id, is_occupied, current_order_id, active')
+    const { data: umbrella, error: umbrellaErr } = await (supabaseAdmin.from('umbrellas') as any)
+      .select('id, tenant_id, vendor_id, is_occupied, current_order_id, active')
       .eq('id', umbrella_id)
       .eq('vendor_id', vendor_id)
       .single();
@@ -82,9 +92,8 @@ export async function POST(req: NextRequest) {
     // Buscar preços reais dos produtos no banco (nunca confiar no cliente)
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id);
 
-    const { data: dbProducts, error: prodErr } = await supabaseAdmin
-      .from('products')
-      .select('id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
+    const { data: dbProducts, error: prodErr } = await (supabaseAdmin.from('products') as any)
+      .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
       .in('id', productIds)
       .eq('vendor_id', vendor_id);
 
@@ -92,7 +101,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Erro ao validar produtos.' }, { status: 500 });
     }
 
-    const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+    const productMap = new Map((dbProducts as any[]).map((p) => [p.id, p]));
 
     // Validar produtos e calcular total com preços do banco
     const orderItems: { product_id: string; quantity: number; unit_price: number; subtotal: number }[] = [];
@@ -118,7 +127,14 @@ export async function POST(req: NextRequest) {
     // Criar pedido
     const { data: order, error: orderErr } = await supabaseAdmin
       .from('orders')
-      .insert({ vendor_id, customer_id, umbrella_id, total, notes: notes || null })
+      .insert({
+        tenant_id: (umbrella as any).tenant_id,
+        vendor_id,
+        customer_id,
+        umbrella_id,
+        total,
+        notes: notes || null,
+      } as any)
       .select()
       .single();
 
@@ -127,7 +143,11 @@ export async function POST(req: NextRequest) {
     // Criar itens do pedido
     const { error: itemsErr } = await supabaseAdmin
       .from('order_items')
-      .insert(orderItems.map((oi) => ({ ...oi, order_id: order.id })));
+      .insert(orderItems.map((oi) => ({
+        tenant_id: (umbrella as any).tenant_id,
+        ...oi,
+        order_id: order.id,
+      } as any)));
 
     if (itemsErr) throw itemsErr;
 

@@ -81,7 +81,7 @@ curl https://sandexpress-xxxxx.vercel.app/api/health
 # 2. Testar login (via Postman ou curl)
 curl -X POST https://sandexpress-xxxxx.vercel.app/api/auth/vendor \
   -H "Content-Type: application/json" \
-  -d '{"document_login":"12345678901","password":"senha123@"}'
+  -d '{"document_login":"12345678901","password":"senha-inicial-do-vendor"}'
 
 # 3. Verificar conectividade com Supabase
 # Abra DevTools > Network > qualquer requisição
