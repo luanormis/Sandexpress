@@ -83,7 +83,7 @@ Body: {
 ```
 
 ### Admin
-- **Senha**: `123@senha123@` (env: `ADMIN_PASSWORD`)
+- **Senha**: definida somente na variavel de ambiente `ADMIN_PASSWORD`
 - Query: `POST /api/auth/admin`
 
 ## 📦 Estrutura de Dados
@@ -154,7 +154,7 @@ No Vercel → Settings → Environment Variables:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxxxx
-ADMIN_PASSWORD=123@senha123@
+ADMIN_PASSWORD=defina-uma-senha-forte-no-provedor
 ```
 
 ### 3. Deploy

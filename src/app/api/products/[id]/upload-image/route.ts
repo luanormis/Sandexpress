@@ -1,26 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { canAccessVendor, getRequestSession } from "@/lib/auth-session";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const { id: productId } = await params;
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const vendorId = formData.get("vendorId") as string;
-    const authToken = request.headers.get("authorization")?.replace("Bearer ", "");
+    const session = getRequestSession(request);
 
-    if (!file || !vendorId || !authToken) {
+    if (!file || !vendorId) {
       return NextResponse.json(
-        { error: "File, vendorId, and authorization required" },
+        { error: "File and vendorId are required" },
         { status: 400 }
       );
     }
 
+    if (!canAccessVendor(session, vendorId)) {
+      return NextResponse.json({ error: "Nao autorizado." }, { status: 403 });
+    }
+
     // Verificar se o vendor tem plano plus
-    const { data: plan, error: planError } = await supabase
+    const { data: plan, error: planError } = await supabaseAdmin
       .from("vendor_plans")
       .select("*")
       .eq("vendor_id", vendorId)
@@ -51,7 +56,7 @@ export async function POST(
 
     // Upload da imagem para o storage
     const fileName = `products/${vendorId}/${productId}/${Date.now()}-${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from("product-images")
       .upload(fileName, file);
 
@@ -63,12 +68,12 @@ export async function POST(
     }
 
     // Get public URL
-    const { data: publicUrl } = supabase.storage
+    const { data: publicUrl } = supabaseAdmin.storage
       .from("product-images")
       .getPublicUrl(uploadData.path);
 
     // Atualizar produto com a nova imagem
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("products")
       .update({
         image_url: publicUrl.publicUrl,
@@ -86,7 +91,7 @@ export async function POST(
     }
 
     // Incrementar contador de imagens usadas
-    const { error: counterError } = await supabase
+    const { error: counterError } = await supabaseAdmin
       .from("vendor_plans")
       .update({
         custom_images_used: plan.custom_images_used + 1,

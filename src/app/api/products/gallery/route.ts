@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       query = query.eq("plan_type", "free");
     }
 
-    const { data, error } = await query.order("category").order("title");
+    const { data, error } = await query.order("category").order("name");
 
     if (error) {
       return NextResponse.json(

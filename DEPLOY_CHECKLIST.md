@@ -62,7 +62,7 @@ git push -u origin main
 ```
 NEXT_PUBLIC_SUPABASE_URL = https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY = xxxxx
-ADMIN_PASSWORD = 123@senha123@
+ADMIN_PASSWORD = defina-uma-senha-forte-no-provedor
 ```
 
 2. Clique "Deploy"

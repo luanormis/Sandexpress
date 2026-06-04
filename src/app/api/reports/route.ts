@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     // Calcular período
     const now = new Date();
-    let startDate = new Date();
+    const startDate = new Date();
     switch (period) {
       case 'week': startDate.setDate(now.getDate() - 7); break;
       case 'month': startDate.setMonth(now.getMonth() - 1); break;
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     const umbrellasActiveCount = (umbrellasResult.data || []).filter(u => u.active).length;
 
     // Relatórios diários
-    const todayOrders = allOrders.filter(o => new Date(o.created_at) >= todayStart);
+    const todayOrders = allOrders.filter(o => o.created_at && new Date(o.created_at) >= todayStart);
     const today_revenue = todayOrders.reduce((acc, o) => acc + Number(o.total), 0);
     const today_customers = new Set(todayOrders.map(o => o.customer_id)).size;
 
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     const top_customers = Array.from(
       new Map((allOrders || []).map(order => [order.customer_id, order])).values()
     ).map(order => ({
-      name: order.customers?.name || order.customer || 'Cliente',
+      name: order.customers?.name || 'Cliente',
       phone: order.customers?.phone || '',
       visits: allOrders.filter(o => o.customer_id === order.customer_id).length,
       total_spent: allOrders
@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
 
     const hourlySalesMap = new Map<string, number>();
     allOrders.forEach(order => {
+      if (!order.created_at) return;
       const createdAt = new Date(order.created_at);
       const hour = `${createdAt.getHours().toString().padStart(2, '0')}h`;
       hourlySalesMap.set(hour, (hourlySalesMap.get(hour) || 0) + 1);

@@ -145,7 +145,7 @@ git push origin main
 ✅ Row Level Security (isolamento no BD)  
 ✅ Tokens de reset com expiração (1 hora)  
 ✅ Autenticação obrigatória de senha no 1º acesso  
-✅ Master password para admin (`123@senha123@`)  
+✅ Master password para admin via variavel de ambiente `ADMIN_PASSWORD`
 
 ---
 

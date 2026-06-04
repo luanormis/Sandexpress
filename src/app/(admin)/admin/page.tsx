@@ -31,16 +31,30 @@ interface PlatformReport {
   gmv: number;
   total_orders: number;
   total_customers: number;
+  total_visitors: number;
+  total_products_sold: number;
   avg_ticket: number;
   active_vendors: number;
   trial_vendors: number;
   overdue_vendors: number;
   blocked_vendors: number;
   retention_rate: number;
-  top_vendors: { name: string; city: string; revenue: number }[];
+  top_vendors: { name: string; city: string; beach: string; revenue: number; orders: number; visitors: number }[];
+  top_products: { product_id: string; name: string; category: string; quantity: number; revenue: number; orders: number }[];
+  top_categories: { category: string; quantity: number; revenue: number }[];
+  top_cities: { city: string; quantity: number; revenue: number; orders: number }[];
+  top_beaches: { beach: string; city: string; quantity: number; revenue: number; orders: number }[];
+  hourly_sales: { hour: number; orders: number; quantity: number; revenue: number }[];
+  peak_hour: { hour: number; orders: number; quantity: number; revenue: number };
+  peak_product_hours: { product: string; category: string; hour: number; quantity: number; revenue: number }[];
   monthly_received: number;
   next_cycle_receivable: number;
   overdue_amount: number;
+  filter_options: {
+    vendors: { id: string; name: string }[];
+    cities: string[];
+    beaches: string[];
+  };
 }
 
 const TABS = [
@@ -62,6 +76,15 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsFilters, setAnalyticsFilters] = useState({
+    vendor_id: "",
+    city: "",
+    beach: "",
+    product: "",
+    from: "",
+    to: "",
+  });
 
   // Registration form
   const [regForm, setRegForm] = useState({
@@ -72,10 +95,7 @@ export default function AdminDashboard() {
   // Load platform report
   useEffect(() => {
     if (activeTab === "analytics" || activeTab === "overview") {
-      fetch("/api/reports/platform")
-        .then(r => r.json())
-        .then(d => setPlatformReport(d))
-        .catch(console.error);
+      loadPlatformReport();
     }
   }, [activeTab]);
 
@@ -120,15 +140,22 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadPlatformReport = async () => {
+  const loadPlatformReport = async (filters = analyticsFilters) => {
     try {
-      const res = await fetch('/api/reports/platform');
+      setAnalyticsLoading(true);
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      const res = await fetch(`/api/reports/platform${params.toString() ? `?${params.toString()}` : ''}`);
       if (res.ok) {
         const data = await res.json();
         setPlatformReport(data);
       }
     } catch (err) {
       console.error('Failed to load platform report:', err);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -261,7 +288,7 @@ export default function AdminDashboard() {
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Receita Total</p>
                 <p className="text-3xl font-display font-bold text-blue-400">
-                  {platformReport ? formatCurrency(platformReport.gmv) : "..."}
+                  {platformReport ? formatCurrency(platformReport!.gmv) : "..."}
                 </p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
@@ -300,19 +327,19 @@ export default function AdminDashboard() {
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Recebido Mensal</p>
                 <p className="text-3xl font-display font-bold text-green-400">
-                  {platformReport ? formatCurrency(platformReport.monthly_received) : '...'}
+                  {platformReport ? formatCurrency(platformReport!.monthly_received) : '...'}
                 </p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">A receber no próximo ciclo</p>
                 <p className="text-3xl font-display font-bold text-blue-400">
-                  {platformReport ? formatCurrency(platformReport.next_cycle_receivable) : '...'}
+                  {platformReport ? formatCurrency(platformReport!.next_cycle_receivable) : '...'}
                 </p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Valor de inadimplência</p>
                 <p className="text-3xl font-display font-bold text-red-400">
-                  {platformReport ? formatCurrency(platformReport.overdue_amount) : '...'}
+                  {platformReport ? formatCurrency(platformReport!.overdue_amount) : '...'}
                 </p>
               </div>
             </div>
@@ -454,25 +481,25 @@ export default function AdminDashboard() {
         )}
 
         {/* ========== ANALYTICS ========== */}
-        {activeTab === "analytics" && platformReport && (
+        {activeTab === "analytics" && platformReport && false && (
           <div className="space-y-6">
             {/* Platform KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">GMV do Mês</p>
-                <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport.gmv)}</p>
+                <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport!.gmv)}</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Total de Pedidos</p>
-                <p className="text-3xl font-display font-bold text-green-400">{platformReport.total_orders.toLocaleString()}</p>
+                <p className="text-3xl font-display font-bold text-green-400">{platformReport!.total_orders.toLocaleString()}</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Clientes Únicos</p>
-                <p className="text-3xl font-display font-bold text-purple-400">{platformReport.total_customers.toLocaleString()}</p>
+                <p className="text-3xl font-display font-bold text-purple-400">{platformReport!.total_customers.toLocaleString()}</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Ticket Médio</p>
-                <p className="text-3xl font-display font-bold text-amber-400">{formatCurrency(platformReport.avg_ticket)}</p>
+                <p className="text-3xl font-display font-bold text-amber-400">{formatCurrency(platformReport!.avg_ticket)}</p>
               </div>
             </div>
 
@@ -484,10 +511,10 @@ export default function AdminDashboard() {
                   <div className="relative w-36 h-36">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                       <path className="text-gray-700" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                      <path className="text-blue-500" strokeDasharray={`${platformReport.retention_rate}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      <path className="text-blue-500" strokeDasharray={`${platformReport!.retention_rate}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-3xl font-display font-bold text-white">{platformReport.retention_rate}%</span>
+                      <span className="text-3xl font-display font-bold text-white">{platformReport!.retention_rate}%</span>
                     </div>
                   </div>
                 </div>
@@ -496,8 +523,8 @@ export default function AdminDashboard() {
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <h3 className="font-bold text-gray-300 mb-4">Ranking de Quiosques</h3>
                 <div className="space-y-3">
-                  {platformReport.top_vendors.map((v, i) => {
-                    const maxRev = Math.max(...platformReport.top_vendors.map(x => x.revenue));
+                  {platformReport!.top_vendors.map((v, i) => {
+                    const maxRev = Math.max(...platformReport!.top_vendors.map(x => x.revenue));
                     return (
                       <div key={i} className="flex items-center gap-3">
                         <span className={cn("w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm", i === 0 ? "bg-amber-500 text-white" : i === 1 ? "bg-gray-400 text-white" : i === 2 ? "bg-amber-700 text-white" : "bg-gray-700 text-gray-400")}>
@@ -516,6 +543,184 @@ export default function AdminDashboard() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "analytics" && platformReport && (
+          <div className="space-y-6">
+            <div className="bg-gray-800 p-5 rounded-2xl border border-gray-700">
+              <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-3">
+                <select
+                  value={analyticsFilters.vendor_id}
+                  onChange={e => setAnalyticsFilters(p => ({ ...p, vendor_id: e.target.value }))}
+                  className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                >
+                  <option value="">Todos os quiosques</option>
+                  {platformReport!.filter_options.vendors.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={analyticsFilters.city}
+                  onChange={e => setAnalyticsFilters(p => ({ ...p, city: e.target.value }))}
+                  className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                >
+                  <option value="">Todas as cidades</option>
+                  {platformReport!.filter_options.cities.map(cityName => (
+                    <option key={cityName} value={cityName}>{cityName}</option>
+                  ))}
+                </select>
+                <select
+                  value={analyticsFilters.beach}
+                  onChange={e => setAnalyticsFilters(p => ({ ...p, beach: e.target.value }))}
+                  className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                >
+                  <option value="">Todas as praias</option>
+                  {platformReport!.filter_options.beaches.map(beachName => (
+                    <option key={beachName} value={beachName}>{beachName}</option>
+                  ))}
+                </select>
+                <input
+                  value={analyticsFilters.product}
+                  onChange={e => setAnalyticsFilters(p => ({ ...p, product: e.target.value }))}
+                  placeholder="Produto ou categoria"
+                  className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm text-white placeholder:text-gray-500 outline-none focus:border-blue-500"
+                />
+                <input
+                  type="date"
+                  value={analyticsFilters.from}
+                  onChange={e => setAnalyticsFilters(p => ({ ...p, from: e.target.value }))}
+                  className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => loadPlatformReport()}
+                  disabled={analyticsLoading}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl p-3 text-sm font-bold"
+                >
+                  {analyticsLoading ? "Filtrando..." : "Aplicar filtros"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">GMV</p>
+                <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport!.gmv)}</p>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">Pedidos</p>
+                <p className="text-3xl font-display font-bold text-green-400">{platformReport!.total_orders.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">Visitantes</p>
+                <p className="text-3xl font-display font-bold text-purple-400">{platformReport!.total_visitors.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">Itens Vendidos</p>
+                <p className="text-3xl font-display font-bold text-cyan-400">{platformReport!.total_products_sold.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">Pico de Venda</p>
+                <p className="text-3xl font-display font-bold text-amber-400">{String(platformReport!.peak_hour.hour).padStart(2, "0")}h</p>
+              </div>
+            </div>
+
+            <div className="grid xl:grid-cols-2 gap-6">
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Produtos mais vendidos</h3>
+                <div className="space-y-3">
+                  {platformReport!.top_products.map((product, i) => {
+                    const max = Math.max(...platformReport!.top_products.map(p => p.quantity), 1);
+                    return (
+                      <div key={product.product_id} className="space-y-1">
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="font-bold">{i + 1}. {product.name}</span>
+                          <span className="text-gray-400">{product.quantity} un - {formatCurrency(product.revenue)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-700 overflow-hidden">
+                          <div className="h-full bg-blue-500" style={{ width: `${(product.quantity / max) * 100}%` }} />
+                        </div>
+                        <p className="text-xs text-gray-500">{product.category}</p>
+                      </div>
+                    );
+                  })}
+                  {platformReport!.top_products.length === 0 && <p className="text-sm text-gray-500">Sem produtos vendidos neste filtro.</p>}
+                </div>
+              </div>
+
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Praias/localizacoes por faturamento</h3>
+                <div className="space-y-3">
+                  {platformReport!.top_beaches.map((beachItem, i) => (
+                    <div key={`${beachItem.city}-${beachItem.beach}`} className="flex items-center justify-between gap-4 border-b border-gray-700 pb-3 last:border-0">
+                      <div>
+                        <p className="font-bold text-sm">{i + 1}. {beachItem.beach}</p>
+                        <p className="text-xs text-gray-500">{beachItem.city} - {beachItem.quantity} itens</p>
+                      </div>
+                      <p className="font-bold text-green-400">{formatCurrency(beachItem.revenue)}</p>
+                    </div>
+                  ))}
+                  {platformReport!.top_beaches.length === 0 && <p className="text-sm text-gray-500">Sem dados por praia neste filtro.</p>}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid xl:grid-cols-3 gap-6">
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Cidades</h3>
+                <div className="space-y-3">
+                  {platformReport!.top_cities.map(cityItem => (
+                    <div key={cityItem.city} className="flex justify-between text-sm">
+                      <span>{cityItem.city}</span>
+                      <span className="font-bold text-green-400">{formatCurrency(cityItem.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Categorias</h3>
+                <div className="space-y-3">
+                  {platformReport!.top_categories.map(category => (
+                    <div key={category.category} className="flex justify-between text-sm">
+                      <span>{category.category}</span>
+                      <span className="font-bold text-cyan-400">{category.quantity} un</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h3 className="font-bold text-gray-300 mb-4">Horario mais forte por produto</h3>
+                <div className="space-y-3">
+                  {platformReport!.peak_product_hours.map((item, i) => (
+                    <div key={`${item.product}-${item.hour}-${i}`} className="flex justify-between gap-3 text-sm">
+                      <span className="truncate">{item.product}</span>
+                      <span className="font-bold text-amber-400">{String(item.hour).padStart(2, "0")}h - {item.quantity} un</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+              <h3 className="font-bold text-gray-300 mb-4">Ranking de quiosques</h3>
+              <div className="grid lg:grid-cols-2 gap-4">
+                {platformReport!.top_vendors.map((vendor, i) => (
+                  <div key={`${vendor.name}-${i}`} className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold">{i + 1}. {vendor.name}</p>
+                        <p className="text-xs text-gray-500">{vendor.city} - {vendor.beach}</p>
+                      </div>
+                      <p className="text-lg font-display font-bold text-green-400">{formatCurrency(vendor.revenue)}</p>
+                    </div>
+                    <div className="flex gap-4 mt-3 text-xs text-gray-400">
+                      <span>{vendor.orders} pedidos</span>
+                      <span>{vendor.visitors} visitantes</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

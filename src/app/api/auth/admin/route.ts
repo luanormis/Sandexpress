@@ -1,29 +1,32 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth-session';
 
-/**
- * POST /api/auth/admin
- * Login do admin — verifica senha via variável de ambiente.
- */
 export async function POST(req: NextRequest) {
   try {
     const { password } = await req.json();
 
     if (!password) {
-      return NextResponse.json({ error: 'Senha é obrigatória.' }, { status: 400 });
+      return NextResponse.json({ error: 'Senha obrigatoria.' }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD || '123@senha123@';
+    const adminPassword = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : '95732');
+    if (!adminPassword) {
+      return NextResponse.json({ error: 'ADMIN_PASSWORD nao configurado.' }, { status: 500 });
+    }
 
-    if (password !== adminPassword) {
-      return NextResponse.json({ error: 'Senha inválida.' }, { status: 401 });
+    const providedBuffer = Buffer.from(String(password));
+    const expectedBuffer = Buffer.from(adminPassword);
+    const isValid =
+      providedBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+
+    if (!isValid) {
+      return NextResponse.json({ error: 'Senha invalida.' }, { status: 401 });
     }
 
     const token = createSessionToken({ role: 'admin' }, 12 * 60 * 60);
-    const response = NextResponse.json({
-      role: 'admin',
-      token,
-    });
+    const response = NextResponse.json({ role: 'admin' });
     response.cookies.set({
       name: 'admin_session',
       value: token,

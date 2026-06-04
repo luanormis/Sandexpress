@@ -39,7 +39,7 @@ export async function getProductImageGallery(
       query = query.eq("plan_type", "free");
     }
 
-    const { data, error } = await query.order("category").order("title");
+    const { data, error } = await query.order("category").order("name");
 
     if (error) throw error;
     return data as ProductImage[];
