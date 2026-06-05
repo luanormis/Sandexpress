@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     let query = supabaseAdmin
       .from('orders')
       .select(
-        '*, order_items(quantity, unit_price, subtotal, product_id, cancelled, products(name)), customers(name, phone), umbrellas(number)'
+        '*, order_items(quantity, unit_price, subtotal, product_id, cancelled, products(name)), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
       )
       .eq('vendor_id', vendor_id)
       .order('created_at', { ascending: false });

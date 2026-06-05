@@ -1,39 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-type MenuSeedItem = {
-  category: string;
-  name: string;
-  price: number;
-  sort_order: number;
-};
-
-const DEFAULT_MENU: MenuSeedItem[] = [
-  { category: 'Petiscos e Porcoes', name: 'Porcao de Peixe Frito', price: 75, sort_order: 10 },
-  { category: 'Petiscos e Porcoes', name: 'Porcao de Camarao Frito', price: 90, sort_order: 20 },
-  { category: 'Petiscos e Porcoes', name: 'Porcao de Batata Frita', price: 35, sort_order: 30 },
-  { category: 'Petiscos e Porcoes', name: 'Porcao de Mandioca Frita', price: 38, sort_order: 40 },
-  { category: 'Pasteis', name: 'Pastel de Camarao', price: 14, sort_order: 50 },
-  { category: 'Pasteis', name: 'Pastel de Carne', price: 12, sort_order: 60 },
-  { category: 'Pasteis', name: 'Pastel de Queijo', price: 12, sort_order: 70 },
-  { category: 'Pasteis', name: 'Pastel de Palmito', price: 12, sort_order: 80 },
-  { category: 'Pasteis', name: 'Pastel de Frango com Catupiry', price: 13, sort_order: 90 },
-  { category: 'Drinks, Caipirinhas e Batidas', name: 'Caipirinha de Limao (Cachaca)', price: 22, sort_order: 100 },
-  { category: 'Drinks, Caipirinhas e Batidas', name: 'Caipiroska de Frutas (Vodka)', price: 26, sort_order: 110 },
-  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Coco', price: 20, sort_order: 120 },
-  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Maracuja', price: 20, sort_order: 130 },
-  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Morango', price: 20, sort_order: 140 },
-  { category: 'Cervejas em Lata', name: 'Cerveja Amstel / Skol / Brahma (Lata 350ml)', price: 10, sort_order: 150 },
-  { category: 'Cervejas em Lata', name: 'Cerveja Heineken / Corona / Stella Artois (Lata 350ml)', price: 12, sort_order: 160 },
-  { category: 'Cervejas em Lata', name: 'Cerveja Budweiser / Eisenbahn (Lata 350ml)', price: 11, sort_order: 170 },
-  { category: 'Cervejas em Lata', name: 'Cervejas Latao (Marcas Tradicionais - 473ml)', price: 13, sort_order: 180 },
-  { category: 'Bebidas Nao Alcoolicas', name: 'Suco Natural de Frutas (Laranja, Abacaxi ou Limao)', price: 12, sort_order: 190 },
-  { category: 'Bebidas Nao Alcoolicas', name: 'Refrigerante Lata (Coca-Cola / Coca-Cola Zero)', price: 7, sort_order: 200 },
-  { category: 'Bebidas Nao Alcoolicas', name: 'Refrigerante Lata (Guarana Antarctica / Sprite / Fanta Laranja)', price: 7, sort_order: 210 },
-  { category: 'Bebidas Nao Alcoolicas', name: 'Agua Mineral sem Gas', price: 5, sort_order: 220 },
-  { category: 'Bebidas Nao Alcoolicas', name: 'Agua Mineral com Gas', price: 6, sort_order: 230 },
-];
+import { DEFAULT_MENU } from '@/lib/default-menu';
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -54,8 +22,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    if (!body.name || !body.owner_name || !body.owner_phone) {
-      return NextResponse.json({ error: 'name, owner_name e owner_phone sao obrigatorios.' }, { status: 400 });
+    if (!body.name || !body.owner_name || !body.owner_phone || !body.city || !body.state || !body.beach_name) {
+      return NextResponse.json({
+        error: 'Nome do quiosque, responsavel, telefone, praia, cidade e estado sao obrigatorios.',
+      }, { status: 400 });
     }
 
     const cleanPhone = String(body.owner_phone || '').replace(/\D/g, '');
@@ -64,6 +34,9 @@ export async function POST(req: NextRequest) {
     const documentLogin = String(body.document_login || cleanCnpj || cleanCpf || cleanPhone).trim();
     if (!documentLogin) {
       return NextResponse.json({ error: 'Informe telefone, CPF ou CNPJ para criar o login.' }, { status: 400 });
+    }
+    if (!cleanCpf && !cleanCnpj) {
+      return NextResponse.json({ error: 'Informe CPF ou CNPJ para o cadastro do quiosque.' }, { status: 400 });
     }
 
     const initialPassword = String(body.password || crypto.randomBytes(9).toString('base64url'));
@@ -81,7 +54,7 @@ export async function POST(req: NextRequest) {
         status: 'active',
         city: body.city || null,
         state: body.state || null,
-        beach_name: body.beach_name || body.address || null,
+        beach_name: body.beach_name,
         primary_color: body.primary_color || '#ff7a1a',
         logo_url: body.logo_url || null,
       })
@@ -100,9 +73,9 @@ export async function POST(req: NextRequest) {
         cpf: cleanCpf || null,
         cnpj: cleanCnpj || null,
         document_login: documentLogin,
-        address: body.address || body.beach_name || null,
-        city: body.city || null,
-        state: body.state || null,
+        address: body.address || body.beach_name,
+        city: body.city,
+        state: String(body.state).toUpperCase(),
         logo_url: body.logo_url || null,
         primary_color: body.primary_color || '#ff7a1a',
         secondary_color: body.secondary_color || '#0f3d4f',

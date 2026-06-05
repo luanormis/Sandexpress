@@ -17,6 +17,7 @@ interface Vendor {
   owner_email: string | null;
   city: string | null;
   state: string | null;
+  beach_name?: string | null;
   cnpj: string | null;
   cpf: string | null;
   subscription_status: string;
@@ -88,9 +89,10 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "",
   });
   const [regSuccess, setRegSuccess] = useState(false);
+  const [regError, setRegError] = useState("");
 
   // Load platform report
   useEffect(() => {
@@ -177,9 +179,14 @@ export default function AdminDashboard() {
   // Register vendor
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone) return;
+    const hasDocument = regForm.cpf.replace(/\D/g, "") || regForm.cnpj.replace(/\D/g, "");
+    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone || !regForm.beach_name || !regForm.city || !regForm.state || !hasDocument) {
+      setRegError("Preencha telefone, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      return;
+    }
 
     try {
+      setRegError("");
       const res = await fetch("/api/vendors/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,18 +202,23 @@ export default function AdminDashboard() {
           state: regForm.state || null,
           cnpj: regForm.cnpj || null,
           cpf: regForm.cpf || null,
+          beach_name: regForm.beach_name || null,
           subscription_status: "trial",
           plan_type: "trial",
-          trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+          trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(),
           is_active: true,
-          max_umbrellas: 5,
+          max_umbrellas: 50,
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "" });
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "" });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRegError(data.error || "Nao foi possivel cadastrar o quiosque.");
       }
     } catch (err) {
       console.error("Register error:", err);
+      setRegError("Falha de conexao ao cadastrar o quiosque.");
     }
   };
 
@@ -735,7 +747,7 @@ export default function AdminDashboard() {
               <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center">
                 <CheckCircle2 size={48} className="text-green-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-display font-bold text-green-400 mb-2">Quiosque cadastrado!</h3>
-                <p className="text-gray-400 mb-6">O quiosque foi criado com <strong>7 dias grátis</strong> de avaliação.</p>
+                <p className="text-gray-400 mb-6">O quiosque foi criado com <strong>3 dias grátis</strong> de avaliação.</p>
                 <button
                   onClick={() => { setRegSuccess(false); setActiveTab("vendors"); }}
                   className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700"
@@ -756,20 +768,29 @@ export default function AdminDashboard() {
                       placeholder="Ex: Quiosque do Sol"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-1">Praia *</label>
+                    <input
+                      type="text" required
+                      value={regForm.beach_name} onChange={e => setRegForm(p => ({ ...p, beach_name: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                      placeholder="Praia das Pitangueiras"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-400 mb-1">Cidade</label>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">Cidade *</label>
                       <input
-                        type="text"
+                        type="text" required
                         value={regForm.city} onChange={e => setRegForm(p => ({ ...p, city: e.target.value }))}
                         className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
                         placeholder="Santos"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-gray-400 mb-1">Estado</label>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">Estado *</label>
                       <input
-                        type="text" maxLength={2}
+                        type="text" required maxLength={2}
                         value={regForm.state} onChange={e => setRegForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
                         className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
                         placeholder="SP"
@@ -831,8 +852,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {regError && (
+                  <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-300">
+                    {regError}
+                  </div>
+                )}
+
                 <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl text-lg hover:bg-blue-700 active:scale-95 transition-all">
-                  Cadastrar Quiosque (7 dias grátis)
+                  Cadastrar Quiosque (3 dias grátis)
                 </button>
               </form>
             )}

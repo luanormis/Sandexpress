@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   UtensilsCrossed, Smartphone, Zap, QrCode, TrendingUp, CheckCircle2,
-  Camera, Clock, Gift, FileText, X, ChevronRight,
+  Camera, Gift, FileText, X, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,14 +14,20 @@ export default function LandingPage() {
   const [regSuccess, setRegSuccess] = useState(false);
   const [regCredentials, setRegCredentials] = useState<{ login: string; password?: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "",
   });
   const [loading, setLoading] = useState(false);
+  const [registerError, setRegisterError] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email) return;
+    const hasDocument = form.cpf.replace(/\D/g, "") || form.cnpj.replace(/\D/g, "");
+    if (!form.name || !form.owner_name || !form.owner_phone || !form.beach_name || !form.city || !form.state || !hasDocument) {
+      setRegisterError("Preencha telefone, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      return;
+    }
     setLoading(true);
+    setRegisterError("");
     try {
       const res = await fetch("/api/vendors/register", {
         method: "POST",
@@ -35,14 +41,18 @@ export default function LandingPage() {
           password: data.temporary_password,
         });
         setRegSuccess(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRegisterError(data.error || "Nao foi possivel finalizar o cadastro. Tente novamente.");
       }
     } catch (err) {
       console.error(err);
+      setRegisterError("Falha de conexao ao criar cadastro. Confira a internet e tente novamente.");
     }
     setLoading(false);
   };
 
-  const openModal = () => { setShowModal(true); setRegSuccess(false); setRegCredentials(null); };
+  const openModal = () => { setShowModal(true); setRegSuccess(false); setRegCredentials(null); setRegisterError(""); };
 
   return (
     <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
@@ -284,15 +294,6 @@ export default function LandingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Email *</label>
-                    <input
-                      type="email" required
-                      value={form.owner_email} onChange={e => setForm(p => ({ ...p, owner_email: e.target.value }))}
-                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                      placeholder="email@exemplo.com"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp *</label>
                     <input
                       type="tel" required
@@ -308,6 +309,15 @@ export default function LandingPage() {
                       value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                       className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                       placeholder="Ex: Quiosque do Sol"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Praia *</label>
+                    <input
+                      type="text" required
+                      value={form.beach_name} onChange={e => setForm(p => ({ ...p, beach_name: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="Ex: Praia das Pitangueiras"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -334,7 +344,7 @@ export default function LandingPage() {
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">Cidade</label>
                       <input
-                        type="text"
+                        type="text" required
                         value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                         placeholder="Santos"
@@ -343,13 +353,18 @@ export default function LandingPage() {
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">Estado</label>
                       <input
-                        type="text" maxLength={2}
+                        type="text" required maxLength={2}
                         value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                         placeholder="SP"
                       />
                     </div>
                   </div>
+                  {registerError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                      {registerError}
+                    </div>
+                  )}
 
                   <button
                     type="submit"

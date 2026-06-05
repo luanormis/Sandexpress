@@ -16,7 +16,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   const { data: orders, error: ordersErr } = await supabaseAdmin
     .from('orders')
-    .select('id, umbrella_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas(number)')
+    .select('id, umbrella_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
     .eq('vendor_id', vendorId)
     .eq('status', 'completed')
     .gte('created_at', startOfDay)

@@ -52,9 +52,14 @@ function isAllowedOrigin(req: NextRequest) {
   if (!origin) return process.env.NODE_ENV !== 'production';
 
   const requestOrigin = req.nextUrl.origin;
-  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL
-    ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
-    : requestOrigin;
+  let configuredOrigin = requestOrigin;
+  try {
+    configuredOrigin = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
+      : requestOrigin;
+  } catch {
+    configuredOrigin = requestOrigin;
+  }
 
   return origin === requestOrigin || origin === configuredOrigin;
 }
