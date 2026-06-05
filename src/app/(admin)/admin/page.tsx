@@ -93,6 +93,8 @@ export default function AdminDashboard() {
   });
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
+  const [bootstrapLoading, setBootstrapLoading] = useState(false);
+  const [bootstrapMessage, setBootstrapMessage] = useState("");
 
   // Load platform report
   useEffect(() => {
@@ -222,6 +224,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const bootstrapTestVendor = async () => {
+    setBootstrapLoading(true);
+    setBootstrapMessage("");
+    try {
+      const res = await fetch("/api/admin/bootstrap-test-vendor", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBootstrapMessage(data.error || "Nao foi possivel recriar o usuario teste001.");
+        return;
+      }
+      setBootstrapMessage("teste001 / teste001 pronto com 50 guarda-sois e cardapio padrao.");
+      await loadVendors();
+      await loadPlatformReport();
+    } catch {
+      setBootstrapMessage("Falha de conexao ao recriar o usuario teste001.");
+    } finally {
+      setBootstrapLoading(false);
+    }
+  };
+
   // Filtered vendors
   const filteredVendors = vendors.filter(v =>
     v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
@@ -297,6 +319,26 @@ export default function AdminDashboard() {
         {/* ========== OVERVIEW ========== */}
         {activeTab === "overview" && (
           <div className="space-y-6">
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="font-bold text-blue-200">Setup rapido de producao</h3>
+                  <p className="mt-1 text-sm text-blue-100/70">
+                    Recria o login teste001 com senha teste001, 50 guarda-sois e o cardapio padrao no Supabase conectado a este deploy.
+                  </p>
+                  {bootstrapMessage && <p className="mt-3 text-sm font-bold text-blue-100">{bootstrapMessage}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={bootstrapTestVendor}
+                  disabled={bootstrapLoading}
+                  className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {bootstrapLoading ? "Criando..." : "Recriar teste001"}
+                </button>
+              </div>
+            </div>
+
             {/* KPIs */}
             <div className="grid grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">

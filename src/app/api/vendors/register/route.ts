@@ -39,6 +39,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Informe CPF ou CNPJ para o cadastro do quiosque.' }, { status: 400 });
     }
 
+    const duplicateFilters = [
+      `document_login.eq.${documentLogin}`,
+      cleanCpf ? `cpf.eq.${cleanCpf}` : '',
+      cleanCnpj ? `cnpj.eq.${cleanCnpj}` : '',
+    ].filter(Boolean).join(',');
+
+    const { data: duplicateVendor, error: duplicateError } = await supabaseAdmin
+      .from('vendors')
+      .select('id, document_login, cpf, cnpj')
+      .or(duplicateFilters)
+      .maybeSingle();
+
+    if (duplicateError) throw duplicateError;
+    if (duplicateVendor) {
+      return NextResponse.json({
+        error: 'Ja existe um quiosque cadastrado com este CPF, CNPJ ou login. Use outro documento ou entre pelo painel do quiosque.',
+      }, { status: 409 });
+    }
+
     const initialPassword = String(body.password || crypto.randomBytes(9).toString('base64url'));
     if (initialPassword.length < 8) {
       return NextResponse.json({ error: 'A senha inicial deve ter pelo menos 8 caracteres.' }, { status: 400 });
@@ -129,6 +148,8 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
   } catch (err) {
     console.error('Vendor register error:', err);
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Erro ao gravar no Supabase. Confirme que o banco foi criado com infra/sql-iniciar-novo-projeto.sql e que as variaveis do Vercel apontam para esse projeto.',
+    }, { status: 500 });
   }
 }

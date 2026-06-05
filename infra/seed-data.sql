@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS vendors (
   password_hash       TEXT,
   subscription_status TEXT NOT NULL DEFAULT 'trial'
     CHECK (subscription_status IN ('trial','active','overdue','blocked')),
-  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '3 days'),
   plan_type           TEXT CHECK (plan_type IN ('trial','monthly','6months','12months')),
   plan_expires_at     TIMESTAMPTZ,
   max_umbrellas       INTEGER NOT NULL DEFAULT 50,
@@ -337,3 +337,5 @@ CREATE POLICY IF NOT EXISTS pol_items_select
 -- 5. Clique em "Run" ou "Ctrl+Enter"
 -- 6. Aguarde - pode levar 2-5 minutos com 500 quiosques
 -- ============================================================================
+-- ARQUIVO LEGADO: nao use para producao.
+-- Para recriar o banco correto do SandExpress, use infra/sql-iniciar-novo-projeto.sql.

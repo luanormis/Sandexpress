@@ -22,7 +22,7 @@ CREATE TABLE vendors (
   password_reset_expires_at TIMESTAMPTZ,
   subscription_status TEXT NOT NULL DEFAULT 'trial'
     CHECK (subscription_status IN ('trial','active','overdue','blocked')),
-  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+  trial_ends_at       TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '3 days'),
   plan_type           TEXT CHECK (plan_type IN ('trial','monthly','6months','12months')),
   plan_expires_at     TIMESTAMPTZ,
   max_umbrellas       INTEGER NOT NULL DEFAULT 120,  -- aumentado para 120
@@ -251,3 +251,5 @@ ALTER TABLE account_adjustments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY pol_adjustments_insert ON account_adjustments FOR INSERT WITH CHECK (TRUE);
 CREATE POLICY pol_adjustments_select ON account_adjustments FOR SELECT USING (TRUE);
 CREATE POLICY pol_adjustments_update ON account_adjustments FOR UPDATE USING (TRUE);
+-- ARQUIVO LEGADO: nao use para producao.
+-- Para recriar o banco correto do SandExpress, use infra/sql-iniciar-novo-projeto.sql.
