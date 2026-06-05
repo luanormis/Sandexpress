@@ -220,6 +220,27 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS daily_closings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  business_date DATE NOT NULL,
+  total_orders INTEGER NOT NULL DEFAULT 0,
+  total_revenue NUMERIC(12,2) NOT NULL DEFAULT 0,
+  total_items_sold INTEGER NOT NULL DEFAULT 0,
+  avg_ticket NUMERIC(12,2) NOT NULL DEFAULT 0,
+  unique_customers INTEGER NOT NULL DEFAULT 0,
+  payment_methods JSONB NOT NULL DEFAULT '{}'::jsonb,
+  top_products JSONB NOT NULL DEFAULT '[]'::jsonb,
+  hourly_breakdown JSONB NOT NULL DEFAULT '[]'::jsonb,
+  orders_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
+  closed_by TEXT,
+  closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(vendor_id, business_date)
+);
+
 CREATE TABLE IF NOT EXISTS analytics_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
@@ -263,6 +284,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_tenant_umbrella_status ON orders(tenant_id
 CREATE INDEX IF NOT EXISTS idx_orders_created_brin ON orders USING BRIN(created_at);
 CREATE INDEX IF NOT EXISTS idx_order_items_tenant_order ON order_items(tenant_id, order_id);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_reset ON rate_limit_buckets(reset_at);
+CREATE INDEX IF NOT EXISTS idx_daily_closings_tenant_date ON daily_closings(tenant_id, business_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_closings_vendor_date ON daily_closings(vendor_id, business_date DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_vendor_event_created ON analytics_events(vendor_id, event_type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_payload_gin ON analytics_events USING GIN(payload);
 CREATE INDEX IF NOT EXISTS idx_otps_lookup ON customer_otps(vendor_id, phone, used, expires_at);
@@ -274,6 +297,7 @@ ALTER TABLE umbrellas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_closings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_otps ENABLE ROW LEVEL SECURITY;
 
@@ -293,6 +317,7 @@ DROP POLICY IF EXISTS service_only_umbrellas ON umbrellas;
 DROP POLICY IF EXISTS service_only_products ON products;
 DROP POLICY IF EXISTS service_only_orders ON orders;
 DROP POLICY IF EXISTS service_only_order_items ON order_items;
+DROP POLICY IF EXISTS service_only_daily_closings ON daily_closings;
 DROP POLICY IF EXISTS service_only_analytics ON analytics_events;
 DROP POLICY IF EXISTS service_only_otps ON customer_otps;
 
@@ -303,6 +328,7 @@ CREATE POLICY service_only_umbrellas ON umbrellas FOR ALL USING (FALSE) WITH CHE
 CREATE POLICY service_only_products ON products FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_orders ON orders FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_order_items ON order_items FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_daily_closings ON daily_closings FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_analytics ON analytics_events FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_otps ON customer_otps FOR ALL USING (FALSE) WITH CHECK (FALSE);
 
@@ -328,3 +354,4 @@ ANALYZE umbrellas;
 ANALYZE products;
 ANALYZE orders;
 ANALYZE order_items;
+ANALYZE daily_closings;

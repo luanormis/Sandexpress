@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
-  Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
+  Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star, CalendarCheck,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -103,6 +103,8 @@ export default function VendorDashboard() {
   const [reportPeriod, setReportPeriod] = useState("month");
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [closingDay, setClosingDay] = useState(false);
+  const [closingMessage, setClosingMessage] = useState("");
 
   // --- Customers State ---
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -200,6 +202,38 @@ export default function VendorDashboard() {
     } catch (err) {
       console.error('Move order error:', err);
       alert('Erro de rede ao atualizar pedido.');
+    }
+  };
+
+  const closeBusinessDay = async () => {
+    if (!vendorId) return;
+    const today = new Date().toISOString().split("T")[0];
+    const confirmed = confirm("Fechar o dia agora? As vendas pagas de hoje serao consolidadas para relatorios.");
+    if (!confirmed) return;
+
+    setClosingDay(true);
+    setClosingMessage("");
+    try {
+      const res = await fetch("/api/daily-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendorId, date: today }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setClosingMessage(data.error || "Erro ao fechar o dia.");
+        return;
+      }
+      setClosingMessage(`${data.message} Pedidos: ${data.report?.summary?.total_orders || 0} - Total: ${formatCurrency(Number(data.report?.summary?.total_revenue || 0))}`);
+      fetch(`/api/reports?vendor_id=${vendorId}&period=${reportPeriod}`)
+        .then(r => r.json())
+        .then(d => setReportData(d))
+        .catch(() => undefined);
+    } catch (err) {
+      console.error("Close business day error:", err);
+      setClosingMessage("Erro de rede ao fechar o dia.");
+    } finally {
+      setClosingDay(false);
     }
   };
 
@@ -633,6 +667,37 @@ export default function VendorDashboard() {
           {/* ========== ABA 4: RELATÓRIOS ========== */}
           {activeTab === "reports" && (
             <div className="space-y-6">
+              <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#FFF2E5] text-[#FF6B00] flex items-center justify-center shrink-0">
+                    <CalendarCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 text-lg">Fechamento do Dia</h3>
+                    <p className="text-sm text-gray-500 max-w-2xl">
+                      Consolida as vendas completadas e pagas de hoje em um registro fixo para relatorios,
+                      auditoria e comparacao futura.
+                    </p>
+                    {closingMessage && (
+                      <p className={cn(
+                        "mt-3 rounded-lg px-3 py-2 text-sm font-bold",
+                        closingMessage.startsWith("Erro") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                      )}>
+                        {closingMessage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={closeBusinessDay}
+                  disabled={closingDay}
+                  className="bg-[#394E59] hover:bg-[#263640] text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <CalendarCheck size={18} />
+                  {closingDay ? "Fechando..." : "Fechar dia"}
+                </button>
+              </div>
+
               {/* Period filter */}
               <div className="flex gap-2 flex-wrap">
                 {[
