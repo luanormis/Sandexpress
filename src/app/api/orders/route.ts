@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /**
  * GET /api/orders?vendor_id=xxx&status=received
@@ -12,11 +11,6 @@ import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
  */
 export async function GET(req: NextRequest) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const { searchParams } = new URL(req.url);
     const vendor_id = searchParams.get('vendor_id');
     const status = searchParams.get('status');
@@ -29,16 +23,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
-    let query = enforceTenantScope(
-      supabaseAdmin
-        .from('orders')
-        .select(
-          '*, order_items(quantity, unit_price, subtotal, product_id, cancelled, products(name)), customers(name, phone), umbrellas(number)'
-        )
-        .eq('vendor_id', vendor_id)
-        .order('created_at', { ascending: false }),
-      tenantId
-    );
+    let query = supabaseAdmin
+      .from('orders')
+      .select(
+        '*, order_items(quantity, unit_price, subtotal, product_id, cancelled, products(name)), customers(name, phone), umbrellas(number)'
+      )
+      .eq('vendor_id', vendor_id)
+      .order('created_at', { ascending: false });
 
     if (status) {
       query = query.eq('status', status);
@@ -46,7 +37,18 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const mapped = (data || []).map((order: any) => ({
+      ...order,
+      umbrella: order.umbrellas?.number ?? 0,
+      customer: order.customers?.name ?? 'Cliente',
+      phone: order.customers?.phone ?? '',
+      time: order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      items: (order.order_items || []).map((item: any) => ({
+        q: item.quantity,
+        n: item.products?.name || 'Produto',
+      })),
+    }));
+    return NextResponse.json(mapped);
   } catch (err) {
     console.error('Orders GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -55,11 +57,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const { vendor_id, customer_id, umbrella_id, items, notes } = await req.json();
 
     if (!vendor_id || !customer_id || !umbrella_id || !Array.isArray(items) || items.length === 0) {
@@ -79,14 +76,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar guarda-sol pertence ao vendor
-    const { data: umbrella, error: umbrellaErr } = await enforceTenantScope(
-      supabaseAdmin
-        .from('umbrellas')
-        .select('id, vendor_id, is_occupied, current_order_id, active')
-        .eq('id', umbrella_id)
-        .eq('vendor_id', vendor_id),
-      tenantId
-    ).single();
+    const { data: umbrella, error: umbrellaErr } = await (supabaseAdmin.from('umbrellas') as any)
+      .select('id, tenant_id, vendor_id, is_occupied, current_order_id, active')
+      .eq('id', umbrella_id)
+      .eq('vendor_id', vendor_id)
+      .single();
 
     if (umbrellaErr || !umbrella) {
       return NextResponse.json({ error: 'Guarda-sol inválido para este quiosque.' }, { status: 400 });
@@ -98,20 +92,16 @@ export async function POST(req: NextRequest) {
     // Buscar preços reais dos produtos no banco (nunca confiar no cliente)
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id);
 
-    const { data: dbProducts, error: prodErr } = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .select('id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
-        .in('id', productIds)
-        .eq('vendor_id', vendor_id),
-      tenantId
-    ) as { data: any[] | null; error: any };
+    const { data: dbProducts, error: prodErr } = await (supabaseAdmin.from('products') as any)
+      .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
+      .in('id', productIds)
+      .eq('vendor_id', vendor_id);
 
     if (prodErr || !dbProducts) {
       return NextResponse.json({ error: 'Erro ao validar produtos.' }, { status: 500 });
     }
 
-    const productMap = new Map(dbProducts!.map((p: any) => [p.id, p]));
+    const productMap = new Map((dbProducts as any[]).map((p) => [p.id, p]));
 
     // Validar produtos e calcular total com preços do banco
     const orderItems: { product_id: string; quantity: number; unit_price: number; subtotal: number }[] = [];
@@ -135,24 +125,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Criar pedido
-    const { data: order, error: orderErr } = await enforceTenantScope(
-      supabaseAdmin
-        .from('orders')
-        .insert({ vendor_id, customer_id, umbrella_id, total, notes: notes || null, tenant_id: tenantId }),
-      tenantId
-    )
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        tenant_id: (umbrella as any).tenant_id,
+        vendor_id,
+        customer_id,
+        umbrella_id,
+        total,
+        notes: notes || null,
+      } as any)
       .select()
       .single();
 
     if (orderErr) throw orderErr;
 
     // Criar itens do pedido
-    const { error: itemsErr } = await enforceTenantScope(
-      supabaseAdmin
-        .from('order_items')
-        .insert(orderItems.map((oi) => ({ ...oi, order_id: order.id, tenant_id: tenantId }))),
-      tenantId
-    );
+    const { error: itemsErr } = await supabaseAdmin
+      .from('order_items')
+      .insert(orderItems.map((oi) => ({
+        tenant_id: (umbrella as any).tenant_id,
+        ...oi,
+        order_id: order.id,
+      } as any)));
 
     if (itemsErr) throw itemsErr;
 
@@ -161,51 +156,40 @@ export async function POST(req: NextRequest) {
       const product = productMap.get(item.product_id)!;
       if (product.stock_quantity !== null) {
         const newQty = product.stock_quantity - item.quantity;
-        await enforceTenantScope(
-          supabaseAdmin
-            .from('products')
-            .update({
-              stock_quantity: newQty,
-              blocked_by_stock: newQty <= 0,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', item.product_id),
-          tenantId
-        );
+        await supabaseAdmin
+          .from('products')
+          .update({
+            stock_quantity: newQty,
+            blocked_by_stock: newQty <= 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', item.product_id);
       }
     }
 
     // Marcar guarda-sol como ocupado
     if (!umbrella.is_occupied) {
-      await enforceTenantScope(
-        supabaseAdmin
-          .from('umbrellas')
-          .update({ is_occupied: true, current_order_id: order.id })
-          .eq('id', umbrella_id),
-        tenantId
-      );
+      await supabaseAdmin
+        .from('umbrellas')
+        .update({ is_occupied: true, current_order_id: order.id })
+        .eq('id', umbrella_id);
     }
 
     // Atualizar total gasto do cliente
-    const { data: customer } = await enforceTenantScope(
-      supabaseAdmin
-        .from('customers')
-        .select('total_spent')
-        .eq('id', customer_id),
-      tenantId
-    ).single();
+    const { data: customer } = await supabaseAdmin
+      .from('customers')
+      .select('total_spent')
+      .eq('id', customer_id)
+      .single();
 
     if (customer) {
-      await enforceTenantScope(
-        supabaseAdmin
-          .from('customers')
-          .update({
-            total_spent: Number(customer.total_spent) + total,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', customer_id),
-        tenantId
-      );
+      await supabaseAdmin
+        .from('customers')
+        .update({
+          total_spent: Number(customer.total_spent) + total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', customer_id);
     }
 
     return NextResponse.json(order, { status: 201 });

@@ -1,7 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from '@/lib/plans';
+
+type MenuSeedItem = {
+  category: string;
+  name: string;
+  price: number;
+  sort_order: number;
+};
+
+const DEFAULT_MENU: MenuSeedItem[] = [
+  { category: 'Petiscos e Porcoes', name: 'Porcao de Peixe Frito', price: 75, sort_order: 10 },
+  { category: 'Petiscos e Porcoes', name: 'Porcao de Camarao Frito', price: 90, sort_order: 20 },
+  { category: 'Petiscos e Porcoes', name: 'Porcao de Batata Frita', price: 35, sort_order: 30 },
+  { category: 'Petiscos e Porcoes', name: 'Porcao de Mandioca Frita', price: 38, sort_order: 40 },
+  { category: 'Pasteis', name: 'Pastel de Camarao', price: 14, sort_order: 50 },
+  { category: 'Pasteis', name: 'Pastel de Carne', price: 12, sort_order: 60 },
+  { category: 'Pasteis', name: 'Pastel de Queijo', price: 12, sort_order: 70 },
+  { category: 'Pasteis', name: 'Pastel de Palmito', price: 12, sort_order: 80 },
+  { category: 'Pasteis', name: 'Pastel de Frango com Catupiry', price: 13, sort_order: 90 },
+  { category: 'Drinks, Caipirinhas e Batidas', name: 'Caipirinha de Limao (Cachaca)', price: 22, sort_order: 100 },
+  { category: 'Drinks, Caipirinhas e Batidas', name: 'Caipiroska de Frutas (Vodka)', price: 26, sort_order: 110 },
+  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Coco', price: 20, sort_order: 120 },
+  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Maracuja', price: 20, sort_order: 130 },
+  { category: 'Drinks, Caipirinhas e Batidas', name: 'Batida de Morango', price: 20, sort_order: 140 },
+  { category: 'Cervejas em Lata', name: 'Cerveja Amstel / Skol / Brahma (Lata 350ml)', price: 10, sort_order: 150 },
+  { category: 'Cervejas em Lata', name: 'Cerveja Heineken / Corona / Stella Artois (Lata 350ml)', price: 12, sort_order: 160 },
+  { category: 'Cervejas em Lata', name: 'Cerveja Budweiser / Eisenbahn (Lata 350ml)', price: 11, sort_order: 170 },
+  { category: 'Cervejas em Lata', name: 'Cervejas Latao (Marcas Tradicionais - 473ml)', price: 13, sort_order: 180 },
+  { category: 'Bebidas Nao Alcoolicas', name: 'Suco Natural de Frutas (Laranja, Abacaxi ou Limao)', price: 12, sort_order: 190 },
+  { category: 'Bebidas Nao Alcoolicas', name: 'Refrigerante Lata (Coca-Cola / Coca-Cola Zero)', price: 7, sort_order: 200 },
+  { category: 'Bebidas Nao Alcoolicas', name: 'Refrigerante Lata (Guarana Antarctica / Sprite / Fanta Laranja)', price: 7, sort_order: 210 },
+  { category: 'Bebidas Nao Alcoolicas', name: 'Agua Mineral sem Gas', price: 5, sort_order: 220 },
+  { category: 'Bebidas Nao Alcoolicas', name: 'Agua Mineral com Gas', price: 6, sort_order: 230 },
+];
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -14,17 +46,9 @@ async function hashPassword(password: string) {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-function generateTemporaryPassword() {
-  return crypto.randomBytes(10).toString('base64url');
-}
-
-function onlyDigits(value?: string | null) {
-  return (value || '').replace(/\D/g, '');
-}
-
 /**
  * POST /api/vendors/register
- * Cadastro de novo quiosque a partir da landing page ou admin.
+ * Cria um tenant isolado, o vendor, o cardapio padrao e ate 50 guarda-sois.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -34,77 +58,97 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'name, owner_name e owner_phone sao obrigatorios.' }, { status: 400 });
     }
 
-    const documentLogin = onlyDigits(body.document_login || body.cnpj || body.cpf || body.owner_phone);
-    if (!documentLogin) {
-      return NextResponse.json({ error: 'CPF ou CNPJ e obrigatorio para login.' }, { status: 400 });
+    if (!body.document_login) {
+      return NextResponse.json({ error: 'CPF ou CNPJ (document_login) e obrigatorio para login.' }, { status: 400 });
     }
 
-    const password = body.password?.trim();
-    let passwordToStore: string;
-    let passwordNeedsReset = true;
-
-    if (password) {
-      if (password.length < 8) {
-        return NextResponse.json({ error: 'A senha deve ter ao menos 8 caracteres.' }, { status: 400 });
-      }
-      passwordToStore = password;
-      passwordNeedsReset = false;
-    } else {
-      passwordToStore = generateTemporaryPassword();
+    const initialPassword = String(body.password || crypto.randomBytes(9).toString('base64url'));
+    if (initialPassword.length < 8) {
+      return NextResponse.json({ error: 'A senha inicial deve ter pelo menos 8 caracteres.' }, { status: 400 });
     }
 
-    const passwordHash = await hashPassword(passwordToStore);
+    const passwordHash = await hashPassword(initialPassword);
+    const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const maxUmbrellas = Math.min(Math.max(Number(body.max_umbrellas || 50), 1), 50);
 
-    const { data, error } = await supabaseAdmin
-      .from('vendors')
+    const { data: tenant, error: tenantError } = await (supabaseAdmin.from('tenants') as any)
       .insert({
         name: body.name,
-        owner_name: body.owner_name,
-        owner_phone: onlyDigits(body.owner_phone),
-        owner_email: body.owner_email || null,
-        cpf: onlyDigits(body.cpf) || null,
-        cnpj: onlyDigits(body.cnpj) || null,
-        document_login: documentLogin,
+        status: 'active',
         city: body.city || null,
         state: body.state || null,
-        password_hash: passwordHash,
-        password_needs_reset: passwordNeedsReset,
-        subscription_status: 'trial',
-        plan_type: 'trial',
-        trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString(),
-        max_umbrellas: PLAN_UMBRELLA_LIMIT,
+        beach_name: body.beach_name || body.address || null,
+        primary_color: body.primary_color || '#ff7a1a',
+        logo_url: body.logo_url || null,
       })
       .select()
       .single();
 
-    if (error) throw error;
-
-    const { error: tenantError } = await supabaseAdmin
-      .from('tenants')
-      .upsert({
-        id: data.id,
-        name: data.name,
-        status: data.is_active ? 'active' : 'blocked',
-        city: data.city,
-        state: data.state,
-        primary_color: data.primary_color || '#FF6B00',
-        logo_url: data.logo_url,
-      });
-
     if (tenantError) throw tenantError;
 
-    const responseBody: any = {
-      ...data,
-      message: 'Conta criada com sucesso.',
-      password_needs_reset: passwordNeedsReset,
-    };
+    const { data: vendor, error: vendorError } = await (supabaseAdmin.from('vendors') as any)
+      .insert({
+        tenant_id: tenant.id,
+        name: body.name,
+        owner_name: body.owner_name,
+        owner_phone: body.owner_phone,
+        owner_email: body.owner_email || null,
+        cpf: body.cpf || null,
+        cnpj: body.cnpj || null,
+        document_login: body.document_login,
+        address: body.address || body.beach_name || null,
+        city: body.city || null,
+        state: body.state || null,
+        logo_url: body.logo_url || null,
+        primary_color: body.primary_color || '#ff7a1a',
+        secondary_color: body.secondary_color || '#0f3d4f',
+        password_hash: passwordHash,
+        password_needs_reset: !body.password,
+        subscription_status: 'trial',
+        plan_type: 'trial',
+        trial_ends_at: trialEndsAt,
+        max_umbrellas: maxUmbrellas,
+        is_active: true,
+      })
+      .select()
+      .single();
 
-    if (!password) {
-      responseBody.temporary_password = passwordToStore;
-      responseBody.message = 'Conta criada com senha temporaria. Altere a senha no primeiro acesso.';
-    }
+    if (vendorError) throw vendorError;
 
-    return NextResponse.json(responseBody, { status: 201 });
+    const { error: productsError } = await (supabaseAdmin.from('products') as any).insert(
+      DEFAULT_MENU.map((item) => ({
+        tenant_id: tenant.id,
+        vendor_id: vendor.id,
+        ...item,
+        active: true,
+        stock_quantity: null,
+        blocked_by_stock: false,
+      }))
+    );
+    if (productsError) throw productsError;
+
+    const { error: umbrellasError } = await (supabaseAdmin.from('umbrellas') as any).insert(
+      Array.from({ length: maxUmbrellas }, (_, index) => ({
+        tenant_id: tenant.id,
+        vendor_id: vendor.id,
+        number: index + 1,
+        label: `Guarda-sol ${index + 1}`,
+        active: true,
+        is_occupied: false,
+        map_x: 8 + ((index % 10) * 9),
+        map_y: 10 + (Math.floor(index / 10) * 14),
+      }))
+    );
+    if (umbrellasError) throw umbrellasError;
+
+    return NextResponse.json({
+      ...vendor,
+      tenant_id: tenant.id,
+      message: body.password
+        ? 'Quiosque criado com senha definida pelo vendor.'
+        : 'Quiosque criado com senha temporaria. O vendor deve alterar no primeiro acesso.',
+      temporary_password: body.password ? undefined : initialPassword,
+    }, { status: 201 });
   } catch (err) {
     console.error('Vendor register error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

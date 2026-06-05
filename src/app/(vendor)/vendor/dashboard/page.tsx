@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
-  Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star,
+  Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star, CalendarCheck,
 } from "lucide-react";
-import Image from "next/image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ---------- TYPES ----------
@@ -104,6 +103,8 @@ export default function VendorDashboard() {
   const [reportPeriod, setReportPeriod] = useState("month");
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [closingDay, setClosingDay] = useState(false);
+  const [closingMessage, setClosingMessage] = useState("");
 
   // --- Customers State ---
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -186,8 +187,6 @@ export default function VendorDashboard() {
 
   // Order management
   const moveOrder = async (id: string, newStatus: string) => {
-    const previous = orders;
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PATCH',
@@ -195,14 +194,46 @@ export default function VendorDashboard() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        setOrders(previous);
-        alert(err?.error || 'Erro ao atualizar pedido.');
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Erro ao atualizar pedido.');
+        return;
       }
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
     } catch (err) {
       console.error('Move order error:', err);
-      setOrders(previous);
       alert('Erro de rede ao atualizar pedido.');
+    }
+  };
+
+  const closeBusinessDay = async () => {
+    if (!vendorId) return;
+    const today = new Date().toISOString().split("T")[0];
+    const confirmed = confirm("Fechar o dia agora? As vendas pagas de hoje serao consolidadas para relatorios.");
+    if (!confirmed) return;
+
+    setClosingDay(true);
+    setClosingMessage("");
+    try {
+      const res = await fetch("/api/daily-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendorId, date: today }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setClosingMessage(data.error || "Erro ao fechar o dia.");
+        return;
+      }
+      setClosingMessage(`${data.message} Pedidos: ${data.report?.summary?.total_orders || 0} - Total: ${formatCurrency(Number(data.report?.summary?.total_revenue || 0))}`);
+      fetch(`/api/reports?vendor_id=${vendorId}&period=${reportPeriod}`)
+        .then(r => r.json())
+        .then(d => setReportData(d))
+        .catch(() => undefined);
+    } catch (err) {
+      console.error("Close business day error:", err);
+      setClosingMessage("Erro de rede ao fechar o dia.");
+    } finally {
+      setClosingDay(false);
     }
   };
 
@@ -325,24 +356,11 @@ export default function VendorDashboard() {
     }
   };
 
-  const generateQR = async (umbrella: Umbrella) => {
+  const generateQR = (umbrella: Umbrella) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    try {
-      const res = await fetch(`/api/qr?umbrella_id=${umbrella.id}&number=${umbrella.number}&format=png&base_url=${encodeURIComponent(baseUrl)}`);
-      if (!res.ok) throw new Error('QR generation failed');
-      const data = await res.json();
-
-      await fetch(`/api/umbrellas/${umbrella.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qr_url: data.target_url }),
-      });
-
-      setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: data.qr_image_url, qr_url: data.target_url } : u));
-    } catch (err) {
-      console.error('Generate QR error:', err);
-      alert('Erro ao gerar QR Code.');
-    }
+    const targetUrl = `${baseUrl}/u/${umbrella.id}`;
+    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(targetUrl)}&format=png&margin=20`;
+    setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: qrImg, qr_url: targetUrl } : u));
   };
 
   // Filtered products
@@ -379,7 +397,7 @@ export default function VendorDashboard() {
                 </div>
               </div>
               <div className="text-sm text-gray-600 mb-2 border-t border-gray-50 pt-2">
-                {order.items.map((i, idx) => <div key={idx}>{i.q}x {i.n}</div>)}
+                {(order.items || []).map((i, idx) => <div key={idx}>{i.q}x {i.n}</div>)}
               </div>
               {order.notes && (
                 <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg mb-2 border border-amber-100">
@@ -412,10 +430,7 @@ export default function VendorDashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-3">
-            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={36} height={36} />
-            <h1 className="font-display font-bold text-xl text-[#3D1A0A]">SandExpress</h1>
-          </div>
+          <h1 className="font-display font-bold text-xl text-[#FF6B00]">SandExpress</h1>
           <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">
@@ -469,6 +484,7 @@ export default function VendorDashboard() {
               {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
               {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
               {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
+              {renderKanbanColumn("Conta Solicitada", "closing_requested", "Confirmar Pagamento", "completed", "bg-orange-500")}
               {renderKanbanColumn("Entregue", "completed", "", "", "bg-green-500")}
             </div>
           )}
@@ -651,6 +667,37 @@ export default function VendorDashboard() {
           {/* ========== ABA 4: RELATÓRIOS ========== */}
           {activeTab === "reports" && (
             <div className="space-y-6">
+              <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#FFF2E5] text-[#FF6B00] flex items-center justify-center shrink-0">
+                    <CalendarCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 text-lg">Fechamento do Dia</h3>
+                    <p className="text-sm text-gray-500 max-w-2xl">
+                      Consolida as vendas completadas e pagas de hoje em um registro fixo para relatorios,
+                      auditoria e comparacao futura.
+                    </p>
+                    {closingMessage && (
+                      <p className={cn(
+                        "mt-3 rounded-lg px-3 py-2 text-sm font-bold",
+                        closingMessage.startsWith("Erro") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                      )}>
+                        {closingMessage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={closeBusinessDay}
+                  disabled={closingDay}
+                  className="bg-[#394E59] hover:bg-[#263640] text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <CalendarCheck size={18} />
+                  {closingDay ? "Fechando..." : "Fechar dia"}
+                </button>
+              </div>
+
               {/* Period filter */}
               <div className="flex gap-2 flex-wrap">
                 {[

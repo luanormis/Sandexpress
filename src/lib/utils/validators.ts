@@ -46,7 +46,7 @@ export function isCNPJ(value: string): boolean {
   
   let size = clean.length - 2
   let numbers = clean.substring(0, size)
-  let digits = clean.substring(size)
+  const digits = clean.substring(size)
   let sum = 0
   let pos = size - 7
   

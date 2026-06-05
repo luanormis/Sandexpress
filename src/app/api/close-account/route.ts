@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getRequestSession } from '@/lib/auth-session';
-import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
-
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering'];
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 /**
  * POST /api/close-account
  * Fechar conta do cliente (após pagamento confirmado)
- *
+ * 
  * Body: {
  *   vendor_id,
  *   umbrella_id OR (customer_phone),
@@ -18,19 +15,8 @@ const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering'];
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = getRequestSession(req);
-    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
-
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const body = await req.json();
-    const vendor_id = body.vendor_id || session.vendor_id;
-    const { umbrella_id, customer_phone, payment_method, notes } = body;
+    const { vendor_id, umbrella_id, customer_phone, payment_method, notes, request_only } = body;
 
     if (!vendor_id || (!umbrella_id && !customer_phone)) {
       return NextResponse.json(
@@ -39,20 +25,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (session.role === 'vendor' && session.vendor_id !== vendor_id) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+    const session = getRequestSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
+    }
+    if (session.role === 'vendor' || session.role === 'admin') {
+      if (!canAccessVendor(session, vendor_id)) {
+        return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+      }
+    } else if (session.role === 'customer' && session.vendor_id !== vendor_id) {
+      return NextResponse.json({ error: 'Sessao de cliente invalida para este quiosque.' }, { status: 403 });
     }
 
-    let query = enforceTenantScope(
-      supabaseAdmin
-        .from('orders')
-        .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
-        .eq('vendor_id', vendor_id)
-        .in('status', OPEN_ACCOUNT_STATUSES)
-        .or('paid.is.null,paid.eq.false')
-        .order('created_at', { ascending: true }),
-      tenantId
-    );
+    // 1. Encontrar a ordem aberta
+    let query = supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
+      .eq('vendor_id', vendor_id)
+      .eq('status', 'received')
+      .order('created_at', { ascending: true });
 
     if (umbrella_id) {
       query = query.eq('umbrella_id', umbrella_id);
@@ -69,83 +60,99 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let selectedOrders = orders;
+    // Se houver múltiplas contas abertas, filtrar por customer_phone se fornecido
+    let selectedOrder = orders[0];
     if (customer_phone && orders.length > 1) {
-      const cleanInput = customer_phone.replace(/\D/g, '');
-      const matchingOrders = orders.filter((o: any) => {
+      const matchingOrder = orders.find((o: any) => {
         const cleanPhone = (o.customers?.phone || '').replace(/\D/g, '');
+        const cleanInput = customer_phone.replace(/\D/g, '');
         return cleanPhone === cleanInput;
       });
-      if (matchingOrders.length > 0) selectedOrders = matchingOrders;
-      else if (!umbrella_id) {
-        return NextResponse.json({ error: 'Nenhuma conta aberta encontrada para este cliente.' }, { status: 404 });
+      if (matchingOrder) {
+        selectedOrder = matchingOrder;
       }
     }
 
-    const orderIds = selectedOrders.map((order: any) => order.id);
-    const firstOrder = selectedOrders[0];
-    const total = selectedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
+    if (session.role === 'customer' && selectedOrder.customer_id !== session.customer_id) {
+      return NextResponse.json({ error: 'Conta nao pertence a este cliente.' }, { status: 403 });
+    }
 
-    const { error: updateErr } = await enforceTenantScope(
-      supabaseAdmin
+    if (request_only) {
+      const { data: requested, error: requestErr } = await supabaseAdmin
         .from('orders')
         .update({
-          status: 'completed',
-          paid: true,
-          payment_method: payment_method || 'cash',
-          notes: notes || null,
+          status: 'closing_requested',
+          close_requested_at: new Date().toISOString(),
+          notes: notes || 'Fechamento solicitado pelo cliente',
           updated_at: new Date().toISOString(),
-        })
-        .in('id', orderIds),
-      tenantId
-    );
+        } as any)
+        .eq('id', selectedOrder.id)
+        .select()
+        .single();
+
+      if (requestErr) throw requestErr;
+      return NextResponse.json({
+        success: true,
+        order: requested,
+        message: 'Pedido de fechamento enviado ao quiosque.',
+      });
+    }
+
+    // 2. Atualizar ordem para completed e pago
+    const { error: updateErr } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'completed',
+        paid: true,
+        payment_method: payment_method || 'cash',
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', selectedOrder.id);
 
     if (updateErr) throw updateErr;
 
-    const { error: customerErr } = await enforceTenantScope(
-      supabaseAdmin
-        .from('customers')
-        .update({
-          last_visit_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', firstOrder.customer_id),
-      tenantId
-    );
-
-    if (customerErr) throw customerErr;
-
-    const { error: umbrellaErr } = await enforceTenantScope(
-      supabaseAdmin
+    if (selectedOrder.umbrella_id) {
+      const { error: umbrellaErr } = await supabaseAdmin
         .from('umbrellas')
         .update({
           is_occupied: false,
           current_order_id: null,
         })
-        .eq('id', firstOrder.umbrella_id)
-        .eq('vendor_id', vendor_id),
-      tenantId
-    );
+        .eq('id', selectedOrder.umbrella_id)
+        .eq('vendor_id', vendor_id);
 
-    if (umbrellaErr) throw umbrellaErr;
+      if (umbrellaErr) throw umbrellaErr;
+    }
+
+    // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
+    const { error: customerErr } = await supabaseAdmin
+      .from('customers')
+      .update({
+        visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
+        last_visit_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', selectedOrder.customer_id);
+
+    if (customerErr) throw customerErr;
 
     return NextResponse.json(
       {
         success: true,
-        account: {
-          order_ids: orderIds,
-          customer_id: firstOrder.customer_id,
-          customer_name: (firstOrder as any).customers?.name,
-          customer_phone: (firstOrder as any).customers?.phone,
-          umbrella_id: firstOrder.umbrella_id,
-          total,
+        order: {
+          id: selectedOrder.id,
+          customer_id: selectedOrder.customer_id,
+          customer_name: (selectedOrder as any).customers?.name,
+          customer_phone: (selectedOrder as any).customers?.phone,
+          umbrella_id: selectedOrder.umbrella_id,
+          total: selectedOrder.total,
           status: 'completed',
           paid: true,
           payment_method: payment_method || 'cash',
           closed_at: new Date().toISOString(),
-          umbrella_released: true,
         },
-        message: `Conta fechada com sucesso! Guarda-sol ${firstOrder.umbrella_id} liberado.`,
+        message: `Conta fechada com sucesso! Guarda-sol ${selectedOrder.umbrella_id} liberado.`,
       },
       { status: 200 }
     );
@@ -161,41 +168,30 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = getRequestSession(req);
-    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
-    const vendor_id = searchParams.get('vendor_id') || session.vendor_id;
+    const vendor_id = searchParams.get('vendor_id');
     const umbrella_id = searchParams.get('umbrella_id');
     const customer_phone = searchParams.get('customer_phone');
-    const tenantId = getTenantIdFromRequest(req);
-
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant nÃ£o identificado.' }, { status: 400 });
-    }
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
-    }
-    if (session.role === 'vendor' && session.vendor_id !== vendor_id) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
 
     if (!umbrella_id && !customer_phone) {
       return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
     }
 
-    let query = enforceTenantScope(
-      supabaseAdmin
-        .from('orders')
-        .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
-        .eq('vendor_id', vendor_id)
-        .in('status', OPEN_ACCOUNT_STATUSES)
-        .or('paid.is.null,paid.eq.false'),
-      tenantId
-    );
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+    }
+
+    // Buscar ordem aberta
+    let query = supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
+      .eq('vendor_id', vendor_id)
+      .eq('status', 'received');
 
     if (umbrella_id) {
       query = query.eq('umbrella_id', umbrella_id);
@@ -212,31 +208,27 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let selectedOrders = orders;
+    // Se houver múltiplas, filtrar por phone
+    let selectedOrder = orders[0];
     if (customer_phone && orders.length > 1) {
       const cleanPhone = customer_phone.replace(/\D/g, '');
-      const matching = orders.filter((o: any) => {
+      const matching = orders.find((o: any) => {
         const orderPhone = (o.customers?.phone || '').replace(/\D/g, '');
         return orderPhone === cleanPhone;
       });
-      if (matching.length > 0) selectedOrders = matching;
-      else if (!umbrella_id) {
-        return NextResponse.json({ error: 'Nenhuma conta aberta encontrada para este cliente.' }, { status: 404 });
-      }
+      if (matching) selectedOrder = matching;
     }
 
-    const firstOrder = selectedOrders[0];
-
     return NextResponse.json({
-      order_ids: selectedOrders.map((order: any) => order.id),
-      customer_id: firstOrder.customer_id,
-      customer_name: (firstOrder as any).customers?.name,
-      customer_phone: (firstOrder as any).customers?.phone,
-      umbrella_id: firstOrder.umbrella_id,
-      total: selectedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0),
-      items_count: selectedOrders.reduce((sum: number, order: any) => sum + ((order as any).order_items?.length || 0), 0),
-      created_at: firstOrder.created_at,
-      opened_at: firstOrder.created_at,
+      order_id: selectedOrder.id,
+      customer_id: selectedOrder.customer_id,
+      customer_name: (selectedOrder as any).customers?.name,
+      customer_phone: (selectedOrder as any).customers?.phone,
+      umbrella_id: selectedOrder.umbrella_id,
+      total: selectedOrder.total,
+      items_count: (selectedOrder as any).order_items ? (selectedOrder as any).order_items.length : 0,
+      created_at: selectedOrder.created_at,
+      opened_at: selectedOrder.created_at,
     });
   } catch (err) {
     console.error('Close account GET error:', err);

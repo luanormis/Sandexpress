@@ -70,20 +70,20 @@ Acesse: [http://localhost:3000](http://localhost:3000)
 ### Login do Quiosque
 - **Credencial**: CPF ou CNPJ (único por quiosque)
 - **Senha**: Hash com Scrypt (seguro)
-- **Padrão**: `senha123@`
-- **Mudança obrigatória**: No primeiro acesso
+- **Senha inicial**: criada pelo vendor ou gerada temporariamente no cadastro
+- **Mudança obrigatória**: quando o cadastro gerar senha temporaria
 
 ### Query Login:
 ```bash
 POST /api/auth/vendor
 Body: {
   "document_login": "12345678901", // CPF ou CNPJ
-  "password": "senha123@"
+  "password": "senha-inicial-do-vendor"
 }
 ```
 
 ### Admin
-- **Senha**: `123@senha123@` (env: `ADMIN_PASSWORD`)
+- **Senha**: definida somente na variavel de ambiente `ADMIN_PASSWORD`
 - Query: `POST /api/auth/admin`
 
 ## 📦 Estrutura de Dados
@@ -154,7 +154,7 @@ No Vercel → Settings → Environment Variables:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxxxx
-ADMIN_PASSWORD=123@senha123@
+ADMIN_PASSWORD=defina-uma-senha-forte-no-provedor
 ```
 
 ### 3. Deploy

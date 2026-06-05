@@ -62,7 +62,7 @@ git push -u origin main
 ```
 NEXT_PUBLIC_SUPABASE_URL = https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY = xxxxx
-ADMIN_PASSWORD = 123@senha123@
+ADMIN_PASSWORD = defina-uma-senha-forte-no-provedor
 ```
 
 2. Clique "Deploy"
@@ -81,7 +81,7 @@ curl https://sandexpress-xxxxx.vercel.app/api/health
 # 2. Testar login (via Postman ou curl)
 curl -X POST https://sandexpress-xxxxx.vercel.app/api/auth/vendor \
   -H "Content-Type: application/json" \
-  -d '{"document_login":"12345678901","password":"senha123@"}'
+  -d '{"document_login":"12345678901","password":"senha-inicial-do-vendor"}'
 
 # 3. Verificar conectividade com Supabase
 # Abra DevTools > Network > qualquer requisição
