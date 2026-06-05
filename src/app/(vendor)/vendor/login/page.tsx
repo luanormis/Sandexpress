@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed } from "lucide-react";
+import Image from "next/image";
 
 export default function VendorLogin() {
   const [document_login, setDocumentLogin] = useState("");
@@ -53,9 +53,9 @@ export default function VendorLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-20 h-20 bg-[#FF6B00] rounded-2xl flex items-center justify-center mb-6 shadow-xl">
-        <UtensilsCrossed size={40} className="text-white" />
+    <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-24 h-24 rounded-[32px] brand-card flex items-center justify-center mb-6">
+        <Image src="/sandexpress-logo.svg" alt="SandExpress" width={72} height={72} priority />
       </div>
       <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Painel do Quiosque</h1>
       <p className="text-gray-500 mb-8 max-w-sm">Entre com seu CPF/CNPJ e senha para gerenciar seus pedidos em tempo real.</p>

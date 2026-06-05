@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 /** Campos permitidos para atualização de guarda-sol (whitelist contra mass-assignment) */
-const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint']);
+const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url']);
 
 /**
  * GET /api/umbrellas/[id]
@@ -20,13 +21,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const { id } = await params;
 
-    const { data, error } = await supabaseAdmin
-      .from('umbrellas')
-      .select('id, number, label, active, vendor_id')
-      .eq('id', id)
-      .single();
+    const { data, error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('umbrellas')
+        .select('id, number, label, active, vendor_id')
+        .eq('id', id),
+      tenantId
+    ).single();
 
     if (error || !data) {
       return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
@@ -44,6 +52,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const session = getRequestSession(req);
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
@@ -55,15 +68,23 @@ export async function PATCH(
       active?: boolean | null;
       label?: string | null;
       location_hint?: string | null;
+      qr_url?: string | null;
     } = {};
-    if ('active' in body) safeUpdate.active = body.active as boolean | null;
-    if ('label' in body) safeUpdate.label = body.label as string | null;
-    if ('location_hint' in body) safeUpdate.location_hint = body.location_hint as string | null;
+    for (const field of ALLOWED_UMBRELLA_FIELDS) {
+      if (!(field in body)) continue;
+      if (field === 'active') safeUpdate.active = body.active as boolean | null;
+      if (field === 'label') safeUpdate.label = body.label as string | null;
+      if (field === 'location_hint') safeUpdate.location_hint = body.location_hint as string | null;
+      if (field === 'qr_url') safeUpdate.qr_url = body.qr_url as string | null;
+    }
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
     }
 
-    const umbrellaLookup = await supabaseAdmin.from('umbrellas').select('vendor_id').eq('id', id).single();
+    const umbrellaLookup = await enforceTenantScope(
+      supabaseAdmin.from('umbrellas').select('vendor_id').eq('id', id),
+      tenantId
+    ).single();
     if (umbrellaLookup.error || !umbrellaLookup.data) {
       return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
     }
@@ -71,12 +92,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autorizado para este guarda-sol.' }, { status: 403 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('umbrellas')
-      .update(safeUpdate)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('umbrellas')
+        .update(safeUpdate)
+        .eq('id', id)
+        .select(),
+      tenantId
+    ).single();
 
     if (error) throw error;
     return NextResponse.json(data);
@@ -91,12 +114,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
+    }
+
     const session = getRequestSession(req);
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
     const { id } = await params;
 
-    const umbrellaLookup = await supabaseAdmin.from('umbrellas').select('vendor_id, is_occupied').eq('id', id).single();
+    const umbrellaLookup = await enforceTenantScope(
+      supabaseAdmin.from('umbrellas').select('vendor_id, is_occupied').eq('id', id),
+      tenantId
+    ).single();
     if (umbrellaLookup.error || !umbrellaLookup.data) {
       return NextResponse.json({ error: 'Guarda-sol não encontrado.' }, { status: 404 });
     }
@@ -107,10 +138,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Não é possível remover guarda-sol com conta aberta.' }, { status: 409 });
     }
 
-    const { error } = await supabaseAdmin
-      .from('umbrellas')
-      .delete()
-      .eq('id', id);
+    const { error } = await enforceTenantScope(
+      supabaseAdmin
+        .from('umbrellas')
+        .delete()
+        .eq('id', id),
+      tenantId
+    );
 
     if (error) throw error;
     return NextResponse.json({ success: true });

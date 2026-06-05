@@ -1,13 +1,15 @@
 import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 
-type SessionRole = 'admin' | 'vendor' | 'customer';
+export type SessionRole = 'admin' | 'vendor' | 'customer' | 'user';
 
-type SessionPayload = {
+export type SessionPayload = {
   role: SessionRole;
   vendor_id?: string;
   customer_id?: string;
   umbrella_id?: string;
+  user_id?: string;
+  tenant_id?: string;
   exp: number;
 };
 
@@ -75,6 +77,11 @@ export function getRequestSession(req: NextRequest): SessionPayload | null {
   if (customerSession) return customerSession;
 
   return null;
+}
+
+export function resolveTenantIdFromSession(session: SessionPayload | null): string | null {
+  if (!session) return null;
+  return session.tenant_id || session.vendor_id || null;
 }
 
 export function canAccessVendor(session: SessionPayload | null, vendorId: string): boolean {

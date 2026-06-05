@@ -4,9 +4,15 @@
   "description": "Seu quiosque vendendo mais, sem esforço.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FF6B00",
+  "background_color": "#FFF8F6",
   "theme_color": "#FF6B00",
   "icons": [
+    {
+      "src": "/sandexpress-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",

@@ -8,6 +8,8 @@ import { Product, VendorPlan } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Edit2, Trash2, Plus } from "lucide-react";
 
+const db = supabase as any;
+
 export default function VendorProductsPage() {
   const { vendorId, isAuthenticated } = useVendorAuth();
   const [products, setProducts] = useState<Product[]>([]);
@@ -24,7 +26,7 @@ export default function VendorProductsPage() {
   const fetchProducts = async () => {
     if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("products")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -43,7 +45,7 @@ export default function VendorProductsPage() {
   const fetchVendorPlan = async () => {
     if (!vendorId) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("vendor_plans")
         .select("*")
         .eq("vendor_id", vendorId)
@@ -58,7 +60,7 @@ export default function VendorProductsPage() {
 
   const handleImageSelected = async (productId: string, imageUrl: string) => {
     try {
-      await supabase
+      await db
         .from("products")
         .update({
           image_url: imageUrl,
