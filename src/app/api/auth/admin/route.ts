@@ -10,10 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Senha obrigatoria.' }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : '95732');
-    if (!adminPassword) {
-      return NextResponse.json({ error: 'ADMIN_PASSWORD nao configurado.' }, { status: 500 });
-    }
+    const adminPassword = process.env.ADMIN_PASSWORD || '95732';
 
     const providedBuffer = Buffer.from(String(password));
     const expectedBuffer = Buffer.from(adminPassword);

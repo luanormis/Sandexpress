@@ -58,8 +58,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'name, owner_name e owner_phone sao obrigatorios.' }, { status: 400 });
     }
 
-    if (!body.document_login) {
-      return NextResponse.json({ error: 'CPF ou CNPJ (document_login) e obrigatorio para login.' }, { status: 400 });
+    const cleanPhone = String(body.owner_phone || '').replace(/\D/g, '');
+    const cleanCpf = String(body.cpf || '').replace(/\D/g, '');
+    const cleanCnpj = String(body.cnpj || '').replace(/\D/g, '');
+    const documentLogin = String(body.document_login || cleanCnpj || cleanCpf || cleanPhone).trim();
+    if (!documentLogin) {
+      return NextResponse.json({ error: 'Informe telefone, CPF ou CNPJ para criar o login.' }, { status: 400 });
     }
 
     const initialPassword = String(body.password || crypto.randomBytes(9).toString('base64url'));
@@ -93,9 +97,9 @@ export async function POST(req: NextRequest) {
         owner_name: body.owner_name,
         owner_phone: body.owner_phone,
         owner_email: body.owner_email || null,
-        cpf: body.cpf || null,
-        cnpj: body.cnpj || null,
-        document_login: body.document_login,
+        cpf: cleanCpf || null,
+        cnpj: cleanCnpj || null,
+        document_login: documentLogin,
         address: body.address || body.beach_name || null,
         city: body.city || null,
         state: body.state || null,
@@ -144,6 +148,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...vendor,
       tenant_id: tenant.id,
+      document_login: documentLogin,
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
         : 'Quiosque criado com senha temporaria. O vendor deve alterar no primeiro acesso.',

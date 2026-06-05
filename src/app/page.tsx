@@ -12,6 +12,7 @@ import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans"
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
+  const [regCredentials, setRegCredentials] = useState<{ login: string; password?: string } | null>(null);
   const [form, setForm] = useState({
     name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", city: "", state: "",
   });
@@ -28,6 +29,11 @@ export default function LandingPage() {
         body: JSON.stringify(form),
       });
       if (res.ok) {
+        const data = await res.json();
+        setRegCredentials({
+          login: data.document_login || form.cnpj || form.cpf || form.owner_phone,
+          password: data.temporary_password,
+        });
         setRegSuccess(true);
       }
     } catch (err) {
@@ -36,7 +42,7 @@ export default function LandingPage() {
     setLoading(false);
   };
 
-  const openModal = () => { setShowModal(true); setRegSuccess(false); };
+  const openModal = () => { setShowModal(true); setRegSuccess(false); setRegCredentials(null); };
 
   return (
     <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
@@ -244,6 +250,13 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-2xl font-display font-bold text-gray-900 mb-2">Cadastro realizado!</h3>
                 <p className="text-gray-500 mb-6">Seu quiosque foi criado com {TRIAL_DAYS} dias grátis. Acesse o painel para configurar seu cardápio.</p>
+                {regCredentials && (
+                  <div className="mb-6 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-left">
+                    <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
+                    <p className="mt-2 text-sm text-gray-700">Usuario: <strong>{regCredentials.login}</strong></p>
+                    {regCredentials.password && <p className="text-sm text-gray-700">Senha temporaria: <strong>{regCredentials.password}</strong></p>}
+                  </div>
+                )}
                 <Link
                   href="/vendor/login"
                   className="inline-flex items-center gap-2 bg-[#FF6B00] text-white px-8 py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#E56000] active:scale-95 transition-all"

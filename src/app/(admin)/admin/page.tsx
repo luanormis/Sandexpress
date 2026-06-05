@@ -112,6 +112,8 @@ export default function AdminDashboard() {
       if (res.ok) {
         setIsAuthenticated(true);
         sessionStorage.setItem("admin_token", "authenticated");
+        await loadVendors();
+        await loadPlatformReport();
       } else {
         setAuthError("Senha incorreta.");
       }
