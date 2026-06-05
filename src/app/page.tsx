@@ -43,9 +43,19 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 w-full bg-[#fff8f6]/85 backdrop-blur-md z-50 border-b border-[#e2bfb0]/70">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-[#FF6B00]">
-            <Image src="/sandexpress-logo.svg" alt="SandExpress" width={42} height={42} priority className="drop-shadow-sm" />
-            <span className="font-display font-bold text-2xl text-[#261812]">SandExpress</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[#FF6B00]">
+              <Image src="/sandexpress-logo.svg" alt="SandExpress" width={42} height={42} priority className="drop-shadow-sm" />
+              <span className="font-display font-bold text-2xl text-[#261812]">SandExpress</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-2">
+              <Link href="/vendor/login" className="rounded-full border border-[#e2bfb0] bg-white/70 px-3 py-2 text-xs font-black text-[#572000] hover:border-[#FF6B00] hover:text-[#FF6B00]">
+                Quiosque
+              </Link>
+              <Link href="/admin" className="rounded-full border border-[#e2bfb0] bg-white/70 px-3 py-2 text-xs font-black text-[#572000] hover:border-[#FF6B00] hover:text-[#FF6B00]">
+                Admin
+              </Link>
+            </div>
           </div>
           <div className="hidden md:flex gap-8 font-bold text-sm text-gray-600">
              <a href="#como-funciona" className="hover:text-[#FF6B00] transition-colors">Como funciona</a>
@@ -60,6 +70,15 @@ export default function LandingPage() {
           </div>
         </div>
       </nav>
+
+      <div className="fixed left-3 bottom-3 z-50 flex flex-col gap-2 lg:hidden">
+        <Link href="/vendor/login" className="rounded-full bg-[#394E59] px-4 py-3 text-xs font-black text-white shadow-lg">
+          Quiosque
+        </Link>
+        <Link href="/admin" className="rounded-full bg-[#FF6B00] px-4 py-3 text-xs font-black text-white shadow-lg">
+          Admin
+        </Link>
+      </div>
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 bg-[#fff1eb] text-center text-[#261812] relative overflow-hidden">
