@@ -18,6 +18,28 @@
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Login do Quiosque",
+      "short_name": "Quiosque",
+      "description": "Entrar no painel do quiosque",
+      "url": "/vendor/login",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Admin",
+      "short_name": "Admin",
+      "description": "Entrar no painel administrativo",
+      "url": "/admin",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

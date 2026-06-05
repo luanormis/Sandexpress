@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Bell, Home, ListOrdered, ShoppingCart, UtensilsCrossed } from "lucide-react";
+import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Product = {
@@ -204,6 +205,7 @@ export default function CustomerApp() {
         <button onClick={() => setStep("login")} className="mt-10 w-full max-w-sm rounded-full bg-white py-4 font-black text-[#FF6B00] shadow-lg">
           Comecar pedido
         </button>
+        <InstallShortcutButton context="customer" className="mt-4 w-full max-w-sm text-[#1F2933]" />
       </main>
     );
   }
@@ -247,6 +249,7 @@ export default function CustomerApp() {
         </div>
         {waiterCalled && <p className="mt-3 rounded-lg bg-[#FFF2E5] px-3 py-2 text-sm font-semibold text-[#82533F]">Garcom chamado.</p>}
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+        <InstallShortcutButton context="customer" className="mt-3" />
       </header>
 
       {step === "menu" && (

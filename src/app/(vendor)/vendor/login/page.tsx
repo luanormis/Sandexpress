@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 
 export default function VendorLogin() {
   const [document_login, setDocumentLogin] = useState("");
@@ -59,6 +60,7 @@ export default function VendorLogin() {
       </div>
       <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Painel do Quiosque</h1>
       <p className="text-gray-500 mb-8 max-w-sm">Entre com seu CPF/CNPJ e senha para gerenciar seus pedidos em tempo real.</p>
+      <InstallShortcutButton context="vendor" className="mb-5 w-full max-w-sm" />
       {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
         <div>

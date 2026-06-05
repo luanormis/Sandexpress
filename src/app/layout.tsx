@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Lexend } from "next/font/google";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import "./globals.css";
 
 const lexend = Lexend({
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body
         className={`${lexend.variable} ${inter.variable} antialiased`}
       >
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>
