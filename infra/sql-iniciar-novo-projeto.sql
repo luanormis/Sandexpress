@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS umbrellas CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS vendor_users CASCADE;
 DROP TABLE IF EXISTS vendors CASCADE;
 DROP TABLE IF EXISTS default_menu_items CASCADE;
 DROP TABLE IF EXISTS beaches CASCADE;
@@ -117,6 +118,22 @@ CREATE TABLE vendors (
   pix_key TEXT,
   pix_account_name TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE vendor_users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT,
+  login TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL DEFAULT 'seller'
+    CHECK (role IN ('owner','manager','seller')),
+  password_hash TEXT NOT NULL,
+  password_needs_reset BOOLEAN NOT NULL DEFAULT FALSE,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -342,6 +359,8 @@ CREATE INDEX idx_vendors_beach ON vendors(beach_id);
 CREATE INDEX idx_vendors_document_login ON vendors(document_login);
 CREATE INDEX idx_vendors_city ON vendors(city);
 CREATE INDEX idx_vendors_beach_name ON vendors(beach_name);
+CREATE INDEX idx_vendor_users_vendor ON vendor_users(vendor_id, active);
+CREATE INDEX idx_vendor_users_login ON vendor_users(login);
 
 CREATE INDEX idx_customers_tenant_vendor_phone ON customers(tenant_id, vendor_id, phone);
 CREATE INDEX idx_customers_vendor_last_visit ON customers(vendor_id, last_visit_at DESC);
@@ -390,6 +409,8 @@ CREATE TRIGGER trg_tenants_updated_at BEFORE UPDATE ON tenants
 CREATE TRIGGER trg_beaches_updated_at BEFORE UPDATE ON beaches
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_vendors_updated_at BEFORE UPDATE ON vendors
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_vendor_users_updated_at BEFORE UPDATE ON vendor_users
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_customers_updated_at BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -477,6 +498,7 @@ JOIN vendors v ON v.id = dc.vendor_id;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beaches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vendor_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE umbrellas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -494,6 +516,7 @@ ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY service_only_tenants ON tenants FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_beaches ON beaches FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_vendors ON vendors FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_vendor_users ON vendor_users FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_customers ON customers FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_umbrellas ON umbrellas FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_products ON products FOR ALL USING (FALSE) WITH CHECK (FALSE);
@@ -721,6 +744,7 @@ SET price = EXCLUDED.price,
 ANALYZE tenants;
 ANALYZE beaches;
 ANALYZE vendors;
+ANALYZE vendor_users;
 ANALYZE customers;
 ANALYZE umbrellas;
 ANALYZE products;

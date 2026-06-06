@@ -27,6 +27,7 @@ export async function GET() {
   try {
     const checks = await Promise.all([
       supabaseAdmin.from('vendors').select('id').limit(1),
+      supabaseAdmin.from('vendor_users').select('id').limit(1),
       supabaseAdmin.from('beaches').select('id').limit(1),
       supabaseAdmin.from('default_menu_items').select('id').limit(1),
     ]);
@@ -37,7 +38,7 @@ export async function GET() {
           status: 'degraded',
           ...base,
           database: 'schema_outdated',
-          hint: 'Rode infra/sql-iniciar-novo-projeto.sql no SQL Editor do Supabase para criar beaches e default_menu_items.',
+          hint: 'Rode infra/sql-iniciar-novo-projeto.sql no SQL Editor do Supabase para criar beaches, vendor_users e default_menu_items.',
         },
         { status: 503 }
       );

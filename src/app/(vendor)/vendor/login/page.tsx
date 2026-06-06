@@ -8,8 +8,11 @@ import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 export default function VendorLogin() {
   const [document_login, setDocumentLogin] = useState("");
   const [password, setPassword] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
   const [error, setError] = useState("");
+  const [recoveryMessage, setRecoveryMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -53,6 +56,36 @@ export default function VendorLogin() {
     }
   };
 
+  const handleRecovery = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setRecoveryMessage("");
+    if (!recoveryEmail) {
+      setError("Informe o email cadastrado no quiosque.");
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const response = await fetch("/api/auth/vendor/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner_email: recoveryEmail }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(result.error || "Nao foi possivel enviar a recuperacao.");
+        if (result.reset_url) setRecoveryMessage(`Link local de teste: ${result.reset_url}`);
+        return;
+      }
+      setRecoveryMessage(result.message || "Se o email estiver cadastrado, enviaremos um link de recuperacao.");
+    } catch {
+      setError("Erro ao solicitar recuperacao.");
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
       <div className="w-24 h-24 rounded-[32px] brand-card flex items-center justify-center mb-6">
@@ -90,6 +123,24 @@ export default function VendorLogin() {
         >
           {isLoading ? 'Conectando...' : 'Entrar no Painel'}
         </button>
+      </form>
+      <form onSubmit={handleRecovery} className="mt-6 w-full max-w-sm rounded-2xl border border-[#e2bfb0] bg-white/70 p-4 text-left">
+        <p className="mb-3 text-sm font-black text-[#572000]">Esqueci minha senha</p>
+        <input
+          type="email"
+          placeholder="Email cadastrado"
+          value={recoveryEmail}
+          onChange={e => setRecoveryEmail(e.target.value)}
+          className="w-full border-2 border-gray-200 rounded-xl p-3 text-left focus:border-[#FF6B00] focus:ring-0 outline-none"
+        />
+        <button
+          type="submit"
+          disabled={isRecovering}
+          className="mt-3 w-full rounded-xl border-2 border-[#FF6B00] py-3 text-sm font-black text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white disabled:opacity-50"
+        >
+          {isRecovering ? "Enviando..." : "Enviar link por email"}
+        </button>
+        {recoveryMessage && <p className="mt-3 break-words text-xs font-bold text-green-700">{recoveryMessage}</p>}
       </form>
     </div>
   );

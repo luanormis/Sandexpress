@@ -13,23 +13,30 @@ async function hashPassword(password: string) {
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
+function hashResetToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 /**
  * POST /api/auth/vendor/change-password
  * Altera senha a partir de token de recuperação ou senha atual.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { document_login, current_password, reset_token, new_password } = await req.json();
+    const { document_login, current_password, reset_token, new_password, password_confirm } = await req.json();
 
     if (!new_password || new_password.length < 8) {
       return NextResponse.json({ error: 'Nova senha deve ter ao menos 8 caracteres.' }, { status: 400 });
+    }
+    if (password_confirm !== undefined && new_password !== password_confirm) {
+      return NextResponse.json({ error: 'A nova senha e a confirmacao nao conferem.' }, { status: 400 });
     }
 
     let vendor: any;
     if (reset_token) {
       const { data, error } = await (supabaseAdmin.from('vendors') as any)
         .select('*')
-        .eq('password_reset_token', reset_token)
+        .eq('password_reset_token', hashResetToken(String(reset_token)))
         .single();
       if (error || !data) {
         return NextResponse.json({ error: 'Token inválido ou expirado.' }, { status: 400 });

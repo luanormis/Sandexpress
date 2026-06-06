@@ -67,6 +67,16 @@ interface Customer {
   last_visit_at: string;
 }
 
+interface VendorUser {
+  id: string;
+  name: string;
+  email: string | null;
+  login: string;
+  role: string;
+  active: boolean;
+  created_at: string;
+}
+
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
 const TABS = [
@@ -75,6 +85,7 @@ const TABS = [
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "customers", label: "Clientes", icon: Users },
+  { id: "team", label: "Equipe", icon: Users },
 ];
 
 // =========================================================
@@ -110,6 +121,11 @@ export default function VendorDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [team, setTeam] = useState<VendorUser[]>([]);
+  const [teamForm, setTeamForm] = useState({
+    name: "", email: "", login: "", role: "seller", password: "", password_confirm: "",
+  });
+  const [teamMessage, setTeamMessage] = useState("");
 
   // Data loading functions
   const loadOrders = async (vid: string) => {
@@ -161,6 +177,18 @@ export default function VendorDashboard() {
     }
   };
 
+  const loadTeam = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/vendor-users?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeam(data);
+      }
+    } catch (err) {
+      console.error('Failed to load team:', err);
+    }
+  };
+
   // Load vendor ID and initial data
   useEffect(() => {
     const vid = sessionStorage.getItem("vendor_id");
@@ -171,8 +199,36 @@ export default function VendorDashboard() {
       loadProducts(vid);
       loadUmbrellas(vid);
       loadCustomers(vid);
+      loadTeam(vid);
     }
   }, []);
+
+  const createTeamUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!vendorId) return;
+    setTeamMessage("");
+    if (teamForm.password !== teamForm.password_confirm) {
+      setTeamMessage("A senha e a confirmacao nao conferem.");
+      return;
+    }
+    try {
+      const res = await fetch('/api/vendor-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, ...teamForm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTeamMessage(data.error || "Nao foi possivel criar usuario.");
+        return;
+      }
+      setTeam(prev => [data, ...prev]);
+      setTeamForm({ name: "", email: "", login: "", role: "seller", password: "", password_confirm: "" });
+      setTeamMessage("Usuario criado. Ele ja pode entrar no painel pelo login e senha definidos.");
+    } catch {
+      setTeamMessage("Erro de rede ao criar usuario.");
+    }
+  };
 
   // Load reports when tab or period changes
   useEffect(() => {
@@ -916,6 +972,94 @@ export default function VendorDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ========== ABA 6: EQUIPE ========== */}
+          {activeTab === "team" && (
+            <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+              <form onSubmit={createTeamUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900">Criar usuario do quiosque</h3>
+                  <p className="mt-1 text-sm text-gray-500">Use para vendedores, operadores ou gerentes acessarem o painel.</p>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome"
+                  value={teamForm.name}
+                  onChange={e => setTeamForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                />
+                <input
+                  type="email"
+                  placeholder="Email opcional"
+                  value={teamForm.email}
+                  onChange={e => setTeamForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Login do usuario"
+                  value={teamForm.login}
+                  onChange={e => setTeamForm(p => ({ ...p, login: e.target.value.trim() }))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                />
+                <select
+                  value={teamForm.role}
+                  onChange={e => setTeamForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                >
+                  <option value="seller">Vendedor</option>
+                  <option value="manager">Gerente</option>
+                  <option value="owner">Proprietario</option>
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="Senha"
+                    value={teamForm.password}
+                    onChange={e => setTeamForm(p => ({ ...p, password: e.target.value }))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                  />
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="Confirmar"
+                    value={teamForm.password_confirm}
+                    onChange={e => setTeamForm(p => ({ ...p, password_confirm: e.target.value }))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                  />
+                </div>
+                {teamMessage && <p className="rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{teamMessage}</p>}
+                <button type="submit" className="w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
+                  Criar usuario
+                </button>
+              </form>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 className="font-bold text-lg text-gray-900 mb-4">Usuarios cadastrados</h3>
+                <div className="space-y-3">
+                  {team.map(user => (
+                    <div key={user.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div>
+                        <p className="font-bold text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-500">Login: {user.login} {user.email ? `- ${user.email}` : ""}</p>
+                      </div>
+                      <span className="rounded-full bg-[#ffeae1] px-3 py-1 text-xs font-black text-[#a04100]">
+                        {user.role === 'manager' ? 'Gerente' : user.role === 'owner' ? 'Proprietario' : 'Vendedor'}
+                      </span>
+                    </div>
+                  ))}
+                  {team.length === 0 && (
+                    <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhum usuario criado ainda.</p>
+                  )}
+                </div>
               </div>
             </div>
           )}

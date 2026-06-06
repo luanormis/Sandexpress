@@ -12,9 +12,9 @@ import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans"
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
-  const [regCredentials, setRegCredentials] = useState<{ login: string; password?: string } | null>(null);
+  const [regCredentials, setRegCredentials] = useState<{ login: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", owner_name: "", owner_phone: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
   });
   const [loading, setLoading] = useState(false);
   const [registerError, setRegisterError] = useState("");
@@ -22,8 +22,16 @@ export default function LandingPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const hasDocument = form.cpf.replace(/\D/g, "") || form.cnpj.replace(/\D/g, "");
-    if (!form.name || !form.owner_name || !form.owner_phone || !form.beach_name || !form.city || !form.state || !hasDocument) {
-      setRegisterError("Preencha telefone, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+    if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email || !form.beach_name || !form.city || !form.state || !hasDocument) {
+      setRegisterError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      return;
+    }
+    if (!form.password || form.password.length < 8) {
+      setRegisterError("Crie uma senha com pelo menos 8 caracteres.");
+      return;
+    }
+    if (form.password !== form.password_confirm) {
+      setRegisterError("A senha e a confirmacao nao conferem.");
       return;
     }
     setLoading(true);
@@ -38,7 +46,6 @@ export default function LandingPage() {
         const data = await res.json();
         setRegCredentials({
           login: data.document_login || form.cnpj || form.cpf || form.owner_phone,
-          password: data.temporary_password,
         });
         setRegSuccess(true);
       } else {
@@ -264,7 +271,7 @@ export default function LandingPage() {
                   <div className="mb-6 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-left">
                     <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
                     <p className="mt-2 text-sm text-gray-700">Usuario: <strong>{regCredentials.login}</strong></p>
-                    {regCredentials.password && <p className="text-sm text-gray-700">Senha temporaria: <strong>{regCredentials.password}</strong></p>}
+                    <p className="text-sm text-gray-700">Senha: <strong>a senha que voce acabou de criar</strong></p>
                   </div>
                 )}
                 <Link
@@ -300,6 +307,15 @@ export default function LandingPage() {
                       value={form.owner_phone} onChange={e => setForm(p => ({ ...p, owner_phone: e.target.value.replace(/\D/g, '') }))}
                       className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                       placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Email de Recuperacao *</label>
+                    <input
+                      type="email" required
+                      value={form.owner_email} onChange={e => setForm(p => ({ ...p, owner_email: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="voce@email.com"
                     />
                   </div>
                   <div>
@@ -357,6 +373,26 @@ export default function LandingPage() {
                         value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                         placeholder="SP"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Min. 8 caracteres"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Confirmar Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={form.password_confirm} onChange={e => setForm(p => ({ ...p, password_confirm: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Repita a senha"
                       />
                     </div>
                   </div>

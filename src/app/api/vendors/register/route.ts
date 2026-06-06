@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    if (!body.name || !body.owner_name || !body.owner_phone || !body.city || !body.state || !body.beach_name) {
+    if (!body.name || !body.owner_name || !body.owner_phone || !body.owner_email || !body.city || !body.state || !body.beach_name) {
       return NextResponse.json({
-        error: 'Nome do quiosque, responsavel, telefone, praia, cidade e estado sao obrigatorios.',
+        error: 'Nome do quiosque, responsavel, telefone, email, praia, cidade e estado sao obrigatorios.',
       }, { status: 400 });
     }
 
@@ -59,9 +59,16 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    const initialPassword = String(body.password || crypto.randomBytes(9).toString('base64url'));
+    const initialPassword = String(body.password || '');
+    const passwordConfirm = String(body.password_confirm || '');
+    if (!initialPassword || !passwordConfirm) {
+      return NextResponse.json({ error: 'Crie a senha e confirme a senha do quiosque.' }, { status: 400 });
+    }
+    if (initialPassword !== passwordConfirm) {
+      return NextResponse.json({ error: 'A senha e a confirmacao de senha nao conferem.' }, { status: 400 });
+    }
     if (initialPassword.length < 8) {
-      return NextResponse.json({ error: 'A senha inicial deve ter pelo menos 8 caracteres.' }, { status: 400 });
+      return NextResponse.json({ error: 'A senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
     }
 
     const passwordHash = await hashPassword(initialPassword);
@@ -107,7 +114,7 @@ export async function POST(req: NextRequest) {
         name: body.name,
         owner_name: body.owner_name,
         owner_phone: body.owner_phone,
-        owner_email: body.owner_email || null,
+        owner_email: String(body.owner_email).trim().toLowerCase(),
         cpf: cleanCpf || null,
         cnpj: cleanCnpj || null,
         document_login: documentLogin,
@@ -119,7 +126,7 @@ export async function POST(req: NextRequest) {
         primary_color: body.primary_color || '#ff7a1a',
         secondary_color: body.secondary_color || '#0f3d4f',
         password_hash: passwordHash,
-        password_needs_reset: !body.password,
+        password_needs_reset: false,
         subscription_status: 'trial',
         plan_type: 'trial',
         trial_ends_at: trialEndsAt,
@@ -153,8 +160,7 @@ export async function POST(req: NextRequest) {
       document_login: documentLogin,
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
-        : 'Quiosque criado com senha temporaria. O vendor deve alterar no primeiro acesso.',
-      temporary_password: body.password ? undefined : initialPassword,
+        : 'Quiosque criado.',
     }, { status: 201 });
   } catch (err) {
     console.error('Vendor register error:', err);

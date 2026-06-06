@@ -89,7 +89,7 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
   });
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
@@ -180,8 +180,16 @@ export default function AdminDashboard() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const hasDocument = regForm.cpf.replace(/\D/g, "") || regForm.cnpj.replace(/\D/g, "");
-    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone || !regForm.beach_name || !regForm.city || !regForm.state || !hasDocument) {
-      setRegError("Preencha telefone, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+    if (!regForm.name || !regForm.owner_name || !regForm.owner_phone || !regForm.owner_email || !regForm.beach_name || !regForm.city || !regForm.state || !hasDocument) {
+      setRegError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      return;
+    }
+    if (!regForm.password || regForm.password.length < 8) {
+      setRegError("Crie uma senha com pelo menos 8 caracteres.");
+      return;
+    }
+    if (regForm.password !== regForm.password_confirm) {
+      setRegError("A senha e a confirmacao nao conferem.");
       return;
     }
 
@@ -196,7 +204,9 @@ export default function AdminDashboard() {
         const data = await res.json();
         setVendors(prev => [{
           id: data.id,
-          ...regForm,
+          name: regForm.name,
+          owner_name: regForm.owner_name,
+          owner_phone: regForm.owner_phone,
           owner_email: regForm.owner_email || null,
           city: regForm.city || null,
           state: regForm.state || null,
@@ -211,7 +221,7 @@ export default function AdminDashboard() {
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "" });
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "" });
       } else {
         const data = await res.json().catch(() => ({}));
         setRegError(data.error || "Nao foi possivel cadastrar o quiosque.");
@@ -821,9 +831,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-gray-400 mb-1">Email</label>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">Email *</label>
                       <input
-                        type="email"
+                        type="email" required
                         value={regForm.owner_email} onChange={e => setRegForm(p => ({ ...p, owner_email: e.target.value }))}
                         className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
                         placeholder="email@exemplo.com"
@@ -847,6 +857,26 @@ export default function AdminDashboard() {
                         value={regForm.cnpj} onChange={e => setRegForm(p => ({ ...p, cnpj: e.target.value }))}
                         className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
                         placeholder="12.345.678/0001-90"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={regForm.password} onChange={e => setRegForm(p => ({ ...p, password: e.target.value }))}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        placeholder="Min. 8 caracteres"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">Confirmar Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={regForm.password_confirm} onChange={e => setRegForm(p => ({ ...p, password_confirm: e.target.value }))}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                        placeholder="Repita a senha"
                       />
                     </div>
                   </div>
