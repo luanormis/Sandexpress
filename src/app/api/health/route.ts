@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isSupabaseUrlConfigured } from '@/lib/supabase-env';
 
 /**
  * GET /api/health
@@ -11,21 +12,38 @@ export async function GET() {
     env: process.env.NEXT_PUBLIC_ENV || 'development',
   };
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isSupabaseUrlConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(
       {
         status: 'degraded',
         ...base,
         database: 'not_configured',
-        hint: 'Defina NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.',
+        hint: 'Defina NEXT_PUBLIC_SUPABASE_URL como https://SEU-PROJETO.supabase.co e SUPABASE_SERVICE_ROLE_KEY com a service role key.',
       },
       { status: 503 }
     );
   }
 
   try {
-    const { error } = await supabaseAdmin.from('vendors').select('id').limit(1);
-    if (error) throw error;
+    const checks = await Promise.all([
+      supabaseAdmin.from('vendors').select('id').limit(1),
+      supabaseAdmin.from('beaches').select('id').limit(1),
+      supabaseAdmin.from('default_menu_items').select('id').limit(1),
+    ]);
+    const missingSchema = checks.some(({ error }) => ['42P01', 'PGRST205'].includes(error?.code));
+    if (missingSchema) {
+      return NextResponse.json(
+        {
+          status: 'degraded',
+          ...base,
+          database: 'schema_outdated',
+          hint: 'Rode infra/sql-iniciar-novo-projeto.sql no SQL Editor do Supabase para criar beaches e default_menu_items.',
+        },
+        { status: 503 }
+      );
+    }
+    const failed = checks.find(({ error }) => error);
+    if (failed?.error) throw failed.error;
 
     return NextResponse.json({
       status: 'ok',

@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test:e2e-flow": "node scripts/e2e-flow.mjs"
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.102.1",

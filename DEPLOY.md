@@ -36,7 +36,7 @@ cp .env.example .env.local
 
 # 4. Initialize banco de dados
 # Acesse Supabase Dashboard → SQL Editor
-# Execute os scripts em infra/supabase-schema.sql
+# Execute somente infra/sql-iniciar-novo-projeto.sql
 
 # 5. Inicie servidor de desenvolvimento
 npm run dev
@@ -52,17 +52,17 @@ Acesse: [http://localhost:3000](http://localhost:3000)
 3. Anote `Project URL` e `Anon Key`
 
 ### 2. Executar Schema
-1. Copie conteúdo de `infra/supabase-schema.sql`
+1. Copie conteúdo de `infra/sql-iniciar-novo-projeto.sql`
 2. Vá para Supabase Dashboard → SQL Editor
 3. Cole e execute
 
-### 3. Executar Seed (Produtos de Teste)
-1. Copie conteúdo de `infra/seed-products.sql`
-2. Cole no SQL Editor e execute
-3. Cria 60 produtos por quiosque
+### 3. Cardapio padrao
+- O cardapio padrao e criado automaticamente para cada quiosque novo pelo sistema.
+- O banco tambem guarda uma copia global em `default_menu_items`.
+- O quiosque cria seus proprios guarda-sois no painel.
 
 ### 4. Configurar RLS (Row Level Security)
-- ✅ Já incluído em `supabase-schema.sql`
+- ✅ Já incluído em `sql-iniciar-novo-projeto.sql`
 - Garante isolamento de dados por tenant
 
 ## 🔐 Autenticação

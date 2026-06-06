@@ -168,4 +168,4 @@ npm run start
 ## 9. Importante
 
 Mesmo com o site no ar, a parte de banco precisa ser configurada corretamente.
-Use o guia `infra/supabase-schema.sql` e `infra/seed-data.sql` para criar o esquema e popular os dados antes de testar a aplicação.
+Use somente `infra/sql-iniciar-novo-projeto.sql` no SQL Editor do Supabase para criar o esquema completo do zero.

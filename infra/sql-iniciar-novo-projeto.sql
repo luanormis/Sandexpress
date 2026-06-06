@@ -18,7 +18,6 @@ DROP VIEW IF EXISTS admin_product_sales_analytics;
 DROP VIEW IF EXISTS admin_daily_closing_analytics;
 
 DROP TABLE IF EXISTS platform_settings CASCADE;
-DROP TABLE IF EXISTS customer_otps CASCADE;
 DROP TABLE IF EXISTS analytics_events CASCADE;
 DROP TABLE IF EXISTS daily_closings CASCADE;
 DROP TABLE IF EXISTS rate_limit_buckets CASCADE;
@@ -31,6 +30,8 @@ DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS umbrellas CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS vendors CASCADE;
+DROP TABLE IF EXISTS default_menu_items CASCADE;
+DROP TABLE IF EXISTS beaches CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 
 DROP FUNCTION IF EXISTS set_updated_at();
@@ -56,6 +57,7 @@ CREATE TABLE tenants (
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active','suspended','deleted')),
+  beach_id UUID,
   city TEXT,
   state TEXT,
   region TEXT,
@@ -66,9 +68,26 @@ CREATE TABLE tenants (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE beaches (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  city TEXT NOT NULL,
+  state TEXT NOT NULL,
+  region TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(name, city, state)
+);
+
+ALTER TABLE tenants
+  ADD CONSTRAINT tenants_beach_id_fkey
+  FOREIGN KEY (beach_id) REFERENCES beaches(id) ON DELETE SET NULL;
+
 CREATE TABLE vendors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  beach_id UUID REFERENCES beaches(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   cnpj TEXT UNIQUE,
   cpf TEXT UNIQUE,
@@ -169,6 +188,21 @@ CREATE TABLE product_images (
   plan_type TEXT NOT NULL DEFAULT 'free'
     CHECK (plan_type IN ('free','plus')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE default_menu_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  promotional_price NUMERIC(10,2) CHECK (promotional_price IS NULL OR promotional_price >= 0),
+  image_url TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL DEFAULT 99,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(category, name)
 );
 
 CREATE TABLE vendor_plans (
@@ -288,16 +322,6 @@ CREATE TABLE analytics_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE customer_otps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-  phone TEXT NOT NULL,
-  code TEXT NOT NULL,
-  used BOOLEAN NOT NULL DEFAULT FALSE,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE platform_settings (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL,
@@ -311,7 +335,10 @@ CREATE TABLE platform_settings (
 -- =========================================================
 
 CREATE INDEX idx_tenants_status ON tenants(status);
+CREATE INDEX idx_beaches_location ON beaches(state, city, name);
+CREATE INDEX idx_beaches_active ON beaches(active);
 CREATE INDEX idx_vendors_tenant ON vendors(tenant_id);
+CREATE INDEX idx_vendors_beach ON vendors(beach_id);
 CREATE INDEX idx_vendors_document_login ON vendors(document_login);
 CREATE INDEX idx_vendors_city ON vendors(city);
 CREATE INDEX idx_vendors_beach_name ON vendors(beach_name);
@@ -326,6 +353,7 @@ CREATE INDEX idx_umbrellas_current_order ON umbrellas(current_order_id);
 CREATE INDEX idx_products_tenant_vendor_active_category ON products(tenant_id, vendor_id, active, category);
 CREATE INDEX idx_products_vendor_sort ON products(vendor_id, sort_order);
 CREATE INDEX idx_products_category ON products(vendor_id, category);
+CREATE INDEX idx_default_menu_items_active_sort ON default_menu_items(active, sort_order);
 CREATE INDEX idx_product_images_category ON product_images(category);
 CREATE INDEX idx_product_images_plan ON product_images(plan_type);
 CREATE INDEX idx_vendor_plans_vendor ON vendor_plans(vendor_id);
@@ -351,7 +379,6 @@ CREATE INDEX idx_analytics_vendor_event_created ON analytics_events(vendor_id, e
 CREATE INDEX idx_analytics_events_location ON analytics_events(city, beach_name);
 CREATE INDEX idx_analytics_payload_gin ON analytics_events USING GIN(payload);
 CREATE INDEX idx_analytics_metadata_gin ON analytics_events USING GIN(metadata);
-CREATE INDEX idx_otps_lookup ON customer_otps(vendor_id, phone, used, expires_at);
 CREATE INDEX idx_platform_settings_value ON platform_settings USING GIN(value);
 
 -- =========================================================
@@ -360,11 +387,15 @@ CREATE INDEX idx_platform_settings_value ON platform_settings USING GIN(value);
 
 CREATE TRIGGER trg_tenants_updated_at BEFORE UPDATE ON tenants
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_beaches_updated_at BEFORE UPDATE ON beaches
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_vendors_updated_at BEFORE UPDATE ON vendors
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_customers_updated_at BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON products
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_default_menu_items_updated_at BEFORE UPDATE ON default_menu_items
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_orders_updated_at BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -444,10 +475,12 @@ JOIN vendors v ON v.id = dc.vendor_id;
 -- =========================================================
 
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE beaches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE umbrellas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE default_menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_closings ENABLE ROW LEVEL SECURITY;
@@ -456,14 +489,15 @@ ALTER TABLE vendor_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customer_otps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY service_only_tenants ON tenants FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_beaches ON beaches FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_vendors ON vendors FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_customers ON customers FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_umbrellas ON umbrellas FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_products ON products FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_default_menu_items ON default_menu_items FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_orders ON orders FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_order_items ON order_items FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_daily_closings ON daily_closings FOR ALL USING (FALSE) WITH CHECK (FALSE);
@@ -475,7 +509,6 @@ CREATE POLICY service_only_product_images_update ON product_images FOR UPDATE US
 CREATE POLICY service_only_product_images_delete ON product_images FOR DELETE USING (FALSE);
 CREATE POLICY service_only_rate_limit ON rate_limit_buckets FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_analytics ON analytics_events FOR ALL USING (FALSE) WITH CHECK (FALSE);
-CREATE POLICY service_only_otps ON customer_otps FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_platform_settings ON platform_settings FOR ALL USING (FALSE) WITH CHECK (FALSE);
 
 -- =========================================================
@@ -564,8 +597,7 @@ INSERT INTO platform_settings (key, value, description) VALUES
     "trial_days": 3,
     "monthly_price": 259.00,
     "annual_monthly_price": 199.99,
-    "max_umbrellas": 50,
-    "whatsapp_otp_enabled": false
+    "max_umbrellas": 50
   }'::jsonb,
   'Planos comerciais atuais: trial de 3 dias, mensal e anual ate 50 guarda-sois.'
 ),
@@ -579,7 +611,7 @@ INSERT INTO platform_settings (key, value, description) VALUES
     "default_state": "SP",
     "default_beach": "Praia das Pitangueiras"
   }'::jsonb,
-  'Defaults usados para bootstrap e criacao de novos quiosques.'
+  'Defaults usados para criacao de novos quiosques.'
 )
 ON CONFLICT (key) DO UPDATE
 SET value = EXCLUDED.value,
@@ -587,177 +619,112 @@ SET value = EXCLUDED.value,
     updated_at = NOW();
 
 -- =========================================================
--- USUARIO TESTE INICIAL
--- Login do quiosque: teste001
--- Senha do quiosque: teste001
+-- PRAIAS INICIAIS E CARDAPIO PADRAO GLOBAL
+-- Novos quiosques nascem sem guarda-sois; o proprio quiosque cadastra cada um.
 -- =========================================================
 
-INSERT INTO tenants (
-  id, name, status, city, state, beach_name, primary_color
-) VALUES (
-  '10000000-0000-0000-0000-000000000001',
-  'Quiosque Teste',
-  'active',
-  'Cidade Teste',
-  'SP',
-  'Praia Teste',
-  '#ff7a1a'
-);
+INSERT INTO beaches (name, city, state, region, active) VALUES
+  ('Praia das Pitangueiras', 'Guaruja', 'SP', 'Baixada Santista', TRUE),
+  ('Praia da Enseada', 'Guaruja', 'SP', 'Baixada Santista', TRUE),
+  ('Praia de Asturias', 'Guaruja', 'SP', 'Baixada Santista', TRUE),
+  ('Praia do Tombo', 'Guaruja', 'SP', 'Baixada Santista', TRUE),
+  ('Praia de Santos', 'Santos', 'SP', 'Baixada Santista', TRUE)
+ON CONFLICT (name, city, state) DO UPDATE
+SET region = EXCLUDED.region,
+    active = EXCLUDED.active,
+    updated_at = NOW();
 
-INSERT INTO vendors (
-  id,
-  tenant_id,
-  name,
-  document_login,
-  address,
-  city,
-  state,
-  beach_name,
-  owner_name,
-  owner_phone,
-  owner_email,
-  primary_color,
-  secondary_color,
-  password_hash,
-  password_needs_reset,
-  subscription_status,
-  plan_type,
-  max_umbrellas,
-  pix_enabled,
-  pix_key,
-  pix_account_name,
-  is_active
-) VALUES (
-  '20000000-0000-0000-0000-000000000001',
-  '10000000-0000-0000-0000-000000000001',
-  'Quiosque Teste',
-  'teste001',
-  'Praia Teste',
-  'Cidade Teste',
-  'SP',
-  'Praia Teste',
-  'Operador Teste',
-  '11999999999',
-  'teste@sandexpress.local',
-  '#ff7a1a',
-  '#0f3d4f',
-  'sandexpress_teste001_2026:41c55991323b4ec1905569c3d233ffb218705e650185f895ade89b8b3bc892cdbf7057c1e8e00cb41eacd16e3a51e1f3c0ff6a1aa9d612ac02d705ae984f028e',
-  FALSE,
-  'active',
-  'monthly',
-  50,
-  TRUE,
-  '11999999999',
-  'Quiosque Teste',
-  TRUE
-);
-
-INSERT INTO vendor_plans (
-  vendor_id, plan_type, can_upload_images, max_custom_images, custom_images_used
-) VALUES (
-  '20000000-0000-0000-0000-000000000001', 'monthly', TRUE, 100, 0
-);
-
-INSERT INTO umbrellas (
-  tenant_id, vendor_id, number, label, active, is_occupied, map_x, map_y
-)
-SELECT
-  '10000000-0000-0000-0000-000000000001',
-  '20000000-0000-0000-0000-000000000001',
-  gs,
-  'Guarda-sol ' || gs,
-  TRUE,
-  FALSE,
-  8 + (((gs - 1) % 10) * 9),
-  10 + (FLOOR((gs - 1) / 10) * 14)
-FROM generate_series(1, 50) AS gs;
-
-INSERT INTO products (
-  tenant_id, vendor_id, category, name, price, active, sort_order, stock_quantity, blocked_by_stock
-) VALUES
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Isca de Peixe - Inteira',150,TRUE,10,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Isca de Peixe - Meia',120,TRUE,20,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Isca de Cacao - Inteira',150,TRUE,30,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Isca de Cacao - Meia',120,TRUE,40,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Porquinho - Inteira',150,TRUE,50,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Porquinho - Meia',120,TRUE,60,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Sardinha',150,TRUE,70,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Manjubinha',150,TRUE,80,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Camarao - Inteira',150,TRUE,90,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Camarao - Meia',120,TRUE,100,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Camarao Paulista',160,TRUE,110,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Lula a Dore - Inteira',170,TRUE,120,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Lula a Dore - Meia',140,TRUE,130,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Frango a Passarinho',120,TRUE,140,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','File de Frango Acebolado',120,TRUE,150,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','File de Frango c/ Fritas',120,TRUE,160,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Calabresa Acebolada',120,TRUE,170,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Batata Frita - Inteira',80,TRUE,180,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Batata Frita - Meia',50,TRUE,190,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Batata Maluca com Bacon e Cheddar',100,TRUE,200,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Cebola Empanada',50,TRUE,210,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Contra File c/ Fritas',200,TRUE,220,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Mega 2 Peixes com Fritas e Cebola',250,TRUE,230,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcoes','Mega 4 Peixes com Fritas e Cebola',400,TRUE,240,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Adicionais','Acrescimo de Fritas',10,TRUE,250,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Carne',15,TRUE,260,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Carne c/ Queijo ou Catupiry',18,TRUE,270,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Carne c/ Ovo',18,TRUE,280,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Queijo',15,TRUE,290,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Pizza',15,TRUE,300,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Frango',15,TRUE,310,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Frango c/ Queijo ou Catupiry',18,TRUE,320,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Calabresa',15,TRUE,330,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Calabresa c/ Queijo ou Catupiry',18,TRUE,340,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Camarao',25,TRUE,350,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Carne Seca',25,TRUE,360,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Nutella',22,TRUE,370,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Pasteis','Pastel de Nutella c/ Morango',25,TRUE,380,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcao de Pasteizinhos','Pasteizinhos 24 unidades',100,TRUE,390,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Porcao de Pasteizinhos','Pasteizinhos 18 unidades',70,TRUE,400,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Vodka Absolut',50,TRUE,410,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Vodka Smirnoff',35,TRUE,420,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Saque',35,TRUE,430,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Pinga',25,TRUE,440,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Pina Colada',40,TRUE,450,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Espanhola',25,TRUE,460,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Batidas e Caipirinhas','Tropical com 2 frutas - acrescimo',5,TRUE,470,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Refrigerante Lata',8,TRUE,480,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Skol',8,TRUE,490,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Brahma',8,TRUE,500,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Itaipava',8,TRUE,510,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Heineken',12,TRUE,520,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Budweiser',12,TRUE,530,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Duplo Malte',12,TRUE,540,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Original',12,TRUE,550,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Cerveja sem Alcool',12,TRUE,560,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Energetico',20,TRUE,570,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Agua',5,TRUE,580,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','Agua c/ Gas',8,TRUE,590,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Bebidas','H2OH',10,TRUE,600,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Doses','Campari',20,TRUE,610,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Doses','Whisky Red',30,TRUE,620,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Doses','Smirnoff',15,TRUE,630,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Doses','51 ou Velho Barreiro',5,TRUE,640,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Doses','Gin com Tonica',35,TRUE,650,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Abacaxi',20,TRUE,660,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Caju',20,TRUE,670,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Coco',20,TRUE,680,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Kiwi',20,TRUE,690,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Laranja',20,TRUE,700,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Limao',20,TRUE,710,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Manga',20,TRUE,720,100,FALSE),
-  ('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Sucos','Suco de Maracuja',20,TRUE,730,100,FALSE);
+INSERT INTO default_menu_items (category, name, price, sort_order) VALUES
+  ('Porcoes','Isca de Peixe - Inteira',150,10),
+  ('Porcoes','Isca de Peixe - Meia',120,20),
+  ('Porcoes','Isca de Cacao - Inteira',150,30),
+  ('Porcoes','Isca de Cacao - Meia',120,40),
+  ('Porcoes','Porquinho - Inteira',150,50),
+  ('Porcoes','Porquinho - Meia',120,60),
+  ('Porcoes','Sardinha',150,70),
+  ('Porcoes','Manjubinha',150,80),
+  ('Porcoes','Camarao - Inteira',150,90),
+  ('Porcoes','Camarao - Meia',120,100),
+  ('Porcoes','Camarao Paulista',160,110),
+  ('Porcoes','Lula a Dore - Inteira',170,120),
+  ('Porcoes','Lula a Dore - Meia',140,130),
+  ('Porcoes','Frango a Passarinho',120,140),
+  ('Porcoes','File de Frango Acebolado',120,150),
+  ('Porcoes','File de Frango c/ Fritas',120,160),
+  ('Porcoes','Calabresa Acebolada',120,170),
+  ('Porcoes','Batata Frita - Inteira',80,180),
+  ('Porcoes','Batata Frita - Meia',50,190),
+  ('Porcoes','Batata Maluca com Bacon e Cheddar',100,200),
+  ('Porcoes','Cebola Empanada',50,210),
+  ('Porcoes','Contra File c/ Fritas',200,220),
+  ('Porcoes','Mega 2 Peixes com Fritas e Cebola',250,230),
+  ('Porcoes','Mega 4 Peixes com Fritas e Cebola',400,240),
+  ('Adicionais','Acrescimo de Fritas',10,250),
+  ('Pasteis','Pastel de Carne',15,260),
+  ('Pasteis','Pastel de Carne c/ Queijo ou Catupiry',18,270),
+  ('Pasteis','Pastel de Carne c/ Ovo',18,280),
+  ('Pasteis','Pastel de Queijo',15,290),
+  ('Pasteis','Pastel de Pizza',15,300),
+  ('Pasteis','Pastel de Frango',15,310),
+  ('Pasteis','Pastel de Frango c/ Queijo ou Catupiry',18,320),
+  ('Pasteis','Pastel de Calabresa',15,330),
+  ('Pasteis','Pastel de Calabresa c/ Queijo ou Catupiry',18,340),
+  ('Pasteis','Pastel de Camarao',25,350),
+  ('Pasteis','Pastel de Carne Seca',25,360),
+  ('Pasteis','Pastel de Nutella',22,370),
+  ('Pasteis','Pastel de Nutella c/ Morango',25,380),
+  ('Porcao de Pasteizinhos','Pasteizinhos 24 unidades',100,390),
+  ('Porcao de Pasteizinhos','Pasteizinhos 18 unidades',70,400),
+  ('Batidas e Caipirinhas','Vodka Absolut',50,410),
+  ('Batidas e Caipirinhas','Vodka Smirnoff',35,420),
+  ('Batidas e Caipirinhas','Saque',35,430),
+  ('Batidas e Caipirinhas','Pinga',25,440),
+  ('Batidas e Caipirinhas','Pina Colada',40,450),
+  ('Batidas e Caipirinhas','Espanhola',25,460),
+  ('Batidas e Caipirinhas','Tropical com 2 frutas - acrescimo',5,470),
+  ('Bebidas','Refrigerante Lata',8,480),
+  ('Bebidas','Skol',8,490),
+  ('Bebidas','Brahma',8,500),
+  ('Bebidas','Itaipava',8,510),
+  ('Bebidas','Heineken',12,520),
+  ('Bebidas','Budweiser',12,530),
+  ('Bebidas','Duplo Malte',12,540),
+  ('Bebidas','Original',12,550),
+  ('Bebidas','Cerveja sem Alcool',12,560),
+  ('Bebidas','Energetico',20,570),
+  ('Bebidas','Agua',5,580),
+  ('Bebidas','Agua c/ Gas',8,590),
+  ('Bebidas','H2OH',10,600),
+  ('Doses','Campari',20,610),
+  ('Doses','Whisky Red',30,620),
+  ('Doses','Smirnoff',15,630),
+  ('Doses','51 ou Velho Barreiro',5,640),
+  ('Doses','Gin com Tonica',35,650),
+  ('Sucos','Suco de Abacaxi',20,660),
+  ('Sucos','Suco de Caju',20,670),
+  ('Sucos','Suco de Coco',20,680),
+  ('Sucos','Suco de Kiwi',20,690),
+  ('Sucos','Suco de Laranja',20,700),
+  ('Sucos','Suco de Limao',20,710),
+  ('Sucos','Suco de Manga',20,720),
+  ('Sucos','Suco de Maracuja',20,730)
+ON CONFLICT (category, name) DO UPDATE
+SET price = EXCLUDED.price,
+    sort_order = EXCLUDED.sort_order,
+    active = TRUE,
+    updated_at = NOW();
 
 -- =========================================================
 -- ANALYZE
 -- =========================================================
 
 ANALYZE tenants;
+ANALYZE beaches;
 ANALYZE vendors;
 ANALYZE customers;
 ANALYZE umbrellas;
 ANALYZE products;
+ANALYZE default_menu_items;
 ANALYZE product_images;
 ANALYZE vendor_plans;
 ANALYZE orders;
@@ -766,7 +733,6 @@ ANALYZE daily_closings;
 ANALYZE account_adjustments;
 ANALYZE rate_limit_buckets;
 ANALYZE analytics_events;
-ANALYZE customer_otps;
 ANALYZE platform_settings;
 
 COMMIT;

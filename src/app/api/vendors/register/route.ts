@@ -16,7 +16,8 @@ async function hashPassword(password: string) {
 
 /**
  * POST /api/vendors/register
- * Cria um tenant isolado, o vendor, o cardapio padrao e ate 50 guarda-sois.
+ * Cria um tenant isolado, o vendor e o cardapio padrao.
+ * Os guarda-sois sao criados depois pelo proprio quiosque no painel.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -65,25 +66,43 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(initialPassword);
     const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const maxUmbrellas = Math.min(Math.max(Number(body.max_umbrellas || 50), 1), 50);
+    const maxUmbrellas = 50;
+    const cleanState = String(body.state).trim().toUpperCase();
+    const cleanCity = String(body.city).trim();
+    const cleanBeach = String(body.beach_name).trim();
+
+    const { data: beach, error: beachError } = await (supabaseAdmin.from('beaches') as any)
+      .upsert({
+        name: cleanBeach,
+        city: cleanCity,
+        state: cleanState,
+        active: true,
+      }, { onConflict: 'name,city,state' })
+      .select('id')
+      .single();
+
+    if (beachError && !['42P01', 'PGRST205'].includes(beachError.code)) throw beachError;
+    const beachId = beachError ? null : beach?.id || null;
+
+    const tenantPayload: Record<string, unknown> = {
+      name: body.name,
+      status: 'active',
+      city: cleanCity,
+      state: cleanState,
+      beach_name: cleanBeach,
+      primary_color: body.primary_color || '#ff7a1a',
+      logo_url: body.logo_url || null,
+    };
+    if (beachId) tenantPayload.beach_id = beachId;
 
     const { data: tenant, error: tenantError } = await (supabaseAdmin.from('tenants') as any)
-      .insert({
-        name: body.name,
-        status: 'active',
-        city: body.city || null,
-        state: body.state || null,
-        beach_name: body.beach_name,
-        primary_color: body.primary_color || '#ff7a1a',
-        logo_url: body.logo_url || null,
-      })
+      .insert(tenantPayload)
       .select()
       .single();
 
     if (tenantError) throw tenantError;
 
-    const { data: vendor, error: vendorError } = await (supabaseAdmin.from('vendors') as any)
-      .insert({
+    const vendorPayload: Record<string, unknown> = {
         tenant_id: tenant.id,
         name: body.name,
         owner_name: body.owner_name,
@@ -92,9 +111,10 @@ export async function POST(req: NextRequest) {
         cpf: cleanCpf || null,
         cnpj: cleanCnpj || null,
         document_login: documentLogin,
-        address: body.address || body.beach_name,
-        city: body.city,
-        state: String(body.state).toUpperCase(),
+        address: body.address || cleanBeach,
+        city: cleanCity,
+        state: cleanState,
+        beach_name: cleanBeach,
         logo_url: body.logo_url || null,
         primary_color: body.primary_color || '#ff7a1a',
         secondary_color: body.secondary_color || '#0f3d4f',
@@ -105,7 +125,11 @@ export async function POST(req: NextRequest) {
         trial_ends_at: trialEndsAt,
         max_umbrellas: maxUmbrellas,
         is_active: true,
-      })
+      };
+    if (beachId) vendorPayload.beach_id = beachId;
+
+    const { data: vendor, error: vendorError } = await (supabaseAdmin.from('vendors') as any)
+      .insert(vendorPayload)
       .select()
       .single();
 
@@ -122,20 +146,6 @@ export async function POST(req: NextRequest) {
       }))
     );
     if (productsError) throw productsError;
-
-    const { error: umbrellasError } = await (supabaseAdmin.from('umbrellas') as any).insert(
-      Array.from({ length: maxUmbrellas }, (_, index) => ({
-        tenant_id: tenant.id,
-        vendor_id: vendor.id,
-        number: index + 1,
-        label: `Guarda-sol ${index + 1}`,
-        active: true,
-        is_occupied: false,
-        map_x: 8 + ((index % 10) * 9),
-        map_y: 10 + (Math.floor(index / 10) * 14),
-      }))
-    );
-    if (umbrellasError) throw umbrellasError;
 
     return NextResponse.json({
       ...vendor,

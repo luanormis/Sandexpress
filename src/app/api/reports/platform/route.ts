@@ -13,6 +13,7 @@ type VendorRow = {
   id: string;
   name: string | null;
   address: string | null;
+  beach_name: string | null;
   city: string | null;
   state: string | null;
   subscription_status: string | null;
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
 
     const { data: vendors, error: vendorsError } = await supabaseAdmin
       .from('vendors')
-      .select('id, name, address, city, state, subscription_status, plan_type, is_active');
+      .select('id, name, address, beach_name, city, state, subscription_status, plan_type, is_active');
 
     if (vendorsError) throw vendorsError;
 
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     const selectedVendors = allVendors.filter((vendor) => {
       if (vendorId && vendor.id !== vendorId) return false;
       if (!includesFilter(vendor.city, city)) return false;
-      if (!includesFilter(vendor.address, beach)) return false;
+      if (!includesFilter(vendor.beach_name || vendor.address, beach)) return false;
       return true;
     });
     const selectedVendorIds = new Set(selectedVendors.map((vendor) => vendor.id));
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
       const vendor = vendorMap.get(order.vendor_id);
       const vendorName = vendor?.name || 'Quiosque';
       const vendorCity = vendor?.city || 'Sem cidade';
-      const vendorBeach = vendor?.address || 'Sem praia/localizacao';
+      const vendorBeach = vendor?.beach_name || vendor?.address || 'Sem praia/localizacao';
       const orderRevenue = Number(order.total || 0);
       const hour = new Date(order.created_at).getHours();
 
@@ -228,7 +229,7 @@ export async function GET(req: NextRequest) {
       filter_options: {
         vendors: allVendors.map((v) => ({ id: v.id, name: v.name || 'Quiosque' })),
         cities: Array.from(new Set(allVendors.map((v) => v.city).filter(Boolean))).sort(),
-        beaches: Array.from(new Set(allVendors.map((v) => v.address).filter(Boolean))).sort(),
+        beaches: Array.from(new Set(allVendors.map((v) => v.beach_name || v.address).filter(Boolean))).sort(),
       },
     });
   } catch (err) {

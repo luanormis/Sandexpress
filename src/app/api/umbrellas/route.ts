@@ -49,11 +49,21 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: vendor, error: vendorErr } = await (supabaseAdmin.from('vendors') as any)
-      .select('tenant_id')
+      .select('tenant_id, max_umbrellas')
       .eq('id', body.vendor_id)
       .single();
     if (vendorErr || !vendor?.tenant_id) {
       return NextResponse.json({ error: 'Vendor sem tenant configurado. Execute a migracao de producao.' }, { status: 400 });
+    }
+
+    const { count, error: countError } = await supabaseAdmin
+      .from('umbrellas')
+      .select('id', { count: 'exact', head: true })
+      .eq('vendor_id', body.vendor_id);
+
+    if (countError) throw countError;
+    if ((count || 0) >= Number(vendor.max_umbrellas || 50)) {
+      return NextResponse.json({ error: 'Limite de guarda-sois do plano atingido.' }, { status: 409 });
     }
 
     const { data, error } = await (supabaseAdmin.from('umbrellas') as any)

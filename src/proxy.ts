@@ -12,14 +12,11 @@ const PUBLIC_API_PATHS = new Set([
   '/api/health',
   '/api/qr',
   '/api/customers/login',
-  '/api/customers/request-otp',
   '/api/vendors/register',
-  '/api/test/flow',
 ]);
 
 const SENSITIVE_PUBLIC_PATHS = new Set([
   '/api/customers/login',
-  '/api/customers/request-otp',
   '/api/vendors/register',
   '/api/auth/admin',
   '/api/auth/vendor',
