@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+
 /**
  * POST /api/close-account
  * Fechar conta do cliente (após pagamento confirmado)
@@ -42,7 +44,8 @@ export async function POST(req: NextRequest) {
       .from('orders')
       .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
       .eq('vendor_id', vendor_id)
-      .eq('status', 'received')
+      .in('status', OPEN_ACCOUNT_STATUSES)
+      .eq('paid', false)
       .order('created_at', { ascending: true });
 
     if (umbrella_id) {
@@ -191,7 +194,8 @@ export async function GET(req: NextRequest) {
       .from('orders')
       .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
       .eq('vendor_id', vendor_id)
-      .eq('status', 'received');
+      .in('status', OPEN_ACCOUNT_STATUSES)
+      .eq('paid', false);
 
     if (umbrella_id) {
       query = query.eq('umbrella_id', umbrella_id);
