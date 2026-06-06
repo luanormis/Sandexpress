@@ -17,6 +17,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 DROP VIEW IF EXISTS admin_product_sales_analytics;
 DROP VIEW IF EXISTS admin_daily_closing_analytics;
 
+DROP TABLE IF EXISTS platform_settings CASCADE;
 DROP TABLE IF EXISTS customer_otps CASCADE;
 DROP TABLE IF EXISTS analytics_events CASCADE;
 DROP TABLE IF EXISTS daily_closings CASCADE;
@@ -297,6 +298,14 @@ CREATE TABLE customer_otps (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE platform_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =========================================================
 -- INDICES PARA ESCALA
 -- =========================================================
@@ -343,6 +352,7 @@ CREATE INDEX idx_analytics_events_location ON analytics_events(city, beach_name)
 CREATE INDEX idx_analytics_payload_gin ON analytics_events USING GIN(payload);
 CREATE INDEX idx_analytics_metadata_gin ON analytics_events USING GIN(metadata);
 CREATE INDEX idx_otps_lookup ON customer_otps(vendor_id, phone, used, expires_at);
+CREATE INDEX idx_platform_settings_value ON platform_settings USING GIN(value);
 
 -- =========================================================
 -- TRIGGERS UPDATED_AT
@@ -365,6 +375,8 @@ CREATE TRIGGER trg_account_adjustments_updated_at BEFORE UPDATE ON account_adjus
 CREATE TRIGGER trg_vendor_plans_updated_at BEFORE UPDATE ON vendor_plans
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_rate_limit_buckets_updated_at BEFORE UPDATE ON rate_limit_buckets
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_platform_settings_updated_at BEFORE UPDATE ON platform_settings
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =========================================================
@@ -445,6 +457,7 @@ ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_otps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY service_only_tenants ON tenants FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_vendors ON vendors FOR ALL USING (FALSE) WITH CHECK (FALSE);
@@ -463,6 +476,7 @@ CREATE POLICY service_only_product_images_delete ON product_images FOR DELETE US
 CREATE POLICY service_only_rate_limit ON rate_limit_buckets FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_analytics ON analytics_events FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_otps ON customer_otps FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_platform_settings ON platform_settings FOR ALL USING (FALSE) WITH CHECK (FALSE);
 
 -- =========================================================
 -- REALTIME
@@ -514,6 +528,63 @@ CREATE POLICY product_images_storage_anon_upload
   ON storage.objects
   FOR INSERT
   WITH CHECK (bucket_id = 'product-images');
+
+-- =========================================================
+-- CONFIGURACOES GLOBAIS DA PLATAFORMA
+-- Cores oficiais, precos e defaults para novos quiosques
+-- =========================================================
+
+INSERT INTO platform_settings (key, value, description) VALUES
+(
+  'brand.palette',
+  '{
+    "background": "#fff8f6",
+    "foreground": "#261812",
+    "surface": "#fff8f6",
+    "surface_container": "#ffeae1",
+    "surface_container_high": "#fee3d8",
+    "surface_container_highest": "#f8ddd2",
+    "primary": "#ff6b00",
+    "primary_strong": "#a04100",
+    "primary_hover": "#e56000",
+    "secondary": "#82533f",
+    "dark": "#3d1a0a",
+    "cream": "#fff8f6",
+    "sand": "#f8ddd2",
+    "outline": "#e2bfb0",
+    "vendor_primary": "#ff7a1a",
+    "vendor_secondary": "#0f3d4f"
+  }'::jsonb,
+  'Paleta oficial do Sandexpress aplicada ao sistema e aos novos quiosques.'
+),
+(
+  'plans.current',
+  '{
+    "currency": "BRL",
+    "trial_days": 3,
+    "monthly_price": 259.00,
+    "annual_monthly_price": 199.99,
+    "max_umbrellas": 50,
+    "whatsapp_otp_enabled": false
+  }'::jsonb,
+  'Planos comerciais atuais: trial de 3 dias, mensal e anual ate 50 guarda-sois.'
+),
+(
+  'default.vendor',
+  '{
+    "primary_color": "#ff7a1a",
+    "secondary_color": "#0f3d4f",
+    "logo_url": "/sandexpress-logo.svg",
+    "default_city": "Guaruja",
+    "default_state": "SP",
+    "default_beach": "Praia das Pitangueiras"
+  }'::jsonb,
+  'Defaults usados para bootstrap e criacao de novos quiosques.'
+)
+ON CONFLICT (key) DO UPDATE
+SET value = EXCLUDED.value,
+    description = EXCLUDED.description,
+    updated_at = NOW();
 
 -- =========================================================
 -- USUARIO TESTE INICIAL
@@ -696,5 +767,6 @@ ANALYZE account_adjustments;
 ANALYZE rate_limit_buckets;
 ANALYZE analytics_events;
 ANALYZE customer_otps;
+ANALYZE platform_settings;
 
 COMMIT;
