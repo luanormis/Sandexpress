@@ -414,18 +414,21 @@ export default function VendorDashboard() {
   };
 
   const generateQR = async (umbrella: Umbrella) => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const targetUrl = `${baseUrl}/u/${umbrella.vendor_id}/${umbrella.id}`;
-    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(targetUrl)}&format=png&margin=20`;
-    setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: qrImg, qr_url: targetUrl } : u));
     try {
-      await fetch(`/api/umbrellas/${umbrella.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qr_url: targetUrl }),
-      });
+      const res = await fetch(`/api/qr?umbrella_id=${encodeURIComponent(umbrella.id)}&format=png`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Nao foi possivel gerar o QR Code.");
+        return;
+      }
+      setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? {
+        ...u,
+        qr_image_url: data.qr_image_url,
+        qr_url: data.target_url,
+      } : u));
     } catch (err) {
-      console.error("Failed to persist QR url:", err);
+      console.error("Failed to generate QR:", err);
+      alert("Erro de rede ao gerar QR Code.");
     }
   };
 

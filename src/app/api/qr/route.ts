@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getPublicAppUrl } from '@/lib/public-url';
 
 /**
  * GET /api/qr?umbrella_id=xxx&format=svg|png
@@ -11,8 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const umbrellaId = searchParams.get('umbrella_id');
     const format = searchParams.get('format') || 'svg';
-    const origin = req.headers.get('origin') || new URL(req.url).origin;
-    const baseUrl = searchParams.get('base_url') || process.env.NEXT_PUBLIC_APP_URL || origin;
+    const baseUrl = searchParams.get('base_url') || getPublicAppUrl(req);
 
     if (!umbrellaId) {
       return NextResponse.json({ error: 'umbrella_id obrigatorio.' }, { status: 400 });
@@ -33,6 +33,11 @@ export async function GET(req: NextRequest) {
     }
 
     const targetUrl = `${baseUrl.replace(/\/$/, '')}/u/${umbrella.vendor_id}/${umbrella.id}`;
+
+    await supabaseAdmin
+      .from('umbrellas')
+      .update({ qr_url: targetUrl })
+      .eq('id', umbrella.id);
 
     if (format === 'png') {
       const dataUrl = await QRCode.toDataURL(targetUrl, { width: 400, margin: 2 });

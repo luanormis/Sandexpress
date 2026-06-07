@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-
-function getBaseUrl(req: NextRequest) {
-  return process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || new URL(req.url).origin;
-}
+import { getPublicAppUrl } from '@/lib/public-url';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
@@ -86,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    const qrUrl = `${getBaseUrl(req)}/u/${data.vendor_id}/${data.id}`;
+    const qrUrl = `${getPublicAppUrl(req)}/u/${data.vendor_id}/${data.id}`;
     if (data.qr_url !== qrUrl) {
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('umbrellas')
