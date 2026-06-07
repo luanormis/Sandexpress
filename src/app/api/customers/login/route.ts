@@ -21,9 +21,16 @@ export async function POST(req: NextRequest) {
     }
 
     let tenantId: string | null = null;
+    let umbrellaState: {
+      tenant_id: string;
+      vendor_id: string;
+      active: boolean;
+      is_occupied: boolean;
+      current_order_id: string | null;
+    } | null = null;
     if (umbrella_id) {
       const { data: umbrella, error: umbrellaError } = await (supabaseAdmin.from('umbrellas') as any)
-        .select('tenant_id, vendor_id, active')
+        .select('tenant_id, vendor_id, active, is_occupied, current_order_id')
         .eq('id', umbrella_id)
         .eq('vendor_id', vendor_id)
         .single();
@@ -33,6 +40,7 @@ export async function POST(req: NextRequest) {
       if (!umbrella.active) {
         return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 400 });
       }
+      umbrellaState = umbrella;
       tenantId = umbrella?.tenant_id || null;
     }
 
@@ -52,6 +60,26 @@ export async function POST(req: NextRequest) {
       .eq('vendor_id', vendor_id)
       .eq('phone', cleanPhone)
       .single();
+
+    if (umbrellaState?.is_occupied || umbrellaState?.current_order_id) {
+      const { data: openOrders, error: openOrderError } = await supabaseAdmin
+        .from('orders')
+        .select('id, customer_id, status, paid')
+        .eq('vendor_id', vendor_id)
+        .eq('umbrella_id', umbrella_id)
+        .eq('paid', false)
+        .in('status', ['received', 'preparing', 'delivering', 'closing_requested'])
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (openOrderError) throw openOrderError;
+      const openOrder = openOrders?.[0];
+      if (openOrder && (!existing || openOrder.customer_id !== existing.id)) {
+        return NextResponse.json({
+          error: 'Este guarda-sol esta com uma conta aberta. Ele sera liberado apos o pagamento.',
+        }, { status: 409 });
+      }
+    }
 
     if (existing) {
       const { data: updated, error } = await supabaseAdmin

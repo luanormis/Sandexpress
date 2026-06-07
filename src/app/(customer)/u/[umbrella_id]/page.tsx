@@ -56,6 +56,10 @@ export default function CustomerApp() {
   useEffect(() => {
     async function loadQrData() {
       try {
+        if (!routeVendorId) {
+          setError("QR antigo invalido. Gere um novo QR Code no painel do quiosque.");
+          return;
+        }
         const vendorQuery = routeVendorId ? `?vendor_id=${encodeURIComponent(routeVendorId)}` : "";
         const res = await fetch(`/api/public/umbrella/${umbrellaId}${vendorQuery}`);
         const data = await res.json();

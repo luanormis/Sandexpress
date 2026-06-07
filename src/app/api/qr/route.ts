@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getPublicAppUrl } from '@/lib/public-url';
+import { getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
 
 /**
  * GET /api/qr?umbrella_id=xxx&format=svg|png
@@ -12,7 +12,13 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const umbrellaId = searchParams.get('umbrella_id');
     const format = searchParams.get('format') || 'svg';
-    const baseUrl = searchParams.get('base_url') || getPublicAppUrl(req);
+    const configuredPublicUrl = getConfiguredPublicAppUrl();
+    if (process.env.NODE_ENV === 'production' && !configuredPublicUrl) {
+      return NextResponse.json({
+        error: 'Configure NEXT_PUBLIC_APP_URL com o dominio publico de producao antes de gerar QR Code.',
+      }, { status: 500 });
+    }
+    const baseUrl = configuredPublicUrl || getPublicAppUrl(req);
 
     if (!umbrellaId) {
       return NextResponse.json({ error: 'umbrella_id obrigatorio.' }, { status: 400 });
