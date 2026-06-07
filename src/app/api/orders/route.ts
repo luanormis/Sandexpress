@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
     const { data: dbProducts, error: prodErr } = await (supabaseAdmin.from('products') as any)
       .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
       .in('id', productIds)
-      .eq('vendor_id', vendor_id);
+      .eq('vendor_id', vendor_id)
+      .eq('tenant_id', (umbrella as any).tenant_id);
 
     if (prodErr || !dbProducts) {
       return NextResponse.json({ error: 'Erro ao validar produtos.' }, { status: 500 });

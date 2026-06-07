@@ -30,6 +30,7 @@ type Order = {
 export default function CustomerApp() {
   const params = useParams();
   const umbrellaId = String(params.umbrella_id || "");
+  const routeVendorId = params.vendor_id ? String(params.vendor_id) : "";
 
   const [step, setStep] = useState<"welcome" | "login" | "menu" | "cart" | "orders">("welcome");
   const [vendor, setVendor] = useState<{ id: string; name: string } | null>(null);
@@ -55,7 +56,8 @@ export default function CustomerApp() {
   useEffect(() => {
     async function loadQrData() {
       try {
-        const res = await fetch(`/api/public/umbrella/${umbrellaId}`);
+        const vendorQuery = routeVendorId ? `?vendor_id=${encodeURIComponent(routeVendorId)}` : "";
+        const res = await fetch(`/api/public/umbrella/${umbrellaId}${vendorQuery}`);
         const data = await res.json();
         if (!res.ok) {
           setError(data.error || "Erro ao carregar cardapio.");
@@ -78,7 +80,7 @@ export default function CustomerApp() {
     }
 
     if (umbrellaId) loadQrData();
-  }, [umbrellaId]);
+  }, [umbrellaId, routeVendorId]);
 
   async function startTab() {
     if (!vendor) return;

@@ -22,11 +22,17 @@ export async function POST(req: NextRequest) {
 
     let tenantId: string | null = null;
     if (umbrella_id) {
-      const { data: umbrella } = await (supabaseAdmin.from('umbrellas') as any)
-        .select('tenant_id, vendor_id')
+      const { data: umbrella, error: umbrellaError } = await (supabaseAdmin.from('umbrellas') as any)
+        .select('tenant_id, vendor_id, active')
         .eq('id', umbrella_id)
         .eq('vendor_id', vendor_id)
         .single();
+      if (umbrellaError || !umbrella) {
+        return NextResponse.json({ error: 'Guarda-sol nao pertence a este quiosque.' }, { status: 400 });
+      }
+      if (!umbrella.active) {
+        return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 400 });
+      }
       tenantId = umbrella?.tenant_id || null;
     }
 

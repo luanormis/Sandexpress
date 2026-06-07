@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
+function getBaseUrl(req: NextRequest) {
+  return process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || new URL(req.url).origin;
+}
+
 /**
  * GET /api/umbrellas?vendor_id=xxx
  * Lista todos os guarda-sois de um vendor.
@@ -81,6 +85,19 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    const qrUrl = `${getBaseUrl(req)}/u/${data.vendor_id}/${data.id}`;
+    if (data.qr_url !== qrUrl) {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('umbrellas')
+        .update({ qr_url: qrUrl })
+        .eq('id', data.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      return NextResponse.json(updated, { status: 201 });
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     console.error('Umbrellas POST error:', err);

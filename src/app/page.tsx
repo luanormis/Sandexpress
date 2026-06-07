@@ -63,6 +63,10 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
+      <Link href="/admin" className="fixed left-3 top-3 z-[70] rounded-full bg-[#FF6B00] px-4 py-2 text-xs font-black text-white shadow-lg hover:bg-[#E56000]">
+        Entrar Admin
+      </Link>
+
       {/* Navbar */}
       <nav className="fixed top-0 left-0 w-full bg-[#fff8f6]/85 backdrop-blur-md z-50 border-b border-[#e2bfb0]/70">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">

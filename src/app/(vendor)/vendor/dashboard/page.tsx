@@ -37,6 +37,7 @@ interface Order {
 
 interface Umbrella {
   id: string;
+  vendor_id: string;
   number: number;
   label: string;
   active: boolean;
@@ -412,11 +413,20 @@ export default function VendorDashboard() {
     }
   };
 
-  const generateQR = (umbrella: Umbrella) => {
+  const generateQR = async (umbrella: Umbrella) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const targetUrl = `${baseUrl}/u/${umbrella.id}`;
+    const targetUrl = `${baseUrl}/u/${umbrella.vendor_id}/${umbrella.id}`;
     const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(targetUrl)}&format=png&margin=20`;
     setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? { ...u, qr_image_url: qrImg, qr_url: targetUrl } : u));
+    try {
+      await fetch(`/api/umbrellas/${umbrella.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qr_url: targetUrl }),
+      });
+    } catch (err) {
+      console.error("Failed to persist QR url:", err);
+    }
   };
 
   // Filtered products
