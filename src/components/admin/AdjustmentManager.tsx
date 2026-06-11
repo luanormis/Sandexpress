@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, Check, X } from 'lucide-react';
+import { AlertCircle, Check } from 'lucide-react';
 
 interface Adjustment {
   id: string;
