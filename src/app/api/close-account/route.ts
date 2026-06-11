@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
 /**
  * POST /api/close-account
@@ -104,13 +104,14 @@ export async function POST(req: NextRequest) {
     // 2. Atualizar ordem para completed e pago
     const { error: updateErr } = await supabaseAdmin
       .from('orders')
-      .update({
-        status: 'completed',
-        paid: true,
-        payment_method: payment_method || 'cash',
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      })
+        .update({
+          status: 'completed',
+          paid: true,
+          payment_method: payment_method || 'cash',
+          paid_at: new Date().toISOString(),
+          notes: notes || null,
+          updated_at: new Date().toISOString(),
+        })
       .eq('id', selectedOrder.id);
 
     if (updateErr) throw updateErr;

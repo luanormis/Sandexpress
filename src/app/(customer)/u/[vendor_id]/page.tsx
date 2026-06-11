@@ -37,6 +37,7 @@ export default function CustomerApp() {
   const [umbrella, setUmbrella] = useState<{ id: string; number: number; label?: string | null } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState("");
+  const [currentOrderId, setCurrentOrderId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -52,6 +53,22 @@ export default function CustomerApp() {
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
   const ordersTotal = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const openTotal = ordersTotal + cartTotal;
+
+  async function loadCustomerOrders(nextCustomerId: string, nextVendorId: string) {
+    if (!nextCustomerId || !nextVendorId) return;
+    const res = await fetch(`/api/customers/${encodeURIComponent(nextCustomerId)}/orders?vendor_id=${encodeURIComponent(nextVendorId)}`);
+    const data = await res.json().catch(() => []);
+    if (!res.ok) return;
+    const mapped = (Array.isArray(data) ? data : []).map((order) => ({
+      id: order.id,
+      total: Number(order.total || 0),
+      status: order.status || "received",
+      created_at: order.created_at || new Date().toISOString(),
+    }));
+    setOrders(mapped);
+    if (mapped[0]?.id) setCurrentOrderId(mapped[0].id);
+  }
 
   useEffect(() => {
     async function loadQrData() {
@@ -77,6 +94,7 @@ export default function CustomerApp() {
           setCustomerId(parsed.customer_id || "");
           setCustomerName(parsed.name || "");
           setStep("menu");
+          loadCustomerOrders(parsed.customer_id || "", data.vendor?.id || routeVendorId);
         }
       } catch {
         setError("Erro de rede ao carregar o cardapio.");
@@ -113,6 +131,7 @@ export default function CustomerApp() {
         return;
       }
       setCustomerId(data.id || data.customer_id);
+      setCurrentOrderId(data.current_order_id || "");
       setCustomerName(data.name || name);
       sessionStorage.setItem(`sandexpress_user_${umbrellaId}`, JSON.stringify({
         customer_id: data.id || data.customer_id,
@@ -120,6 +139,7 @@ export default function CustomerApp() {
         phone: data.phone || phone,
         party_size: data.party_size || partySize,
       }));
+      await loadCustomerOrders(data.id || data.customer_id, vendor.id);
       setStep("menu");
     } finally {
       setLoading(false);
@@ -170,6 +190,7 @@ export default function CustomerApp() {
           status: data.status || "received",
           created_at: data.created_at || new Date().toISOString(),
         };
+        setCurrentOrderId(data.id || currentOrderId);
         const existing = prev.find((order) => order.id === data.id);
         if (existing) {
           return prev.map((order) => order.id === data.id ? nextOrder : order);
@@ -200,6 +221,9 @@ export default function CustomerApp() {
         return;
       }
       setOrders((prev) => prev.map((order) => order.id === data.order?.id ? { ...order, status: "closing_requested" } : order));
+      if (!orders.some((order) => order.id === data.order?.id) && data.order?.id) {
+        setOrders([{ id: data.order.id, total: Number(data.order.total || ordersTotal), status: "closing_requested", created_at: data.order.created_at || new Date().toISOString() }]);
+      }
       alert("Pedido de conta enviado ao quiosque.");
     } finally {
       setLoading(false);
@@ -237,7 +261,32 @@ export default function CustomerApp() {
           <div className="mt-6 space-y-4">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none focus:border-[#FF6B00]" />
             <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none focus:border-[#FF6B00]" />
-            <input type="number" min={1} max={50} value={partySize} onChange={(e) => setPartySize(Math.max(1, Math.min(50, Number(e.target.value || 1))))} className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none focus:border-[#FF6B00]" />
+            <div className="rounded-lg border border-[#E7DCCB] bg-white p-3">
+              <p className="mb-2 text-sm font-bold text-[#82533F]">Quantidade de pessoas</p>
+              <div className="grid grid-cols-[44px_1fr_44px] items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPartySize((value) => Math.max(1, value - 1))}
+                  disabled={partySize <= 1}
+                  className="h-11 rounded-lg border border-[#E7DCCB] bg-[#F7F3EA] text-2xl font-black text-[#FF6B00] disabled:opacity-40"
+                  aria-label="Diminuir quantidade de pessoas"
+                >
+                  -
+                </button>
+                <div className="h-11 rounded-lg bg-[#FFF8F0] px-3 text-center text-2xl font-black leading-[44px] text-[#1F2933]">
+                  {partySize}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPartySize((value) => Math.min(50, value + 1))}
+                  disabled={partySize >= 50}
+                  className="h-11 rounded-lg border border-[#E7DCCB] bg-[#F7F3EA] text-2xl font-black text-[#FF6B00] disabled:opacity-40"
+                  aria-label="Aumentar quantidade de pessoas"
+                >
+                  +
+                </button>
+              </div>
+            </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button disabled={loading} onClick={startTab} className="w-full rounded-lg bg-[#FF6B00] py-4 font-black text-white disabled:opacity-60">
               {loading ? "Abrindo..." : "Abrir comanda"}
@@ -255,6 +304,7 @@ export default function CustomerApp() {
           <div>
             <p className="text-xs uppercase font-bold text-[#82533F]">Guarda-sol {umbrella?.number || ""}</p>
             <h1 className="text-xl font-black">{customerName || "Cliente"}</h1>
+            {currentOrderId && <p className="text-[11px] font-bold text-[#82533F]">Pedido #{currentOrderId.slice(0, 8)}</p>}
           </div>
           <div className="flex gap-2">
             <button onClick={requestCloseAccount} disabled={loading} className="rounded-lg bg-[#394E59] px-3 py-2 text-sm font-bold text-white">
@@ -267,14 +317,17 @@ export default function CustomerApp() {
         </div>
         {waiterCalled && <p className="mt-3 rounded-lg bg-[#FFF2E5] px-3 py-2 text-sm font-semibold text-[#82533F]">Garcom chamado.</p>}
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
-        <InstallShortcutButton context="customer" className="mt-3" />
+        <div className="mt-3 rounded-lg border border-[#E7DCCB] bg-[#FFF8F0] px-3 py-2">
+          <p className="text-xs font-bold uppercase text-[#82533F]">Total da conta</p>
+          <p className="text-2xl font-black text-[#FF6B00]">{formatCurrency(openTotal)}</p>
+        </div>
       </header>
 
       {step === "menu" && (
         <section className="p-4 space-y-4">
           <div className="rounded-lg bg-white p-4 border border-[#E7DCCB]">
             <p className="text-sm text-[#82533F]">Total em aberto</p>
-            <p className="text-3xl font-black text-[#FF6B00]">{formatCurrency(cartTotal + ordersTotal)}</p>
+            <p className="text-3xl font-black text-[#FF6B00]">{formatCurrency(openTotal)}</p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {categories.map((category) => (

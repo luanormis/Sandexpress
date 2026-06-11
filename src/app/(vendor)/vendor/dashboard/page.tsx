@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
@@ -25,6 +25,7 @@ interface Product {
 interface OrderItem { q: number; n: string; }
 interface Order {
   id: string;
+  umbrella_id: string;
   umbrella: number;
   customer: string;
   phone: string;
@@ -33,6 +34,7 @@ interface Order {
   time: string;
   items: OrderItem[];
   notes?: string;
+  paid?: boolean;
 }
 
 interface Umbrella {
@@ -41,6 +43,10 @@ interface Umbrella {
   number: number;
   label: string;
   active: boolean;
+  is_occupied?: boolean;
+  current_order_id?: string | null;
+  map_x?: number | null;
+  map_y?: number | null;
   qr_url: string | null;
   qr_image_url?: string;
 }
@@ -99,6 +105,7 @@ export default function VendorDashboard() {
   // --- Orders State ---
   const [orders, setOrders] = useState<Order[]>([]);
   const [newOrderCount, setNewOrderCount] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>([]);
@@ -204,6 +211,15 @@ export default function VendorDashboard() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!vendorId) return;
+    const timer = window.setInterval(() => {
+      loadOrders(vendorId);
+      loadUmbrellas(vendorId);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [vendorId]);
+
   const createTeamUser = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!vendorId) return;
@@ -256,6 +272,7 @@ export default function VendorDashboard() {
         return;
       }
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      setSelectedOrder(prev => prev?.id === id ? { ...prev, status: newStatus } : prev);
     } catch (err) {
       console.error('Move order error:', err);
       alert('Erro de rede ao atualizar pedido.');
@@ -432,6 +449,36 @@ export default function VendorDashboard() {
     }
   };
 
+  const markAccountPaid = async (order: Order) => {
+    if (!vendorId) return;
+    const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella}?`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/close-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          umbrella_id: order.umbrella_id,
+          payment_method: 'cash',
+          notes: order.notes || 'Conta paga no Kanban',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Nao foi possivel confirmar o pagamento.');
+        return;
+      }
+      setOrders(prev => prev.filter(o => o.id !== order.id));
+      setUmbrellas(prev => prev.map(u => u.id === order.umbrella_id ? { ...u, is_occupied: false, current_order_id: null } : u));
+      setSelectedOrder(null);
+    } catch (err) {
+      console.error('Pay account error:', err);
+      alert('Erro de rede ao confirmar pagamento.');
+    }
+  };
+
   // Filtered products
   const filteredProducts = productFilter === "Todos" ? products : products.filter(p => p.category === productFilter);
   const filteredCustomers = customers.filter(c =>
@@ -443,15 +490,15 @@ export default function VendorDashboard() {
   const renderKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
     const colOrders = orders.filter(o => o.status === status);
     return (
-      <div className="bg-gray-100 rounded-2xl p-4 flex flex-col h-[calc(100vh-140px)] min-w-[300px]">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-gray-700 capitalize flex items-center gap-2">
-            <span className={`w-3 h-3 rounded-full ${color}`}></span>
+      <div className="bg-gray-100 rounded-lg p-3 flex flex-col h-[58vh] min-w-[220px] max-w-[240px]">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
             {title}
           </h3>
           <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-3 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
           {colOrders.map(order => (
             <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
               <div className="flex justify-between items-start mb-2">
@@ -491,6 +538,104 @@ export default function VendorDashboard() {
           )}
         </div>
       </div>
+    );
+  };
+
+  const renderCompactKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
+    const colOrders = orders.filter(o => o.status === status);
+    return (
+      <div className="bg-gray-100 rounded-lg p-3 flex flex-col h-[58vh] min-w-[220px] max-w-[240px]">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
+            {title}
+          </h3>
+          <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
+          {colOrders.map(order => (
+            <button
+              key={order.id}
+              onClick={() => setSelectedOrder(order)}
+              className="w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
+                <span className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={11}/> {order.time}</span>
+              </div>
+              <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
+              <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
+              <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
+              <div className="mt-2 flex flex-col gap-1">
+                {status === 'closing_requested' ? (
+                  <span
+                    onClick={(event) => { event.stopPropagation(); markAccountPaid(order); }}
+                    className="w-full cursor-pointer rounded-md bg-green-600 px-2 py-1.5 text-center text-xs font-black text-white hover:bg-green-700"
+                  >
+                    Conta paga
+                  </span>
+                ) : nextStatus ? (
+                  <span
+                    onClick={(event) => { event.stopPropagation(); moveOrder(order.id, nextStatus); }}
+                    className="w-full cursor-pointer rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-center text-xs font-black text-gray-700 hover:bg-[#FF6B00] hover:text-white"
+                  >
+                    {nextAction}
+                  </span>
+                ) : null}
+              </div>
+            </button>
+          ))}
+          {colOrders.length === 0 && (
+            <div className="text-center py-8 text-gray-300">
+              <ShoppingBag size={32} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Nenhum pedido</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderBeachMap = () => {
+    const activeAccounts = orders.filter(order => !order.paid).length;
+    const occupiedUmbrellas = umbrellas.filter(umbrella => umbrella.is_occupied || umbrella.current_order_id).length;
+    return (
+      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-black text-gray-900">Mapa da praia</h3>
+            <p className="text-xs font-bold text-gray-400">{occupiedUmbrellas} ocupados · {activeAccounts} contas abertas</p>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] font-bold text-gray-500">
+            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Livre</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#FF6B00]" />Ocupado</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />Conta</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-8 gap-2 md:grid-cols-12">
+          {umbrellas.map(umbrella => {
+            const order = orders.find(item => item.umbrella_id === umbrella.id);
+            const closing = order?.status === 'closing_requested';
+            const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
+            return (
+              <button
+                key={umbrella.id}
+                onClick={() => order ? setSelectedOrder(order) : undefined}
+                className={cn(
+                  "aspect-square rounded-lg border text-xs font-black transition-all",
+                  !umbrella.active && "border-gray-200 bg-gray-100 text-gray-300",
+                  umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
+                  umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
+                  umbrella.active && closing && "border-orange-300 bg-orange-500 text-white hover:bg-orange-600"
+                )}
+                title={order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
+              >
+                {umbrella.number}
+              </button>
+            );
+          })}
+        </div>
+      </section>
     );
   };
 
@@ -549,12 +694,15 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
-            <div className="flex gap-4 overflow-x-auto pb-4 h-full">
-              {renderKanbanColumn("Recebido", "received", "Iniciar Preparo", "preparing", "bg-blue-500")}
-              {renderKanbanColumn("Preparando", "preparing", "Saiu para Entrega", "delivering", "bg-yellow-500")}
-              {renderKanbanColumn("Entregando", "delivering", "Confirmar Entrega", "completed", "bg-purple-500")}
-              {renderKanbanColumn("Conta Solicitada", "closing_requested", "Confirmar Pagamento", "completed", "bg-orange-500")}
-              {renderKanbanColumn("Entregue", "completed", "", "", "bg-green-500")}
+            <div className="space-y-4">
+              {renderBeachMap()}
+              <div className="flex gap-3 overflow-x-auto pb-4">
+                {renderCompactKanbanColumn("Recebido", "received", "Iniciar", "preparing", "bg-blue-500")}
+                {renderCompactKanbanColumn("Preparando", "preparing", "Saiu", "delivering", "bg-yellow-500")}
+                {renderCompactKanbanColumn("Entregando", "delivering", "Entregue", "completed", "bg-purple-500")}
+                {renderCompactKanbanColumn("Conta Solicitada", "closing_requested", "Conta paga", "", "bg-orange-500")}
+                {renderCompactKanbanColumn("Entregue", "completed", "Solicitar conta", "closing_requested", "bg-green-500")}
+              </div>
             </div>
           )}
 
@@ -1089,6 +1237,15 @@ export default function VendorDashboard() {
         />
       )}
 
+      {selectedOrder && (
+        <OrderModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onMove={moveOrder}
+          onPaid={markAccountPaid}
+        />
+      )}
+
       {/* ========== MODAL: CUSTOMER DETAIL ========== */}
       {selectedCustomer && (
         <CustomerModal
@@ -1096,6 +1253,84 @@ export default function VendorDashboard() {
           onClose={() => setSelectedCustomer(null)}
         />
       )}
+    </div>
+  );
+}
+
+// =========================================================
+// ORDER MODAL COMPONENT
+// =========================================================
+function OrderModal({
+  order,
+  onClose,
+  onMove,
+  onPaid,
+}: {
+  order: Order;
+  onClose: () => void;
+  onMove: (id: string, status: string) => Promise<void>;
+  onPaid: (order: Order) => Promise<void>;
+}) {
+  const next = order.status === 'received'
+    ? { label: 'Iniciar preparo', status: 'preparing' }
+    : order.status === 'preparing'
+      ? { label: 'Saiu para entrega', status: 'delivering' }
+      : order.status === 'delivering'
+        ? { label: 'Confirmar entrega', status: 'completed' }
+        : order.status === 'completed'
+          ? { label: 'Solicitar conta', status: 'closing_requested' }
+          : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-start p-6 border-b border-gray-100">
+          <div>
+            <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p>
+            <h3 className="text-xl font-display font-bold text-gray-900">Pedido #{order.id.slice(0, 8)}</h3>
+            <p className="mt-1 text-sm font-bold text-gray-500">{order.customer} · {order.phone}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="rounded-xl bg-[#fff8f6] p-4">
+            <p className="text-xs font-black uppercase text-[#82533F]">Total da conta</p>
+            <p className="text-3xl font-black text-[#FF6B00]">{formatCurrency(order.total)}</p>
+          </div>
+          <div>
+            <h4 className="mb-2 text-sm font-black text-gray-700">Itens</h4>
+            <div className="space-y-2">
+              {(order.items || []).length === 0 ? (
+                <p className="rounded-lg bg-gray-50 p-3 text-sm font-bold text-gray-400">Comanda aberta sem itens.</p>
+              ) : (order.items || []).map((item, index) => (
+                <div key={`${item.n}-${index}`} className="flex justify-between rounded-lg border border-gray-100 p-3 text-sm">
+                  <span className="font-bold text-gray-900">{item.n}</span>
+                  <span className="font-black text-[#FF6B00]">{item.q}x</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {order.notes && (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">
+              {order.notes}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 border-t border-gray-100 p-6">
+          <button onClick={onClose} className="flex-1 rounded-xl border-2 border-gray-200 py-3 font-bold text-gray-600 hover:bg-gray-50">
+            Fechar
+          </button>
+          {order.status === 'closing_requested' ? (
+            <button onClick={() => onPaid(order)} className="flex-1 rounded-xl bg-green-600 py-3 font-black text-white hover:bg-green-700">
+              Conta paga
+            </button>
+          ) : next ? (
+            <button onClick={() => onMove(order.id, next.status)} className="flex-1 rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
+              {next.label}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

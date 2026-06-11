@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
 /**
  * GET /api/orders?vendor_id=xxx&status=received
@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const vendor_id = searchParams.get('vendor_id');
     const status = searchParams.get('status');
+    const includePaid = searchParams.get('include_paid') === 'true';
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
       )
       .eq('vendor_id', vendor_id)
       .order('created_at', { ascending: false });
+
+    if (!includePaid) {
+      query = query.eq('paid', false);
+    }
 
     if (status) {
       query = query.eq('status', status);
@@ -168,10 +173,12 @@ export async function POST(req: NextRequest) {
     } else {
       const nextTotal = Number(order.total || 0) + total;
       const nextNotes = notes ? [order.notes, notes].filter(Boolean).join('\n') : order.notes;
+      const nextStatus = order.status === 'completed' ? 'received' : order.status;
       const { data: updatedOrder, error: updateOrderErr } = await supabaseAdmin
         .from('orders')
         .update({
           total: nextTotal,
+          status: nextStatus,
           notes: nextNotes || null,
           updated_at: new Date().toISOString(),
         } as any)
