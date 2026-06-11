@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
@@ -163,6 +163,54 @@ export default function VendorDashboard() {
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState("");
+  const knownOrderStatusesRef = useRef<Map<string, string>>(new Map());
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const getAudioContext = () => {
+    if (typeof window === "undefined") return null;
+    const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    if (!audioContextRef.current) audioContextRef.current = new AudioContextCtor();
+    return audioContextRef.current;
+  };
+
+  const playToneSequence = (tones: { frequency: number; start: number; duration: number; type?: OscillatorType }[]) => {
+    const audio = getAudioContext();
+    if (!audio) return;
+    if (audio.state === "suspended") {
+      audio.resume().catch(() => undefined);
+    }
+    const base = audio.currentTime + 0.02;
+    tones.forEach((tone) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = tone.type || "sine";
+      oscillator.frequency.value = tone.frequency;
+      gain.gain.setValueAtTime(0.001, base + tone.start);
+      gain.gain.exponentialRampToValueAtTime(0.18, base + tone.start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, base + tone.start + tone.duration);
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.start(base + tone.start);
+      oscillator.stop(base + tone.start + tone.duration + 0.03);
+    });
+  };
+
+  const playNewOrderSound = () => {
+    playToneSequence([
+      { frequency: 880, start: 0, duration: 0.12 },
+      { frequency: 1175, start: 0.14, duration: 0.18 },
+    ]);
+  };
+
+  const playCashRegisterSound = () => {
+    playToneSequence([
+      { frequency: 1046, start: 0, duration: 0.08, type: "triangle" },
+      { frequency: 1318, start: 0.08, duration: 0.08, type: "triangle" },
+      { frequency: 1568, start: 0.17, duration: 0.18, type: "square" },
+      { frequency: 784, start: 0.38, duration: 0.14, type: "triangle" },
+    ]);
+  };
 
   // Data loading functions
   const loadOrders = async (vid: string) => {
@@ -170,6 +218,23 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/orders?vendor_id=${vid}`);
       if (res.ok) {
         const data = await res.json();
+        const nextStatusMap = new Map<string, string>();
+        let hasNewOrder = false;
+        let hasNewClosingRequest = false;
+        data.forEach((order: Order) => {
+          const previousStatus = knownOrderStatusesRef.current.get(order.id);
+          nextStatusMap.set(order.id, order.status);
+          if (!previousStatus && order.status === "received") hasNewOrder = true;
+          if (!previousStatus && order.status === "closing_requested") hasNewClosingRequest = true;
+          if (previousStatus && previousStatus !== "closing_requested" && order.status === "closing_requested") {
+            hasNewClosingRequest = true;
+          }
+        });
+        if (knownOrderStatusesRef.current.size > 0) {
+          if (hasNewOrder) playNewOrderSound();
+          if (hasNewClosingRequest) playCashRegisterSound();
+        }
+        knownOrderStatusesRef.current = nextStatusMap;
         setOrders(data);
         setNewOrderCount(data.filter((o: Order) => o.status === 'received').length);
       }
@@ -296,6 +361,19 @@ export default function VendorDashboard() {
     }, 5000);
     return () => window.clearInterval(timer);
   }, [vendorId]);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      const audio = getAudioContext();
+      audio?.resume().catch(() => undefined);
+    };
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
 
   const createTeamUser = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -577,7 +655,13 @@ export default function VendorDashboard() {
         </div>
         <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
           {colOrders.map(order => (
-            <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
+            <div
+              key={order.id}
+              className={cn(
+                "bg-white p-4 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md",
+                status === "received" && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md"
+              )}
+            >
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="bg-[#FF6B00] text-white text-xs font-bold px-2 py-1 rounded-md">Barraca {order.umbrella}</span>
@@ -634,7 +718,10 @@ export default function VendorDashboard() {
             <button
               key={order.id}
               onClick={() => setSelectedOrder(order)}
-              className="w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md"
+              className={cn(
+                "w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
+                status === "received" && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md"
+              )}
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
@@ -1019,15 +1106,26 @@ export default function VendorDashboard() {
                   </div>
                 </div>
 
-                <label className="mt-5 block space-y-2">
-                  <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
-                  <input
-                    value={themeForm.logo_url}
-                    onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
-                    placeholder="/sandexpress-logo.svg ou https://..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
-                  />
-                </label>
+                <div className="mt-5 rounded-2xl border border-dashed border-[#e2bfb0] bg-[#fff8f6] p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e2bfb0] bg-white shadow-sm">
+                      {themeForm.logo_url ? (
+                        <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-3" />
+                      ) : (
+                        <Upload className="text-[#82533f]" size={30} />
+                      )}
+                    </div>
+                    <label className="min-w-0 flex-1 space-y-2">
+                      <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
+                      <input
+                        value={themeForm.logo_url}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
+                        placeholder="/sandexpress-logo.svg ou https://..."
+                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
+                      />
+                    </label>
+                  </div>
+                </div>
 
                 {themeMessage && (
                   <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>

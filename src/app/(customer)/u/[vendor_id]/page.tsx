@@ -35,6 +35,17 @@ type CustomerVendor = {
   logo_url?: string | null;
 };
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  received: "Pedido recebido",
+  preparing: "Em preparo",
+  delivering: "Saiu para entrega",
+  completed: "Entregue",
+  closing_requested: "Conta solicitada",
+  cancelled: "Cancelado",
+};
+
+const BILLABLE_STATUSES = new Set(["completed", "closing_requested"]);
+
 export default function CustomerApp() {
   const params = useParams();
   const umbrellaId = String(params.umbrella_id || params.vendor_id || "");
@@ -60,13 +71,26 @@ export default function CustomerApp() {
 
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
-  const ordersTotal = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const ordersTotal = orders
+    .filter((order) => BILLABLE_STATUSES.has(order.status))
+    .reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const pendingOrdersTotal = orders
+    .filter((order) => !BILLABLE_STATUSES.has(order.status))
+    .reduce((sum, order) => sum + Number(order.total || 0), 0);
   const openTotal = ordersTotal + cartTotal;
+  const latestOrder = orders[0];
   const theme = {
     primary: vendor?.primary_color || "#ff6b00",
     secondary: vendor?.secondary_color || "#82533f",
     logo: vendor?.logo_url || "/sandexpress-logo.svg",
   };
+  const sandExpressMark = (
+    <div className="fixed bottom-3 left-0 right-0 z-30 flex justify-center pointer-events-none">
+      <div className="rounded-full border border-white/60 bg-white/90 px-3 py-1 text-[11px] font-black shadow-sm" style={{ color: theme.secondary }}>
+        SandExpress
+      </div>
+    </div>
+  );
 
   async function loadCustomerOrders(nextCustomerId: string, nextVendorId: string) {
     if (!nextCustomerId || !nextVendorId) return;
@@ -116,6 +140,14 @@ export default function CustomerApp() {
 
     if (umbrellaId) loadQrData();
   }, [umbrellaId, routeVendorId]);
+
+  useEffect(() => {
+    if (!customerId || !vendor?.id) return;
+    const timer = window.setInterval(() => {
+      loadCustomerOrders(customerId, vendor.id);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [customerId, vendor?.id]);
 
   async function startTab() {
     if (!vendor) return;
@@ -265,6 +297,7 @@ export default function CustomerApp() {
           Comecar pedido
         </button>
         <InstallShortcutButton context="customer" className="mt-4 w-full max-w-sm text-[#1F2933]" />
+        {sandExpressMark}
       </main>
     );
   }
@@ -320,6 +353,7 @@ export default function CustomerApp() {
             </button>
           </div>
         </section>
+        {sandExpressMark}
       </main>
     );
   }
@@ -352,7 +386,20 @@ export default function CustomerApp() {
         <div className="mt-3 rounded-lg border border-[#E7DCCB] bg-[#FFF8F0] px-3 py-2">
           <p className="text-xs font-bold uppercase" style={{ color: theme.secondary }}>Total da conta</p>
           <p className="text-2xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
+          {pendingOrdersTotal > 0 && (
+            <p className="text-[11px] font-bold" style={{ color: theme.secondary }}>
+              {formatCurrency(pendingOrdersTotal)} aguardando entrega
+            </p>
+          )}
         </div>
+        {latestOrder && (
+          <div className="mt-3 rounded-lg border border-[#E7DCCB] bg-white px-3 py-2">
+            <p className="text-xs font-bold uppercase" style={{ color: theme.secondary }}>Status do pedido</p>
+            <p className="text-sm font-black" style={{ color: theme.primary }}>
+              Pedido #{latestOrder.id.slice(0, 8)} - {ORDER_STATUS_LABELS[latestOrder.status] || latestOrder.status}
+            </p>
+          </div>
+        )}
       </header>
 
       {step === "menu" && (
@@ -360,6 +407,11 @@ export default function CustomerApp() {
           <div className="rounded-lg bg-white p-4 border border-[#E7DCCB]">
             <p className="text-sm" style={{ color: theme.secondary }}>Total em aberto</p>
             <p className="text-3xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
+            {pendingOrdersTotal > 0 && (
+              <p className="mt-1 text-xs font-bold" style={{ color: theme.secondary }}>
+                Pedidos em preparo/entrega entram na conta quando forem entregues.
+              </p>
+            )}
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {categories.map((category) => (
@@ -417,7 +469,12 @@ export default function CustomerApp() {
               <div className="flex justify-between gap-3">
                 <div>
                   <h2 className="font-black">Pedido #{order.id.slice(0, 8)}</h2>
-                  <p className="text-sm" style={{ color: theme.secondary }}>{order.status}</p>
+                  <p className="text-sm" style={{ color: theme.secondary }}>
+                    {ORDER_STATUS_LABELS[order.status] || order.status}
+                  </p>
+                  {BILLABLE_STATUSES.has(order.status) && (
+                    <p className="mt-1 text-[11px] font-black" style={{ color: theme.primary }}>Contabilizado na conta</p>
+                  )}
                 </div>
                 <p className="font-black" style={{ color: theme.primary }}>{formatCurrency(Number(order.total || 0))}</p>
               </div>
