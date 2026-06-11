@@ -290,8 +290,8 @@ export default function CustomerApp() {
             <UtensilsCrossed size={46} />
           )}
         </div>
-        <h1 className="mt-6 text-4xl font-black">SandExpress</h1>
-        <p className="mt-2 text-white/80">{vendor?.name || "Carregando quiosque..."}</p>
+        <p className="mt-6 text-sm font-black uppercase tracking-wide text-white/70">SandExpress</p>
+        <h1 className="mt-2 max-w-sm text-4xl font-black leading-tight sm:text-5xl">{vendor?.name || "Carregando quiosque..."}</h1>
         {error && <p className="mt-4 rounded-lg bg-white/15 px-4 py-3 text-sm">{error}</p>}
         <button onClick={() => setStep("login")} className="mt-10 w-full max-w-sm rounded-full bg-white py-4 font-black shadow-lg" style={{ color: theme.primary }}>
           Comecar pedido
@@ -311,8 +311,9 @@ export default function CustomerApp() {
               <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
             </div>
             <div>
-              <h1 className="text-3xl font-black">Abrir comanda</h1>
-              <p className="text-sm font-bold" style={{ color: theme.secondary }}>{vendor?.name || "Quiosque"}</p>
+              <p className="text-xs font-black uppercase tracking-wide" style={{ color: theme.secondary }}>SandExpress</p>
+              <h1 className="text-2xl font-black sm:text-3xl">{vendor?.name || "Quiosque"}</h1>
+              <p className="text-sm font-bold" style={{ color: theme.secondary }}>Abrir comanda</p>
             </div>
           </div>
           <p className="mt-2" style={{ color: theme.secondary }}>Informe os dados para iniciar.</p>
