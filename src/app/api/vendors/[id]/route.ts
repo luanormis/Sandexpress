@@ -1,46 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
-import { getTenantIdFromRequest, enforceTenantScope } from '@/lib/tenant-utils';
+import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
-/** Campos que o admin pode atualizar num vendor (whitelist contra mass-assignment) */
 const ALLOWED_VENDOR_FIELDS = new Set([
-  'name', 'address', 'city', 'state', 'owner_name', 'owner_phone', 'owner_email',
-  'logo_url', 'primary_color', 'secondary_color',
-  'subscription_status', 'is_active', 'plan_type', 'plan_expires_at', 'max_umbrellas',
+  'name',
+  'address',
+  'city',
+  'state',
+  'owner_name',
+  'owner_phone',
+  'owner_email',
+  'logo_url',
+  'primary_color',
+  'secondary_color',
+  'subscription_status',
+  'is_active',
+  'plan_type',
+  'plan_expires_at',
+  'trial_ends_at',
+  'max_umbrellas',
 ]);
 
-/**
- * GET /api/vendors/[id]
- * Detalhes de um vendor.
- *
- * PATCH /api/vendors/[id]
- * Atualiza dados do vendor (incluindo bloquear/desbloquear).
- */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const session = getRequestSession(req);
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
 
     const { id } = await params;
-
-    const { data, error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('vendors')
-        .select('*')
-        .eq('id', id),
-      tenantId
-    ).single();
+    const tenantId = getTenantIdFromRequest(req);
+    const query = supabaseAdmin.from('vendors').select('*').eq('id', id);
+    const { data, error } = await (tenantId ? enforceTenantScope(query, tenantId) : query).single();
 
     if (error) throw error;
     return NextResponse.json(data);
@@ -55,36 +50,29 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const session = getRequestSession(req);
     if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
     }
 
     const { id } = await params;
+    const tenantId = getTenantIdFromRequest(req);
     const body = await req.json();
 
-    // Whitelist: apenas campos permitidos ao admin
     const safeUpdate: Record<string, unknown> = {};
     for (const field of ALLOWED_VENDOR_FIELDS) {
       if (field in body) safeUpdate[field] = body[field];
     }
     if (Object.keys(safeUpdate).length === 0) {
-      return NextResponse.json({ error: 'Nenhum campo válido para atualizar.' }, { status: 400 });
+      return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
 
-    const { data, error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('vendors')
-        .update({ ...safeUpdate, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select(),
-      tenantId
-    ).single();
+    const query = supabaseAdmin
+      .from('vendors')
+      .update({ ...safeUpdate, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select();
+    const { data, error } = await (tenantId ? enforceTenantScope(query, tenantId) : query).single();
 
     if (error) throw error;
     return NextResponse.json(data);

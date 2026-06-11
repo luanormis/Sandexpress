@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
-  Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
-  Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star, CalendarCheck,
+  ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
+  Search, Clock, Trash2, Pencil, X, Upload,
+  Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
   Palette, Menu,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -671,67 +671,6 @@ export default function VendorDashboard() {
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     c.phone.includes(customerSearch)
   );
-
-  // Kanban column renderer
-  const renderKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
-    const colOrders = orders.filter(o => o.status === status);
-    return (
-      <div className="bg-gray-100 rounded-lg p-3 flex flex-col h-[58vh] min-w-[220px] max-w-[240px]">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
-            {title}
-          </h3>
-          <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
-        </div>
-        <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
-          {colOrders.map(order => (
-            <div
-              key={order.id}
-              className={cn(
-                "bg-white p-4 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md",
-                status === "received" && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md"
-              )}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <span className="bg-[#FF6B00] text-white text-xs font-bold px-2 py-1 rounded-md">Barraca {order.umbrella}</span>
-                  <p className="font-bold text-gray-900 mt-1">{order.customer}</p>
-                  <p className="text-xs text-gray-400">{order.phone}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[#FF6B00] font-bold block">{formatCurrency(order.total)}</span>
-                  <span className="text-xs text-gray-400 flex items-center gap-1 justify-end mt-1"><Clock size={12}/> {order.time}</span>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600 mb-2 border-t border-gray-50 pt-2">
-                {(order.items || []).map((i, idx) => <div key={idx}>{i.q}x {i.n}</div>)}
-              </div>
-              {order.notes && (
-                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg mb-2 border border-amber-100">
-                  📝 {order.notes}
-                </div>
-              )}
-              {nextStatus && (
-                <button
-                  onClick={() => moveOrder(order.id, nextStatus)}
-                  className="w-full bg-gray-50 hover:bg-[#FF6B00] hover:text-white text-gray-700 border border-gray-200 font-bold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-1"
-                >
-                  <CheckCircle2 size={16} /> {nextAction}
-                </button>
-              )}
-            </div>
-          ))}
-          {colOrders.length === 0 && (
-            <div className="text-center py-8 text-gray-300">
-              <ShoppingBag size={32} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Nenhum pedido</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const renderCompactKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
     const colOrders = orders.filter(o => o.status === status);
