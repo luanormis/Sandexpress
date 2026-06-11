@@ -5,6 +5,7 @@ import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star, CalendarCheck,
+  Palette,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -84,13 +85,38 @@ interface VendorUser {
   created_at: string;
 }
 
+interface KioskTheme {
+  primary_color: string;
+  secondary_color: string;
+  logo_url: string;
+  tenant_id?: string;
+}
+
 const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
+
+const DEFAULT_THEME: KioskTheme = {
+  primary_color: "#ff6b00",
+  secondary_color: "#82533f",
+  logo_url: "/sandexpress-logo.svg",
+};
+
+const BRAND_PALETTE = [
+  { name: "Laranja SandExpress", value: "#ff6b00" },
+  { name: "Laranja forte", value: "#a04100" },
+  { name: "Marrom praia", value: "#82533f" },
+  { name: "Cacau", value: "#3d1a0a" },
+  { name: "Areia", value: "#f8ddd2" },
+  { name: "Creme", value: "#fff8f6" },
+  { name: "Verde livre", value: "#15803d" },
+  { name: "Azul mar", value: "#0f6b78" },
+];
 
 const TABS = [
   { id: "orders", label: "Pedidos", icon: ShoppingBag },
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
+  { id: "theme", label: "Personalizacao", icon: Palette },
   { id: "customers", label: "Clientes", icon: Users },
   { id: "team", label: "Equipe", icon: Users },
 ];
@@ -134,6 +160,9 @@ export default function VendorDashboard() {
     name: "", email: "", login: "", role: "seller", password: "", password_confirm: "",
   });
   const [teamMessage, setTeamMessage] = useState("");
+  const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeMessage, setThemeMessage] = useState("");
 
   // Data loading functions
   const loadOrders = async (vid: string) => {
@@ -197,6 +226,23 @@ export default function VendorDashboard() {
     }
   };
 
+  const loadTheme = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/vendors/${vid}/theme`);
+      if (res.ok) {
+        const data = await res.json();
+        setThemeForm({
+          tenant_id: data.tenant_id,
+          primary_color: data.primary_color || DEFAULT_THEME.primary_color,
+          secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+          logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load theme:', err);
+    }
+  };
+
   // Load vendor ID and initial data
   useEffect(() => {
     const vid = sessionStorage.getItem("vendor_id");
@@ -208,8 +254,39 @@ export default function VendorDashboard() {
       loadUmbrellas(vid);
       loadCustomers(vid);
       loadTeam(vid);
+      loadTheme(vid);
     }
   }, []);
+
+  const saveTheme = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!vendorId) return;
+    setThemeSaving(true);
+    setThemeMessage("");
+    try {
+      const res = await fetch(`/api/vendors/${vendorId}/theme`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(themeForm),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setThemeMessage(data.error || "Nao foi possivel salvar a personalizacao.");
+        return;
+      }
+      setThemeForm({
+        tenant_id: data.tenant_id,
+        primary_color: data.primary_color || DEFAULT_THEME.primary_color,
+        secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+        logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+      });
+      setThemeMessage("Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
+    } catch {
+      setThemeMessage("Erro de rede ao salvar personalizacao.");
+    } finally {
+      setThemeSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!vendorId) return;
@@ -881,7 +958,119 @@ export default function VendorDashboard() {
             </div>
           )}
 
-          {/* ========== ABA 4: RELATÓRIOS ========== */}
+          {/* ========== ABA: PERSONALIZACAO ========== */}
+          {activeTab === "theme" && (
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <form onSubmit={saveTheme} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div className="mb-6">
+                  <h3 className="text-lg font-black text-gray-900">Identidade do quiosque</h3>
+                  <p className="text-sm font-semibold text-gray-500">Cores e logo gravadas no tenant deste quiosque.</p>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Cor principal</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.primary_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.primary_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Cor secundaria</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.secondary_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, secondary_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.secondary_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, secondary_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-black text-gray-700">Paleta SandExpress</p>
+                  <div className="flex flex-wrap gap-2">
+                    {BRAND_PALETTE.map(color => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        title={color.name}
+                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value }))}
+                        className="h-10 w-10 rounded-lg border border-gray-200 shadow-sm transition-transform hover:scale-105"
+                        style={{ backgroundColor: color.value }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <label className="mt-5 block space-y-2">
+                  <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
+                  <input
+                    value={themeForm.logo_url}
+                    onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
+                    placeholder="/sandexpress-logo.svg ou https://..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
+                  />
+                </label>
+
+                {themeMessage && (
+                  <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={themeSaving}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
+                  style={{ backgroundColor: themeForm.primary_color }}
+                >
+                  <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalizacao"}
+                </button>
+              </form>
+
+              <aside className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div className="p-6 text-white" style={{ backgroundColor: themeForm.primary_color }}>
+                  <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-md">
+                    {themeForm.logo_url ? (
+                      <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
+                    ) : (
+                      <Utensils className="text-gray-800" size={34} />
+                    )}
+                  </div>
+                  <h4 className="mt-5 text-2xl font-black">Preview cliente</h4>
+                  <p className="text-sm font-semibold text-white/80">Login, cardapio e botoes do QR.</p>
+                </div>
+                <div className="space-y-4 bg-[#fff8f6] p-6">
+                  <div className="rounded-xl border border-[#e2bfb0] bg-white p-4">
+                    <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
+                    <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(128.5)}</p>
+                  </div>
+                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.primary_color }}>
+                    Abrir comanda
+                  </button>
+                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.secondary_color }}>
+                    Fechar conta
+                  </button>
+                </div>
+              </aside>
+            </div>
+          )}
+
           {activeTab === "reports" && (
             <div className="space-y-6">
               <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

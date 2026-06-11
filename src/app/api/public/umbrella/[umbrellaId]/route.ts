@@ -52,6 +52,11 @@ export async function GET(
       return NextResponse.json({ error: 'Quiosque indisponivel.' }, { status: 403 });
     }
 
+    const { data: tenantTheme } = await (supabaseAdmin.from('tenants') as any)
+      .select('primary_color, secondary_color, logo_url')
+      .eq('id', umbrella.tenant_id)
+      .single();
+
     const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select('id, name, category, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_quantity, blocked_by_stock')
@@ -78,9 +83,9 @@ export async function GET(
         id: vendor.id,
         tenant_id: vendor.tenant_id,
         name: vendor.name,
-        primary_color: vendor.primary_color || '#FF6B00',
-        secondary_color: vendor.secondary_color || '#394E59',
-        logo_url: vendor.logo_url,
+        primary_color: tenantTheme?.primary_color || vendor.primary_color || '#ff6b00',
+        secondary_color: tenantTheme?.secondary_color || vendor.secondary_color || '#82533f',
+        logo_url: tenantTheme?.logo_url || vendor.logo_url || '/sandexpress-logo.svg',
       },
       products: visible,
     });

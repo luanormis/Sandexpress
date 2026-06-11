@@ -68,8 +68,9 @@ CREATE TABLE tenants (
   state TEXT,
   region TEXT,
   beach_name TEXT,
-  primary_color TEXT NOT NULL DEFAULT '#ff7a1a',
-  logo_url TEXT,
+  primary_color TEXT NOT NULL DEFAULT '#ff6b00',
+  secondary_color TEXT NOT NULL DEFAULT '#82533f',
+  logo_url TEXT DEFAULT '/sandexpress-logo.svg',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -105,9 +106,9 @@ CREATE TABLE vendors (
   owner_name TEXT NOT NULL,
   owner_phone TEXT NOT NULL,
   owner_email TEXT,
-  logo_url TEXT,
-  primary_color TEXT NOT NULL DEFAULT '#ff7a1a',
-  secondary_color TEXT DEFAULT '#0f3d4f',
+  logo_url TEXT DEFAULT '/sandexpress-logo.svg',
+  primary_color TEXT NOT NULL DEFAULT '#ff6b00',
+  secondary_color TEXT DEFAULT '#82533f',
   password_hash TEXT,
   password_needs_reset BOOLEAN NOT NULL DEFAULT TRUE,
   password_reset_token TEXT,
@@ -618,8 +619,8 @@ INSERT INTO platform_settings (key, value, description) VALUES
     "cream": "#fff8f6",
     "sand": "#f8ddd2",
     "outline": "#e2bfb0",
-    "vendor_primary": "#ff7a1a",
-    "vendor_secondary": "#0f3d4f"
+    "vendor_primary": "#ff6b00",
+    "vendor_secondary": "#82533f"
   }'::jsonb,
   'Paleta oficial do Sandexpress aplicada ao sistema e aos novos quiosques.'
 ),
@@ -637,8 +638,8 @@ INSERT INTO platform_settings (key, value, description) VALUES
 (
   'default.vendor',
   '{
-    "primary_color": "#ff7a1a",
-    "secondary_color": "#0f3d4f",
+    "primary_color": "#ff6b00",
+    "secondary_color": "#82533f",
     "logo_url": "/sandexpress-logo.svg",
     "default_city": "Guaruja",
     "default_state": "SP",

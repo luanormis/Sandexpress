@@ -302,6 +302,7 @@ export interface Database {
           region: string | null
           beach_name: string | null
           primary_color: string | null
+          secondary_color: string | null
           logo_url: string | null
           created_at: string | null
         }
@@ -314,6 +315,7 @@ export interface Database {
           region?: string | null
           beach_name?: string | null
           primary_color?: string | null
+          secondary_color?: string | null
           logo_url?: string | null
           created_at?: string | null
         }
@@ -325,6 +327,7 @@ export interface Database {
           region?: string | null
           beach_name?: string | null
           primary_color?: string | null
+          secondary_color?: string | null
           logo_url?: string | null
         }
       }

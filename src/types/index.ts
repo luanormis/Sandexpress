@@ -30,6 +30,7 @@ export interface Tenant {
   region?: string | null
   beach_name?: string | null
   primary_color?: string | null
+  secondary_color?: string | null
   logo_url?: string | null
   created_at?: string
 }

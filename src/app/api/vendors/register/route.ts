@@ -103,8 +103,9 @@ export async function POST(req: NextRequest) {
       city: cleanCity,
       state: cleanState,
       beach_name: cleanBeach,
-      primary_color: body.primary_color || '#ff7a1a',
-      logo_url: body.logo_url || null,
+      primary_color: body.primary_color || '#ff6b00',
+      secondary_color: body.secondary_color || '#82533f',
+      logo_url: body.logo_url || '/sandexpress-logo.svg',
     };
     if (beachId) tenantPayload.beach_id = beachId;
 
@@ -131,9 +132,9 @@ export async function POST(req: NextRequest) {
         city: cleanCity,
         state: cleanState,
         beach_name: cleanBeach,
-        logo_url: body.logo_url || null,
-        primary_color: body.primary_color || '#ff7a1a',
-        secondary_color: body.secondary_color || '#0f3d4f',
+        logo_url: body.logo_url || '/sandexpress-logo.svg',
+        primary_color: body.primary_color || '#ff6b00',
+        secondary_color: body.secondary_color || '#82533f',
         password_hash: passwordHash,
         password_needs_reset: false,
         owner_email_verified: false,
