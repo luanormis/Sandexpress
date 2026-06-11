@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   UtensilsCrossed, Smartphone, Zap, QrCode, TrendingUp, CheckCircle2,
-  Camera, Gift, FileText, X, ChevronRight,
+  Camera, Gift, FileText, X, ChevronRight, Menu,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,6 +11,7 @@ import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans"
 
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean; verificationUrl?: string } | null>(null);
   const [form, setForm] = useState({
@@ -65,73 +66,88 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
-      <Link href="/admin" className="fixed left-3 top-3 z-[70] rounded-full bg-[#FF6B00] px-4 py-2 text-xs font-black text-white shadow-lg hover:bg-[#E56000]">
-        Entrar Admin
-      </Link>
-
       {/* Navbar */}
       <nav className="fixed top-0 left-0 w-full bg-[#fff8f6]/85 backdrop-blur-md z-50 border-b border-[#e2bfb0]/70">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
               <Image src="/sandexpress-logo.svg" alt="SandExpress" width={42} height={42} priority className="drop-shadow-sm" />
-              <span className="font-display font-bold text-2xl text-[#261812]">SandExpress</span>
+              <span className="font-display font-bold text-xl sm:text-2xl text-[#261812]">SandExpress</span>
             </div>
           </div>
-          <div className="hidden md:flex gap-8 font-bold text-sm text-gray-600">
-             <a href="#como-funciona" className="hover:text-[#FF6B00] transition-colors">Como funciona</a>
-             <a href="#beneficios" className="hover:text-[#FF6B00] transition-colors">Benefícios</a>
-             <a href="#planos" className="hover:text-[#FF6B00] transition-colors">Planos</a>
-          </div>
-          <div className="flex items-center gap-4">
-             <Link href="/vendor/login" className="font-bold text-sm text-gray-600 hover:text-gray-900 hidden md:block">Login Lojista</Link>
-             <button onClick={openModal} className="bg-[#FF6B00] text-white px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-sm">
-                Teste Grátis {TRIAL_DAYS} dias
+          <div className="flex items-center gap-2 sm:gap-4">
+             <button onClick={openModal} className="bg-[#FF6B00] text-white px-4 sm:px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-xs sm:text-sm whitespace-nowrap">
+                Cadastrar gratis
+             </button>
+             <button
+               type="button"
+               onClick={() => setMenuOpen(true)}
+               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e2bfb0] bg-white text-[#572000] shadow-sm hover:border-[#FF6B00]"
+               aria-label="Abrir menu"
+             >
+               <Menu size={20} />
              </button>
           </div>
         </div>
       </nav>
 
+      {menuOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/40" onClick={() => setMenuOpen(false)}>
+          <aside className="ml-auto flex h-full w-[min(84vw,320px)] flex-col bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#e2bfb0] p-5">
+              <span className="font-display text-xl font-bold text-[#261812]">Menu</span>
+              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar menu">
+                <X size={22} />
+              </button>
+            </div>
+            <nav className="flex flex-col gap-2 p-5 text-sm font-black text-gray-700">
+              <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Como funciona</a>
+              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Beneficios</a>
+              <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Planos</a>
+              <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Painel do quiosque</Link>
+              <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Admin</Link>
+            </nav>
+          </aside>
+        </div>
+      )}
+
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 bg-[#fff1eb] text-center text-[#261812] relative overflow-hidden">
+      <section className="pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 bg-[#fff1eb] text-center text-[#261812] relative overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-br from-[#ff6b00] via-[#ffb693] to-[#fff8f6]" />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sand.png')] opacity-10 mix-blend-overlay"></div>
-        <div className="max-w-4xl mx-auto relative z-10 pt-16">
+        <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
           <Image src="/sandexpress-logo.svg" alt="" width={96} height={96} priority className="mx-auto mb-6 drop-shadow-xl" />
           <span className="bg-white/45 text-[#572000] px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
-          <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
             Seu quiosque vendendo mais, sem esforço.
           </h1>
-          <p className="text-xl md:text-2xl text-[#572000] mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-[#572000] mb-10 sm:mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex items-center justify-center">
             <button onClick={openModal} className="w-full sm:w-auto bg-white text-[#FF6B00] px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl transition-all active:scale-95">
-              Criar minha conta grátis
+              Cadastrar gratis
             </button>
-            <a href="#como-funciona" className="w-full sm:w-auto bg-transparent border-2 border-white/30 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-white/10 transition-all">
-              Ver demonstração
-            </a>
           </div>
         </div>
         
         {/* App Mockup in Hero */}
-        <div className="mt-20 max-w-3xl mx-auto brand-card rounded-t-[40px] p-4 overflow-hidden relative" style={{height: 250}}>
+        <div className="mt-14 sm:mt-20 max-w-3xl mx-auto brand-card rounded-t-[32px] sm:rounded-t-[40px] p-3 sm:p-4 overflow-hidden relative" style={{height: 250}}>
            <div className="w-full h-full bg-[#fff8f6] rounded-[32px] border border-[#e2bfb0] flex items-center justify-center">
-              <span className="font-display font-bold text-[#a04100] text-3xl">Pedidos por QR</span>
+              <span className="font-display font-bold text-[#a04100] text-2xl sm:text-3xl">Pedidos por QR</span>
            </div>
         </div>
       </section>
 
       {/* Como Funciona */}
-      <section id="como-funciona" className="py-24 px-6 bg-[#fff8f6] border-b border-[#e2bfb0]/70">
+      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#fff8f6] border-b border-[#e2bfb0]/70">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
                <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Em 4 passos simples</h2>
                <p className="text-xl text-gray-500">O fluxo perfeito para o seu cliente pedir sem complicação.</p>
             </div>
             
-            <div className="grid md:grid-cols-4 gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-8">
                {[
                  { i: QrCode, t: "O cliente escaneia", d: "Ele aponta o celular para o QR Code no guarda-sol." },
                  { i: Smartphone, t: "Abre o Cardápio", d: "Sem baixar nada, vê os produtos com fotos e preços." },
@@ -154,14 +170,14 @@ export default function LandingPage() {
       </section>
 
       {/* Benefícios */}
-      <section id="beneficios" className="py-24 px-6 bg-white">
+      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Tudo que você precisa</h2>
             <p className="text-xl text-gray-500">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
             {[
               { icon: Camera, title: "Cardápio Digital com Fotos", desc: "Seus clientes veem os produtos com fotos profissionais, descrições e preços. Tudo atualizado em tempo real." },
               { icon: Zap, title: "Pedidos em Tempo Real", desc: "Receba pedidos instantaneamente no seu painel. Sem erros, sem anotações. Kanban visual para gerenciar." },
@@ -183,7 +199,7 @@ export default function LandingPage() {
       </section>
 
       {/* Planos */}
-      <section id="planos" className="py-24 px-6 bg-[#fff1eb]">
+      <section id="planos" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#fff1eb]">
         <div className="max-w-5xl mx-auto text-center">
            <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Planos que cabem no seu bolso</h2>
            <p className="text-xl text-gray-500 mb-16">Comece com {TRIAL_DAYS} dias grátis. Todos os planos incluem até {PLAN_UMBRELLA_LIMIT} guarda-sóis.</p>
@@ -199,7 +215,7 @@ export default function LandingPage() {
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Começar Grátis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Mensal */}
@@ -212,7 +228,7 @@ export default function LandingPage() {
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Relatórios completos</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Assinar Mensal</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Anual */}
@@ -226,18 +242,18 @@ export default function LandingPage() {
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#E56000] transition-colors">Assinar Anual</button>
+                 <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#E56000] transition-colors">Cadastrar gratis</button>
               </div>
            </div>
         </div>
       </section>
 
       {/* CTA Secundário */}
-      <section className="bg-gradient-to-r from-[#3D1A0A] to-gray-900 py-20 px-6 text-center text-white">
+      <section className="bg-gradient-to-r from-[#3D1A0A] to-gray-900 py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {TRIAL_DAYS} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
-           Seja nosso cliente
+           Cadastrar gratis
         </button>
       </section>
 
@@ -333,7 +349,7 @@ export default function LandingPage() {
                       placeholder="Ex: Praia das Pitangueiras"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">CPF</label>
                       <input
@@ -353,7 +369,7 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">Cidade</label>
                       <input
@@ -373,7 +389,7 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">Senha *</label>
                       <input

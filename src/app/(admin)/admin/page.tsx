@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Users, ShoppingBag, Phone,
-  Mail, MapPin, Clock, ExternalLink, ChevronDown,
+  Mail, MapPin, Clock, ExternalLink, ChevronDown, Menu,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -78,6 +78,7 @@ export default function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [analyticsFilters, setAnalyticsFilters] = useState({
     vendor_id: "",
     city: "",
@@ -282,16 +283,22 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex text-white font-sans">
+    <div className="min-h-screen bg-gray-900 flex flex-col lg:flex-row text-white font-sans">
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-950 flex flex-col border-r border-gray-800 shrink-0">
+      <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 bg-gray-950 flex flex-col border-r border-gray-800 shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="p-6 border-b border-gray-800">
-          <h1 className="font-display font-bold text-xl flex items-center gap-2"><ShieldCheck className="text-blue-500" /> God Mode</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="font-display font-bold text-xl flex items-center gap-2"><ShieldCheck className="text-blue-500" /> God Mode</h1>
+            <button type="button" onClick={() => setSidebarOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 lg:hidden" aria-label="Fechar menu">
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {TABS.map(tab => (
             <button
-              key={tab.id} onClick={() => { setActiveTab(tab.id); setRegSuccess(false); }}
+              key={tab.id} onClick={() => { setActiveTab(tab.id); setRegSuccess(false); setSidebarOpen(false); }}
               className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-colors", activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white")}
             >
               <tab.icon size={18} /> {tab.label}
@@ -301,14 +308,19 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-8 bg-gray-900">
-        <h2 className="text-3xl font-display font-bold mb-8 capitalize">{TABS.find(t => t.id === activeTab)?.label}</h2>
+      <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8 bg-gray-900">
+        <div className="mb-6 flex items-center gap-3 lg:mb-8">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl bg-gray-800 p-3 text-gray-200 lg:hidden" aria-label="Abrir menu">
+            <Menu size={20} />
+          </button>
+          <h2 className="text-2xl sm:text-3xl font-display font-bold capitalize">{TABS.find(t => t.id === activeTab)?.label}</h2>
+        </div>
 
         {/* ========== OVERVIEW ========== */}
         {activeTab === "overview" && (
           <div className="space-y-6">
             {/* KPIs */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Receita Total</p>
                 <p className="text-3xl font-display font-bold text-blue-400">
@@ -338,7 +350,7 @@ export default function AdminDashboard() {
                 <div className="bg-orange-500 h-full transition-all" style={{ width: `${(overdueCount / totalBar) * 100}%` }} />
                 <div className="bg-red-500 h-full transition-all" style={{ width: `${(blockedCount / totalBar) * 100}%` }} />
               </div>
-              <div className="flex gap-6 mt-3 text-sm">
+              <div className="flex flex-wrap gap-3 sm:gap-6 mt-3 text-sm">
                 <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-green-500" />Ativos ({activeCount})</span>
                 <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-amber-500" />Trial ({trialCount})</span>
                 <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-orange-500" />Inadimplentes ({overdueCount})</span>
@@ -347,7 +359,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Billing KPIs */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Recebido Mensal</p>
                 <p className="text-3xl font-display font-bold text-green-400">
@@ -373,7 +385,7 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 <h3 className="font-bold text-gray-300 flex items-center gap-2"><AlertTriangle size={18} className="text-amber-400" />Alertas</h3>
                 {trialExpiring.map(v => (
-                  <div key={v.id} className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
+                  <div key={v.id} className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                       <Clock size={18} className="text-amber-400" />
                       <div>
@@ -387,7 +399,7 @@ export default function AdminDashboard() {
                   </div>
                 ))}
                 {vendors.filter(v => v.subscription_status === "overdue").map(v => (
-                  <div key={v.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center justify-between">
+                  <div key={v.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                       <DollarSign size={18} className="text-red-400" />
                       <div>
@@ -409,7 +421,7 @@ export default function AdminDashboard() {
         {activeTab === "vendors" && (
           <div className="space-y-6">
             {/* Search */}
-            <div className="relative max-w-md">
+            <div className="relative max-w-md w-full">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
@@ -421,8 +433,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Vendors table */}
-            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-              <table className="w-full text-left">
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-x-auto">
+              <table className="min-w-[760px] w-full text-left">
                 <thead className="bg-gray-950 text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="p-4">Quiosque</th>
@@ -508,7 +520,7 @@ export default function AdminDashboard() {
         {activeTab === "analytics" && platformReport && false && (
           <div className="space-y-6">
             {/* Platform KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">GMV do Mês</p>
                 <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport!.gmv)}</p>
@@ -628,7 +640,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">GMV</p>
                 <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport!.gmv)}</p>
@@ -752,7 +764,7 @@ export default function AdminDashboard() {
 
         {/* ========== NOVO QUIOSQUE ========== */}
         {activeTab === "new" && (
-          <div className="max-w-2xl">
+          <div className="max-w-2xl w-full">
             {regSuccess ? (
               <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center">
                 <CheckCircle2 size={48} className="text-green-400 mx-auto mb-4" />
@@ -787,7 +799,7 @@ export default function AdminDashboard() {
                       placeholder="Praia das Pitangueiras"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-400 mb-1">Cidade *</label>
                       <input
@@ -820,7 +832,7 @@ export default function AdminDashboard() {
                       placeholder="João Silva"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-400 mb-1">WhatsApp *</label>
                       <input
@@ -840,7 +852,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-400 mb-1">CPF</label>
                       <input
@@ -860,7 +872,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-400 mb-1">Senha *</label>
                       <input
@@ -906,7 +918,7 @@ export default function AdminDashboard() {
               <button onClick={() => setSelectedVendor(null)} className="text-gray-400 hover:text-white"><X size={24} /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-700/50 p-4 rounded-xl">
                   <p className="text-xs text-gray-400 font-bold mb-1">Responsável</p>
                   <p className="font-bold">{selectedVendor.owner_name}</p>
