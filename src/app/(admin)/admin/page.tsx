@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
-  X, Search, Eye, AlertTriangle, DollarSign, Users, ShoppingBag, Phone,
-  Mail, MapPin, Clock, ExternalLink, ChevronDown, Menu,
+  X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -79,6 +78,7 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [vendorActionLoading, setVendorActionLoading] = useState<string | null>(null);
   const [analyticsFilters, setAnalyticsFilters] = useState({
     vendor_id: "",
     city: "",
@@ -164,17 +164,44 @@ export default function AdminDashboard() {
     }
   };
 
-  // Toggle vendor status
-  const toggleVendor = (id: string) => {
-    setVendors(prev => prev.map(v => {
-      if (v.id !== id) return v;
-      const newActive = !v.is_active;
-      return {
-        ...v,
-        is_active: newActive,
-        subscription_status: newActive ? (v.subscription_status === "blocked" ? "active" : v.subscription_status) : "blocked",
-      };
-    }));
+  const updateVendor = async (id: string, payload: Partial<Vendor>) => {
+    setVendorActionLoading(id);
+    try {
+      const res = await fetch(`/api/vendors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Nao foi possivel atualizar o quiosque.");
+        return;
+      }
+      setVendors(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
+      setSelectedVendor(prev => prev?.id === id ? { ...prev, ...data } : prev);
+    } catch (err) {
+      console.error("Vendor update error:", err);
+      alert("Erro de rede ao atualizar o quiosque.");
+    } finally {
+      setVendorActionLoading(null);
+    }
+  };
+
+  const toggleVendor = async (vendor: Vendor) => {
+    const newActive = !vendor.is_active;
+    await updateVendor(vendor.id, {
+      is_active: newActive,
+      subscription_status: newActive ? (vendor.subscription_status === "blocked" ? "active" : vendor.subscription_status) : "blocked",
+    });
+  };
+
+  const migrateVendorToPaid = async (vendor: Vendor) => {
+    await updateVendor(vendor.id, {
+      is_active: true,
+      subscription_status: "active",
+      plan_type: "monthly",
+      trial_ends_at: null,
+    });
   };
 
   // Register vendor
@@ -491,9 +518,20 @@ export default function AdminDashboard() {
                           >
                             <Eye size={16} />
                           </button>
+                          {v.subscription_status === "trial" && (
+                            <button
+                              onClick={() => migrateVendorToPaid(v)}
+                              disabled={vendorActionLoading === v.id}
+                              className="text-gray-400 hover:text-green-400 transition-colors bg-gray-700 p-2 rounded-lg hover:bg-green-500/10 disabled:opacity-40"
+                              title="Migrar para plano pago"
+                            >
+                              <DollarSign size={16} />
+                            </button>
+                          )}
                           <button
-                            onClick={() => toggleVendor(v.id)}
-                            className={cn("transition-colors p-2 rounded-lg", v.is_active ? "text-gray-400 hover:text-red-400 bg-gray-700 hover:bg-red-500/10" : "text-gray-400 hover:text-green-400 bg-gray-700 hover:bg-green-500/10")}
+                            onClick={() => toggleVendor(v)}
+                            disabled={vendorActionLoading === v.id}
+                            className={cn("transition-colors p-2 rounded-lg disabled:opacity-40", v.is_active ? "text-gray-400 hover:text-red-400 bg-gray-700 hover:bg-red-500/10" : "text-gray-400 hover:text-green-400 bg-gray-700 hover:bg-green-500/10")}
                             title={v.is_active ? "Bloquear" : "Ativar"}
                           >
                             {v.is_active ? <Ban size={16} /> : <CheckCircle2 size={16} />}

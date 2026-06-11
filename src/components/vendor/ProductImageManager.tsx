@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductImage } from "@/types";
-import { Image as ImageIcon, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 
 interface ProductImageManagerProps {
   product: Product;
