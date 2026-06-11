@@ -114,11 +114,8 @@ O administrador deve conseguir:
 
 - `/vendor/login` - login do quiosque e recuperacao de senha.
 - `/vendor/dashboard` - painel gerencial principal.
-- `/vendor/products` - pagina dedicada para produtos e imagens.
-- `/vendor/opening-day` - abertura do dia e controle de estoque.
 - `/vendor/close-account` - fechamento de conta.
 - `/vendor/daily-report` - relatorio diario.
-- `/vendor/plans` - planos do quiosque.
 - `/vendor/reset-password` - redefinicao de senha.
 
 ### Administracao
@@ -1035,20 +1032,6 @@ Pontos que ainda dependem de integracao externa ou refinamento:
 - Tempo real por websocket/realtime para pedidos.
 - Automacao financeira completa de assinatura.
 - Auditoria avancada de usuarios e permissoes granulares por papel.
-
-## Documentacao complementar
-
-Arquivos uteis no repositorio:
-
-- `docs/PRODUCT_IMAGES_SYSTEM.md`.
-- `docs/OPENING_DAY_AND_CLOSE_ACCOUNT_GUIDE.md`.
-- `docs/DAILY_REPORT_GUIDE.md`.
-- `docs/ADJUSTMENT_MANAGER_GUIDE.md`.
-- `docs/EXTERNAL_INTEGRATIONS.md`.
-- `docs/PRODUCTION_RELEASE_MVP.md`.
-- `DEPLOY.md`.
-- `DEPLOY_VERCEL.md`.
-- `DEPLOY_CHECKLIST.md`.
 
 ## Checklist de aceite funcional
 
