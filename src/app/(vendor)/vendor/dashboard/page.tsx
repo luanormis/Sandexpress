@@ -5,9 +5,10 @@ import {
   LayoutDashboard, ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, CheckCircle2, Clock, Trash2, Pencil, X, Upload, Image as ImageIcon,
   Eye, EyeOff, LogOut, Bell, ChevronDown, Phone, TrendingUp, Award, Star, CalendarCheck,
-  Palette,
+  Palette, Menu,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 // ---------- TYPES ----------
 interface Product {
@@ -113,6 +114,7 @@ const BRAND_PALETTE = [
 
 const TABS = [
   { id: "orders", label: "Pedidos", icon: ShoppingBag },
+  { id: "opening", label: "Abertura", icon: CalendarCheck },
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
@@ -127,6 +129,7 @@ const TABS = [
 export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // --- Orders State ---
   const [orders, setOrders] = useState<Order[]>([]);
@@ -162,6 +165,7 @@ export default function VendorDashboard() {
   const [teamMessage, setTeamMessage] = useState("");
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
+  const [themeUploading, setThemeUploading] = useState(false);
   const [themeMessage, setThemeMessage] = useState("");
   const knownOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -350,6 +354,33 @@ export default function VendorDashboard() {
       setThemeMessage("Erro de rede ao salvar personalizacao.");
     } finally {
       setThemeSaving(false);
+    }
+  };
+
+  const uploadThemeLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !vendorId) return;
+    setThemeUploading(true);
+    setThemeMessage("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/vendors/${vendorId}/theme/logo`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setThemeMessage(data.error || "Nao foi possivel enviar a logo.");
+        return;
+      }
+      setThemeForm(prev => ({ ...prev, logo_url: data.logo_url || prev.logo_url }));
+      setThemeMessage("Logo enviada e salva no quiosque.");
+    } catch {
+      setThemeMessage("Erro de rede ao enviar a logo.");
+    } finally {
+      setThemeUploading(false);
     }
   };
 
@@ -765,18 +796,18 @@ export default function VendorDashboard() {
     const occupiedUmbrellas = umbrellas.filter(umbrella => umbrella.is_occupied || umbrella.current_order_id).length;
     return (
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-sm font-black text-gray-900">Mapa da praia</h3>
             <p className="text-xs font-bold text-gray-400">{occupiedUmbrellas} ocupados · {activeAccounts} contas abertas</p>
           </div>
-          <div className="flex items-center gap-3 text-[11px] font-bold text-gray-500">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold text-gray-500">
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Livre</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#FF6B00]" />Ocupado</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />Conta</span>
           </div>
         </div>
-        <div className="grid grid-cols-8 gap-2 md:grid-cols-12">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8 md:grid-cols-12">
           {umbrellas.map(umbrella => {
             const order = orders.find(item => item.umbrella_id === umbrella.id);
             const closing = order?.status === 'closing_requested';
@@ -804,18 +835,26 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex font-sans">
+    <div className="min-h-screen bg-white flex flex-col lg:flex-row font-sans">
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
-      <aside className="w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0">
+      <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="p-6 border-b border-gray-200 bg-white">
-          <h1 className="font-display font-bold text-xl text-[#FF6B00]">SandExpress</h1>
-          <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-display font-bold text-xl text-[#FF6B00]">SandExpress</h1>
+              <p className="text-sm text-gray-500 font-semibold">Painel Gerencial</p>
+            </div>
+            <button type="button" onClick={() => setSidebarOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 lg:hidden" aria-label="Fechar menu">
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm relative",
                 activeTab === tab.id ? "bg-[#FF6B00] text-white shadow-md" : "text-gray-600 hover:bg-gray-200"
@@ -839,14 +878,19 @@ export default function VendorDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="min-w-0 flex-1 overflow-hidden flex flex-col">
         {/* Header */}
-        <header className="h-20 border-b border-gray-100 flex items-center justify-between px-8 bg-white shrink-0">
-          <h2 className="text-2xl font-bold font-display text-gray-800">
+        <header className="min-h-16 sm:min-h-20 border-b border-gray-100 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 bg-white shrink-0">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl bg-gray-100 p-3 text-gray-700 lg:hidden" aria-label="Abrir menu">
+              <Menu size={20} />
+            </button>
+            <h2 className="truncate text-xl sm:text-2xl font-bold font-display text-gray-800">
             {TABS.find(t => t.id === activeTab)?.label}
-          </h2>
+            </h2>
+          </div>
           <div className="flex items-center gap-4">
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2">
+            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Quiosque Aberto
             </span>
@@ -854,7 +898,7 @@ export default function VendorDashboard() {
         </header>
 
         {/* Tab Contents */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gray-50">
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
@@ -871,10 +915,15 @@ export default function VendorDashboard() {
           )}
 
           {/* ========== ABA 2: CARDÁPIO ========== */}
+          {activeTab === "opening" && (
+            <OpeningDayStockControl vendorId={vendorId || undefined} />
+          )}
+
+
           {activeTab === "menu" && (
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                   <div>
                     <h3 className="font-bold text-lg">Seus Produtos</h3>
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
@@ -905,7 +954,7 @@ export default function VendorDashboard() {
 
                 {/* Products table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                  <table className="min-w-[760px] w-full text-left">
                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                       <tr>
                         <th className="p-3 rounded-tl-lg">Produto</th>
@@ -1001,7 +1050,7 @@ export default function VendorDashboard() {
                 )}
 
                 {/* Umbrellas grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {umbrellas.map(u => (
                     <div key={u.id} className={cn("border rounded-2xl p-5 transition-all", u.active ? "bg-white border-gray-100 shadow-sm" : "bg-gray-50 border-gray-200 opacity-60")}>
                       <div className="flex justify-between items-start mb-4">
@@ -1117,12 +1166,24 @@ export default function VendorDashboard() {
                     </div>
                     <label className="min-w-0 flex-1 space-y-2">
                       <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
+                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#E56000]">
+                        <Upload size={18} />
+                        {themeUploading ? "Enviando logo..." : "Subir logo do quiosque"}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={uploadThemeLogo}
+                          disabled={themeUploading}
+                        />
+                      </label>
                       <input
                         value={themeForm.logo_url}
                         onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
                         placeholder="/sandexpress-logo.svg ou https://..."
                         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
                       />
+                      <span className="block text-xs font-semibold text-gray-500">Tambem e possivel colar uma URL manualmente.</span>
                     </label>
                   </div>
                 </div>
@@ -1227,7 +1288,7 @@ export default function VendorDashboard() {
               {reportData && !reportLoading ? (
                 <>
                   {/* Daily summary */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-4">
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Itens disponíveis</p>
                       <p className="text-2xl font-display font-bold text-gray-900">{reportData.daily_summary.available_products}</p>
@@ -1251,8 +1312,8 @@ export default function VendorDashboard() {
                   </div>
 
                   {/* KPIs */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Faturamento</p>
                       <p className="text-3xl font-display font-bold text-gray-900">{formatCurrency(reportData.kpis.total_revenue)}</p>
                     </div>
@@ -1321,7 +1382,7 @@ export default function VendorDashboard() {
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Star size={18} className="text-[#FF6B00]" /> Melhores Clientes</h4>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                      <table className="min-w-[640px] w-full text-left">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                           <tr>
                             <th className="p-3 rounded-tl-lg">#</th>
@@ -1358,7 +1419,7 @@ export default function VendorDashboard() {
           {activeTab === "customers" && (
             <div className="space-y-6">
               {/* Customer KPIs */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <p className="text-gray-400 text-sm font-bold mb-1">Total de Clientes</p>
                   <p className="text-3xl font-display font-bold text-gray-900">{customers.length}</p>
@@ -1385,12 +1446,12 @@ export default function VendorDashboard() {
                       placeholder="Buscar nome ou telefone..."
                       value={customerSearch}
                       onChange={e => setCustomerSearch(e.target.value)}
-                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#FF6B00] outline-none w-64"
+                    className="w-full sm:w-64 pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#FF6B00] outline-none"
                     />
                   </div>
                 </div>
 
-                <table className="w-full text-left">
+                <table className="min-w-[640px] w-full text-left">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                     <tr>
                       <th className="p-3 rounded-tl-lg">Cliente</th>
@@ -1426,7 +1487,7 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 6: EQUIPE ========== */}
           {activeTab === "team" && (
-            <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
               <form onSubmit={createTeamUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
                 <div>
                   <h3 className="font-bold text-lg text-gray-900">Criar usuario do quiosque</h3>
@@ -1464,7 +1525,7 @@ export default function VendorDashboard() {
                   <option value="manager">Gerente</option>
                   <option value="owner">Proprietario</option>
                 </select>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     type="password"
                     required
@@ -1490,7 +1551,7 @@ export default function VendorDashboard() {
                 </button>
               </form>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
                 <h3 className="font-bold text-lg text-gray-900 mb-4">Usuarios cadastrados</h3>
                 <div className="space-y-3">
                   {team.map(user => (
@@ -1704,7 +1765,7 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
           </div>
 
           {/* Price row */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Preço Normal *</label>
               <input
@@ -1794,7 +1855,7 @@ function CustomerModal({ customer, onClose }: { customer: Customer; onClose: () 
 
         <div className="p-6">
           {/* Customer KPIs */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-50 p-4 rounded-xl text-center">
               <p className="text-xs text-gray-400 font-bold mb-1">Total Gasto</p>
               <p className="font-display font-bold text-[#FF6B00]">{formatCurrency(customer.total_spent)}</p>
