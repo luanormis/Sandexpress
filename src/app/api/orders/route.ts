@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+
 /**
  * GET /api/orders?vendor_id=xxx&status=received
  * Lista pedidos de um vendor, filtrável por status.
@@ -89,6 +91,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 400 });
     }
 
+    const { data: openOrders, error: openOrderErr } = await supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, status, total, paid, notes')
+      .eq('vendor_id', vendor_id)
+      .eq('umbrella_id', umbrella_id)
+      .eq('paid', false)
+      .in('status', OPEN_ACCOUNT_STATUSES)
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (openOrderErr) throw openOrderErr;
+    const openOrder = openOrders?.[0] as any;
+    if (openOrder && openOrder.customer_id !== customer_id) {
+      return NextResponse.json({
+        error: 'Este guarda-sol esta com uma conta aberta. Ele sera liberado apos o pagamento.',
+      }, { status: 409 });
+    }
+    if (openOrder?.status === 'closing_requested') {
+      return NextResponse.json({ error: 'A conta deste guarda-sol ja esta em fechamento.' }, { status: 409 });
+    }
+
     // Buscar preços reais dos produtos no banco (nunca confiar no cliente)
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id);
 
@@ -125,21 +148,40 @@ export async function POST(req: NextRequest) {
       orderItems.push({ product_id: item.product_id, quantity: item.quantity, unit_price, subtotal });
     }
 
-    // Criar pedido
-    const { data: order, error: orderErr } = await supabaseAdmin
-      .from('orders')
-      .insert({
-        tenant_id: (umbrella as any).tenant_id,
-        vendor_id,
-        customer_id,
-        umbrella_id,
-        total,
-        notes: notes || null,
-      } as any)
-      .select()
-      .single();
+    let order = openOrder;
+    if (!order) {
+      const { data: newOrder, error: orderErr } = await supabaseAdmin
+        .from('orders')
+        .insert({
+          tenant_id: (umbrella as any).tenant_id,
+          vendor_id,
+          customer_id,
+          umbrella_id,
+          total,
+          notes: notes || null,
+        } as any)
+        .select()
+        .single();
 
-    if (orderErr) throw orderErr;
+      if (orderErr) throw orderErr;
+      order = newOrder;
+    } else {
+      const nextTotal = Number(order.total || 0) + total;
+      const nextNotes = notes ? [order.notes, notes].filter(Boolean).join('\n') : order.notes;
+      const { data: updatedOrder, error: updateOrderErr } = await supabaseAdmin
+        .from('orders')
+        .update({
+          total: nextTotal,
+          notes: nextNotes || null,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', order.id)
+        .select()
+        .single();
+
+      if (updateOrderErr) throw updateOrderErr;
+      order = updatedOrder;
+    }
 
     // Criar itens do pedido
     const { error: itemsErr } = await supabaseAdmin
@@ -168,13 +210,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Marcar guarda-sol como ocupado
-    if (!umbrella.is_occupied) {
-      await supabaseAdmin
-        .from('umbrellas')
-        .update({ is_occupied: true, current_order_id: order.id })
-        .eq('id', umbrella_id);
-    }
+    await supabaseAdmin
+      .from('umbrellas')
+      .update({ is_occupied: true, current_order_id: order.id })
+      .eq('id', umbrella_id);
 
     // Atualizar total gasto do cliente
     const { data: customer } = await supabaseAdmin

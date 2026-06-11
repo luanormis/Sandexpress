@@ -12,7 +12,7 @@ import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans"
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
-  const [regCredentials, setRegCredentials] = useState<{ login: string } | null>(null);
+  const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean; verificationUrl?: string } | null>(null);
   const [form, setForm] = useState({
     name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
   });
@@ -46,6 +46,8 @@ export default function LandingPage() {
         const data = await res.json();
         setRegCredentials({
           login: data.document_login || form.cnpj || form.cpf || form.owner_phone,
+          emailSent: Boolean(data.email_verification?.sent),
+          verificationUrl: data.email_verification?.verification_url,
         });
         setRegSuccess(true);
       } else {
@@ -276,6 +278,14 @@ export default function LandingPage() {
                     <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
                     <p className="mt-2 text-sm text-gray-700">Usuario: <strong>{regCredentials.login}</strong></p>
                     <p className="text-sm text-gray-700">Senha: <strong>a senha que voce acabou de criar</strong></p>
+                    <p className="mt-3 text-sm text-gray-700">
+                      {regCredentials.emailSent
+                        ? "Enviamos um email para validar o cadastro."
+                        : "Email de validacao nao enviado. Configure RESEND_API_KEY para disparos reais."}
+                    </p>
+                    {regCredentials.verificationUrl && (
+                      <p className="mt-2 break-words text-xs font-bold text-[#FF6B00]">Link local de teste: {regCredentials.verificationUrl}</p>
+                    )}
                   </div>
                 )}
                 <Link

@@ -1,5 +1,10 @@
 -- SandExpress - SQL iniciar novo projeto
 -- Use este arquivo quando quiser recriar o Supabase do zero.
+-- Consolidado com as atualizacoes de:
+-- - recuperacao de senha por email;
+-- - validacao de email do cadastro do quiosque;
+-- - usuarios da equipe do quiosque;
+-- - cardapio padrao individual por quiosque.
 --
 -- ATENCAO:
 -- 1. Este script APAGA as tabelas do SandExpress listadas abaixo.
@@ -107,6 +112,10 @@ CREATE TABLE vendors (
   password_needs_reset BOOLEAN NOT NULL DEFAULT TRUE,
   password_reset_token TEXT,
   password_reset_expires_at TIMESTAMPTZ,
+  owner_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  owner_email_verified_at TIMESTAMPTZ,
+  owner_email_verification_token TEXT,
+  owner_email_verification_expires_at TIMESTAMPTZ,
   subscription_status TEXT NOT NULL DEFAULT 'trial'
     CHECK (subscription_status IN ('trial','active','overdue','blocked')),
   trial_ends_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '3 days'),
@@ -359,6 +368,7 @@ CREATE INDEX idx_vendors_beach ON vendors(beach_id);
 CREATE INDEX idx_vendors_document_login ON vendors(document_login);
 CREATE INDEX idx_vendors_city ON vendors(city);
 CREATE INDEX idx_vendors_beach_name ON vendors(beach_name);
+CREATE INDEX idx_vendors_owner_email_verification ON vendors(owner_email_verification_token);
 CREATE INDEX idx_vendor_users_vendor ON vendor_users(vendor_id, active);
 CREATE INDEX idx_vendor_users_login ON vendor_users(login);
 

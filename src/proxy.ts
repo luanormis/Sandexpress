@@ -13,6 +13,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/qr',
   '/api/customers/login',
   '/api/vendors/register',
+  '/api/vendors/verify-email',
 ]);
 
 const SENSITIVE_PUBLIC_PATHS = new Set([

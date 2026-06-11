@@ -3,6 +3,74 @@ import { createSessionToken } from '@/lib/auth-session';
 import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+
+async function ensureOpenAccount({
+  tenantId,
+  vendorId,
+  customerId,
+  umbrellaId,
+}: {
+  tenantId: string | null;
+  vendorId: string;
+  customerId: string;
+  umbrellaId?: string | null;
+}) {
+  if (!umbrellaId) return null;
+  if (!tenantId) throw new Error('Tenant nao identificado para abrir comanda.');
+
+  const { data: openOrders, error: openOrderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, customer_id, status, paid')
+    .eq('vendor_id', vendorId)
+    .eq('umbrella_id', umbrellaId)
+    .eq('paid', false)
+    .in('status', OPEN_ACCOUNT_STATUSES)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (openOrderError) throw openOrderError;
+  const openOrder = openOrders?.[0];
+  if (openOrder) {
+    if (openOrder.customer_id !== customerId) {
+      return {
+        error: 'Este guarda-sol esta com uma conta aberta. Ele sera liberado apos o pagamento.',
+      };
+    }
+    await supabaseAdmin
+      .from('umbrellas')
+      .update({ is_occupied: true, current_order_id: openOrder.id })
+      .eq('id', umbrellaId)
+      .eq('vendor_id', vendorId);
+    return { orderId: openOrder.id };
+  }
+
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .insert({
+      tenant_id: tenantId,
+      vendor_id: vendorId,
+      customer_id: customerId,
+      umbrella_id: umbrellaId,
+      status: 'received',
+      total: 0,
+      paid: false,
+      notes: 'Comanda aberta pelo QR Code',
+    } as any)
+    .select('id')
+    .single();
+
+  if (orderError) throw orderError;
+
+  await supabaseAdmin
+    .from('umbrellas')
+    .update({ is_occupied: true, current_order_id: order.id })
+    .eq('id', umbrellaId)
+    .eq('vendor_id', vendorId);
+
+  return { orderId: order.id };
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (await isRateLimited(req, 'customer-login', 20, 10 * 60 * 1000)) {
@@ -96,8 +164,17 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
+      const account = await ensureOpenAccount({
+        tenantId,
+        vendorId: vendor_id,
+        customerId: updated.id,
+        umbrellaId: umbrella_id,
+      });
+      if (account?.error) {
+        return NextResponse.json({ error: account.error }, { status: 409 });
+      }
       const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id }, 12 * 60 * 60);
-      const response = NextResponse.json(updated);
+      const response = NextResponse.json({ ...updated, current_order_id: account?.orderId || null });
       response.cookies.set({
         name: 'customer_session',
         value: token,
@@ -123,8 +200,17 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+    const account = await ensureOpenAccount({
+      tenantId,
+      vendorId: vendor_id,
+      customerId: newCustomer.id,
+      umbrellaId: umbrella_id,
+    });
+    if (account?.error) {
+      return NextResponse.json({ error: account.error }, { status: 409 });
+    }
     const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id }, 12 * 60 * 60);
-    const response = NextResponse.json(newCustomer, { status: 201 });
+    const response = NextResponse.json({ ...newCustomer, current_order_id: account?.orderId || null }, { status: 201 });
     response.cookies.set({
       name: 'customer_session',
       value: token,

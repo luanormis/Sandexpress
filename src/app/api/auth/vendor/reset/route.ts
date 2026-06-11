@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAppBaseUrl, sendEmail } from '@/lib/email';
+import { buildPasswordResetEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function hashResetToken(token: string) {
@@ -51,18 +52,15 @@ export async function POST(req: NextRequest) {
     }
 
     const resetUrl = `${getAppBaseUrl(req)}/vendor/reset-password?token=${encodeURIComponent(resetToken)}`;
+    const email = buildPasswordResetEmail({
+      vendorName: vendor.name,
+      ownerName: vendor.owner_name,
+      resetUrl,
+      expiresIn: '1 hora',
+    });
     const emailResult = await sendEmail({
       to: normalizedEmail,
-      subject: 'Recuperacao de senha SandExpress',
-      text: `Use este link para criar uma nova senha do seu quiosque SandExpress: ${resetUrl}\n\nO link vence em 1 hora.`,
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#261812">
-          <h2>Recuperacao de senha SandExpress</h2>
-          <p>Recebemos uma solicitacao para redefinir a senha do quiosque <strong>${vendor.name}</strong>.</p>
-          <p><a href="${resetUrl}" style="display:inline-block;background:#ff6b00;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Criar nova senha</a></p>
-          <p>Este link vence em 1 hora. Se voce nao pediu isso, ignore este email.</p>
-        </div>
-      `,
+      ...email,
     });
 
     if (!emailResult.ok) {

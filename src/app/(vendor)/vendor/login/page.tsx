@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
@@ -14,6 +14,19 @@ export default function VendorLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const verified = new URLSearchParams(window.location.search).get("verified");
+    if (verified === "success") {
+      setRecoveryMessage("Email validado com sucesso. Ja pode entrar no painel.");
+    } else if (verified === "expired") {
+      setError("Link de validacao expirado. Solicite suporte para reenviar a validacao.");
+    } else if (verified === "invalid" || verified === "missing-token") {
+      setError("Link de validacao invalido.");
+    } else if (verified === "error") {
+      setError("Nao foi possivel validar o email agora.");
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

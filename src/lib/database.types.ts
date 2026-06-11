@@ -29,6 +29,10 @@ export interface Database {
           password_needs_reset: boolean
           password_reset_token: string | null
           password_reset_expires_at: string | null
+          owner_email_verified: boolean
+          owner_email_verified_at: string | null
+          owner_email_verification_token: string | null
+          owner_email_verification_expires_at: string | null
           subscription_status: string
           trial_ends_at: string | null
           plan_type: string | null
@@ -58,6 +62,10 @@ export interface Database {
           password_needs_reset?: boolean
           password_reset_token?: string | null
           password_reset_expires_at?: string | null
+          owner_email_verified?: boolean
+          owner_email_verified_at?: string | null
+          owner_email_verification_token?: string | null
+          owner_email_verification_expires_at?: string | null
           subscription_status?: string
           trial_ends_at?: string | null
           plan_type?: string | null
@@ -86,6 +94,10 @@ export interface Database {
           password_needs_reset?: boolean
           password_reset_token?: string | null
           password_reset_expires_at?: string | null
+          owner_email_verified?: boolean
+          owner_email_verified_at?: string | null
+          owner_email_verification_token?: string | null
+          owner_email_verification_expires_at?: string | null
           subscription_status?: string
           trial_ends_at?: string | null
           plan_type?: string | null

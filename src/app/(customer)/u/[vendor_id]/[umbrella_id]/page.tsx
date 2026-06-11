@@ -1,1 +1,1 @@
-export { default } from "../../[umbrella_id]/page";
+export { default } from "../page";

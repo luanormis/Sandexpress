@@ -16,7 +16,13 @@ ALTER TABLE vendors
   ADD COLUMN IF NOT EXISTS owner_email TEXT,
   ADD COLUMN IF NOT EXISTS password_reset_token TEXT,
   ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS password_needs_reset BOOLEAN DEFAULT FALSE;
+  ADD COLUMN IF NOT EXISTS password_needs_reset BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS owner_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS owner_email_verified_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS owner_email_verification_token TEXT,
+  ADD COLUMN IF NOT EXISTS owner_email_verification_expires_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_vendors_owner_email_verification ON vendors(owner_email_verification_token);
 
 CREATE TABLE IF NOT EXISTS vendor_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

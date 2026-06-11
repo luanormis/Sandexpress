@@ -29,8 +29,8 @@ type Order = {
 
 export default function CustomerApp() {
   const params = useParams();
-  const umbrellaId = String(params.umbrella_id || "");
-  const routeVendorId = params.vendor_id ? String(params.vendor_id) : "";
+  const umbrellaId = String(params.umbrella_id || params.vendor_id || "");
+  const routeVendorId = params.umbrella_id && params.vendor_id ? String(params.vendor_id) : "";
 
   const [step, setStep] = useState<"welcome" | "login" | "menu" | "cart" | "orders">("welcome");
   const [vendor, setVendor] = useState<{ id: string; name: string } | null>(null);
@@ -163,7 +163,19 @@ export default function CustomerApp() {
         setError(data.error || "Erro ao enviar pedido.");
         return;
       }
-      setOrders((prev) => [{ id: data.id, total: cartTotal, status: data.status || "received", created_at: data.created_at || new Date().toISOString() }, ...prev]);
+      setOrders((prev) => {
+        const nextOrder = {
+          id: data.id,
+          total: Number(data.total ?? cartTotal),
+          status: data.status || "received",
+          created_at: data.created_at || new Date().toISOString(),
+        };
+        const existing = prev.find((order) => order.id === data.id);
+        if (existing) {
+          return prev.map((order) => order.id === data.id ? nextOrder : order);
+        }
+        return [nextOrder, ...prev];
+      });
       setCart([]);
       setNotes("");
       setStep("orders");

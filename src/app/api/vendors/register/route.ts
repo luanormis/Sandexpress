@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { getAppBaseUrl, sendEmail } from '@/lib/email';
+import { buildVendorVerificationEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_MENU } from '@/lib/default-menu';
 
@@ -12,6 +14,10 @@ async function hashPassword(password: string) {
     });
   })) as Buffer;
   return `${salt}:${derivedKey.toString('hex')}`;
+}
+
+function hashToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 /**
@@ -109,6 +115,9 @@ export async function POST(req: NextRequest) {
 
     if (tenantError) throw tenantError;
 
+    const verificationToken = crypto.randomBytes(32).toString('base64url');
+    const verificationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const vendorPayload: Record<string, unknown> = {
         tenant_id: tenant.id,
         name: body.name,
@@ -127,6 +136,9 @@ export async function POST(req: NextRequest) {
         secondary_color: body.secondary_color || '#0f3d4f',
         password_hash: passwordHash,
         password_needs_reset: false,
+        owner_email_verified: false,
+        owner_email_verification_token: hashToken(verificationToken),
+        owner_email_verification_expires_at: verificationExpiresAt,
         subscription_status: 'trial',
         plan_type: 'trial',
         trial_ends_at: trialEndsAt,
@@ -154,10 +166,28 @@ export async function POST(req: NextRequest) {
     );
     if (productsError) throw productsError;
 
+    const verificationUrl = `${getAppBaseUrl(req)}/api/vendors/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    const verificationEmail = buildVendorVerificationEmail({
+      vendorName: vendor.name,
+      ownerName: vendor.owner_name,
+      login: documentLogin,
+      trialEndsAt,
+      verificationUrl,
+    });
+    const emailResult = await sendEmail({
+      to: String(vendor.owner_email).trim().toLowerCase(),
+      ...verificationEmail,
+    });
+
     return NextResponse.json({
       ...vendor,
       tenant_id: tenant.id,
       document_login: documentLogin,
+      email_verification: {
+        sent: emailResult.ok,
+        reason: emailResult.ok ? null : emailResult.reason,
+        ...(process.env.NODE_ENV !== 'production' ? { verification_url: verificationUrl } : {}),
+      },
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
         : 'Quiosque criado.',

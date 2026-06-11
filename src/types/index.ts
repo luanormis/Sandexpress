@@ -8,6 +8,8 @@ export interface Vendor {
   owner_name: string
   owner_phone: string
   owner_email?: string | null
+  owner_email_verified?: boolean
+  owner_email_verified_at?: string | null
   logo_url?: string | null
   primary_color: string
   secondary_color?: string | null
