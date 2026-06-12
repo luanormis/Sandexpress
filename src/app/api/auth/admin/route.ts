@@ -1,6 +1,14 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken } from '@/lib/auth-session';
+import { createSessionToken, getRequestSession } from '@/lib/auth-session';
+
+export async function GET(req: NextRequest) {
+  const session = getRequestSession(req);
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+  return NextResponse.json({ authenticated: true, role: 'admin' });
+}
 
 export async function POST(req: NextRequest) {
   try {
