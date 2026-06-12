@@ -317,7 +317,7 @@ export default function AdminDashboard() {
   // If not authenticated, show login
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+      <div className="min-h-app bg-gray-900 flex items-center justify-center p-4 pt-safe">
         <div className="bg-gray-800 rounded-2xl p-8 max-w-sm w-full border border-gray-700 shadow-2xl">
           <div className="flex items-center gap-3 mb-6 justify-center">
             <ShieldCheck size={32} className="text-blue-500" />
@@ -333,7 +333,7 @@ export default function AdminDashboard() {
               className="w-full bg-gray-700 border-2 border-gray-600 rounded-xl p-4 text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
             />
             {authError && <p className="text-red-400 text-sm text-center">{authError}</p>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
+            <button type="submit" className="tap-target w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
               Entrar
             </button>
           </form>
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col lg:flex-row text-white font-sans">
+    <div className="min-h-app bg-gray-900 flex flex-col lg:flex-row text-white font-sans">
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 bg-gray-950 flex flex-col border-r border-gray-800 shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -359,7 +359,7 @@ export default function AdminDashboard() {
           {TABS.map(tab => (
             <button
               key={tab.id} onClick={() => { setActiveTab(tab.id); setRegSuccess(false); setSidebarOpen(false); }}
-              className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-colors", activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white")}
+              className={cn("tap-target w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-colors", activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white")}
             >
               <tab.icon size={18} /> {tab.label}
             </button>
@@ -368,12 +368,12 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8 bg-gray-900">
-        <div className="mb-6 flex items-center gap-3 lg:mb-8">
-          <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl bg-gray-800 p-3 text-gray-200 lg:hidden" aria-label="Abrir menu">
+      <main className="min-w-0 flex-1 overflow-auto bg-gray-900 p-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-safe sm:p-6 sm:pb-[calc(104px+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
+        <div className="sticky top-0 z-20 -mx-4 mb-6 flex items-center gap-3 border-b border-gray-800 bg-gray-900/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mb-8 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="tap-target rounded-xl bg-gray-800 p-3 text-gray-200 lg:hidden" aria-label="Abrir menu">
             <Menu size={20} />
           </button>
-          <h2 className="text-2xl sm:text-3xl font-display font-bold capitalize">{TABS.find(t => t.id === activeTab)?.label}</h2>
+          <h2 className="min-w-0 truncate text-2xl sm:text-3xl font-display font-bold capitalize">{TABS.find(t => t.id === activeTab)?.label}</h2>
         </div>
 
         {adminDataError && (
@@ -985,6 +985,24 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-800 bg-gray-950/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(0,0,0,0.28)] backdrop-blur lg:hidden">
+        <div className="grid grid-cols-4 gap-2">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setRegSuccess(false); setSidebarOpen(false); }}
+              className={cn(
+                "tap-target flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-black",
+                activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-400"
+              )}
+            >
+              <tab.icon size={19} />
+              <span className="mt-0.5 max-w-full truncate">{tab.label === "Novo Quiosque" ? "Novo" : tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* ========== VENDOR DETAIL MODAL ========== */}
       {selectedVendor && (

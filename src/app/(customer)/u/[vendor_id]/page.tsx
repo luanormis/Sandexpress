@@ -71,6 +71,7 @@ export default function CustomerApp() {
 
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
+  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const ordersTotal = orders
     .filter((order) => BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
@@ -310,7 +311,7 @@ export default function CustomerApp() {
 
   if (step === "welcome") {
     return (
-      <main className="min-h-screen text-white flex flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: theme.primary }}>
+      <main className="min-h-app pt-safe text-white flex flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: theme.primary }}>
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-xl overflow-hidden" style={{ color: theme.primary }}>
           {theme.logo ? (
             <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-3" />
@@ -318,10 +319,10 @@ export default function CustomerApp() {
             <UtensilsCrossed size={46} />
           )}
         </div>
-        <p className="mt-6 text-sm font-black uppercase tracking-wide text-white/70">SandExpress</p>
-        <h1 className="mt-2 max-w-sm text-4xl font-black leading-tight sm:text-5xl">{vendor?.name || "Carregando quiosque..."}</h1>
+        <p className="mt-6 text-xs font-black uppercase text-white/70">SandExpress</p>
+        <h1 className="mt-2 max-w-sm text-4xl font-black leading-tight">{vendor?.name || "Carregando quiosque..."}</h1>
         {error && <p className="mt-4 rounded-lg bg-white/15 px-4 py-3 text-sm">{error}</p>}
-        <button onClick={() => setStep("login")} className="mt-10 w-full max-w-sm rounded-full bg-white py-4 font-black shadow-lg" style={{ color: theme.primary }}>
+        <button onClick={() => setStep("login")} className="tap-target mt-10 w-full max-w-sm rounded-full bg-white py-4 font-black shadow-lg active:scale-[0.98]" style={{ color: theme.primary }}>
           Comecar pedido
         </button>
         <InstallShortcutButton context="customer" className="mt-4 w-full max-w-sm text-[#1F2933]" />
@@ -332,22 +333,22 @@ export default function CustomerApp() {
 
   if (step === "login") {
     return (
-      <main className="min-h-screen bg-[#fff8f6] p-6">
-        <section className="mx-auto mt-10 max-w-md rounded-lg bg-white p-6 shadow-sm border border-[#E7DCCB]">
+      <main className="min-h-app bg-[#fff8f6] px-4 py-6 pt-safe">
+        <section className="mx-auto max-w-md rounded-2xl bg-white p-5 shadow-sm border border-[#E7DCCB] sm:mt-8 sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-[#E7DCCB] bg-white">
               <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-wide" style={{ color: theme.secondary }}>SandExpress</p>
-              <h1 className="text-2xl font-black sm:text-3xl">{vendor?.name || "Quiosque"}</h1>
+              <p className="text-[11px] font-black uppercase" style={{ color: theme.secondary }}>SandExpress</p>
+              <h1 className="text-2xl font-black">{vendor?.name || "Quiosque"}</h1>
               <p className="text-sm font-bold" style={{ color: theme.secondary }}>Abrir comanda</p>
             </div>
           </div>
           <p className="mt-2" style={{ color: theme.secondary }}>Informe os dados para iniciar.</p>
           <div className="mt-6 space-y-4">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none" style={{ borderColor: "#E7DCCB" }} />
-            <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="tap-target w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" style={{ borderColor: "#E7DCCB" }} />
+            <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="tap-target w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" />
             <div className="rounded-lg border border-[#E7DCCB] bg-white p-3">
               <p className="mb-2 text-sm font-bold" style={{ color: theme.secondary }}>Quantidade de pessoas</p>
               <div className="grid grid-cols-[44px_1fr_44px] items-center gap-3">
@@ -377,7 +378,7 @@ export default function CustomerApp() {
               </div>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <button disabled={loading} onClick={startTab} className="w-full rounded-lg py-4 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.primary }}>
+            <button disabled={loading} onClick={startTab} className="tap-target w-full rounded-xl py-4 font-black text-white disabled:opacity-60 active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>
               {loading ? "Abrindo..." : "Abrir comanda"}
             </button>
           </div>
@@ -388,31 +389,31 @@ export default function CustomerApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fff8f6] pb-24 text-[#1F2933]">
-      <header className="sticky top-0 z-20 bg-white border-b border-[#E7DCCB] p-4">
-        <div className="flex items-center justify-between gap-3">
+    <main className="mobile-app-panel bg-[#fff8f6] pb-[calc(96px+env(safe-area-inset-bottom))] text-[#1F2933]">
+      <header className="sticky top-0 z-20 border-b border-[#E7DCCB] bg-white/95 p-4 pt-safe backdrop-blur">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E7DCCB] bg-white">
               <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-1.5" />
             </div>
             <div className="min-w-0">
             <p className="text-xs uppercase font-bold" style={{ color: theme.secondary }}>Guarda-sol {umbrella?.number || ""}</p>
-            <h1 className="text-xl font-black">{customerName || "Cliente"}</h1>
+            <h1 className="truncate text-xl font-black">{customerName || "Cliente"}</h1>
             {currentOrderId && <p className="text-[11px] font-bold" style={{ color: theme.secondary }}>Pedido #{currentOrderId.slice(0, 8)}</p>}
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={requestCloseAccount} disabled={loading} className="rounded-lg px-3 py-2 text-sm font-bold text-white" style={{ backgroundColor: theme.secondary }}>
-              Fechar conta
+          <div className="grid shrink-0 grid-cols-2 gap-2">
+            <button onClick={requestCloseAccount} disabled={loading} className="tap-target rounded-xl px-3 py-2 text-xs font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.secondary }}>
+              Conta
             </button>
-            <button onClick={callWaiter} className="rounded-lg px-3 py-2 text-sm font-bold text-white inline-flex items-center gap-1" style={{ backgroundColor: theme.primary }}>
+            <button onClick={callWaiter} className="tap-target rounded-xl px-3 py-2 text-xs font-black text-white inline-flex items-center justify-center gap-1" style={{ backgroundColor: theme.primary }}>
               <Bell size={16} /> Garcom
             </button>
           </div>
         </div>
         {waiterCalled && <p className="mt-3 rounded-lg bg-[#FFF2E5] px-3 py-2 text-sm font-semibold" style={{ color: theme.secondary }}>Garcom chamado.</p>}
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
-        <div className="mt-3 rounded-lg border border-[#E7DCCB] bg-[#FFF8F0] px-3 py-2">
+        <div className="mt-3 rounded-2xl border border-[#E7DCCB] bg-[#FFF8F0] px-3 py-2">
           <p className="text-xs font-bold uppercase" style={{ color: theme.secondary }}>Total da conta</p>
           <p className="text-2xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
           {pendingOrdersTotal > 0 && (
@@ -433,7 +434,7 @@ export default function CustomerApp() {
 
       {step === "menu" && (
         <section className="p-4 space-y-4">
-          <div className="rounded-lg bg-white p-4 border border-[#E7DCCB]">
+          <div className="rounded-2xl bg-white p-4 border border-[#E7DCCB]">
             <p className="text-sm" style={{ color: theme.secondary }}>Total em aberto</p>
             <p className="text-3xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
             {pendingOrdersTotal > 0 && (
@@ -442,12 +443,12 @@ export default function CustomerApp() {
               </p>
             )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={cn("shrink-0 rounded-full px-4 py-2 text-sm font-bold", activeCategory === category ? "text-white" : "bg-white")}
+                className={cn("tap-target shrink-0 rounded-full px-4 py-2 text-sm font-bold", activeCategory === category ? "text-white" : "bg-white")}
                 style={activeCategory === category ? { backgroundColor: theme.primary } : { color: theme.secondary }}
               >
                 {category}
@@ -456,7 +457,7 @@ export default function CustomerApp() {
           </div>
           <div className="space-y-3">
             {products.filter((p) => activeCategory === "Todos" || p.category === activeCategory).map((product) => (
-              <article key={product.id} className="rounded-lg bg-white border border-[#E7DCCB] p-4">
+              <article key={product.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4">
                 <div className="flex justify-between gap-3">
                   <div>
                     <h2 className="font-black">{product.name}</h2>
@@ -464,7 +465,7 @@ export default function CustomerApp() {
                   </div>
                   <p className="font-black" style={{ color: theme.primary }}>{formatCurrency(Number(product.promotional_price ?? product.price))}</p>
                 </div>
-                <button onClick={() => addToCart(product)} className="mt-4 rounded-lg px-4 py-2 text-sm font-black text-white" style={{ backgroundColor: theme.primary }}>Adicionar</button>
+                <button onClick={() => addToCart(product)} className="tap-target mt-4 w-full rounded-xl px-4 py-3 text-sm font-black text-white active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>Adicionar</button>
               </article>
             ))}
           </div>
@@ -474,27 +475,27 @@ export default function CustomerApp() {
       {step === "cart" && (
         <section className="p-4 space-y-4">
           {cart.length === 0 ? <p className="rounded-lg bg-white p-6 text-center" style={{ color: theme.secondary }}>Carrinho vazio.</p> : cart.map((item) => (
-            <article key={item.product.id} className="rounded-lg bg-white border border-[#E7DCCB] p-4 flex items-center justify-between gap-4">
+            <article key={item.product.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="font-black">{item.product.name}</h2>
                 <p className="text-sm" style={{ color: theme.secondary }}>{formatCurrency(Number(item.product.promotional_price ?? item.product.price) * item.quantity)}</p>
               </div>
               <div className="flex items-center gap-3">
-                <button onClick={() => updateQuantity(item.product.id, -1)} className="rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>-</button>
+                <button onClick={() => updateQuantity(item.product.id, -1)} className="tap-target rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>-</button>
                 <span className="font-black">{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.product.id, 1)} className="rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>+</button>
+                <button onClick={() => updateQuantity(item.product.id, 1)} className="tap-target rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>+</button>
               </div>
             </article>
           ))}
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" rows={3} className="w-full rounded-lg border border-[#E7DCCB] p-4 outline-none" />
-          <button onClick={createOrder} disabled={loading || cart.length === 0} className="w-full rounded-lg py-4 font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.primary }}>Enviar pedido</button>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" rows={3} className="w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" />
+          <button onClick={createOrder} disabled={loading || cart.length === 0} className="tap-target w-full rounded-xl py-4 font-black text-white disabled:opacity-60 active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>Enviar pedido</button>
         </section>
       )}
 
       {step === "orders" && (
         <section className="p-4 space-y-3">
           {orders.length === 0 ? <p className="rounded-lg bg-white p-6 text-center" style={{ color: theme.secondary }}>Nenhum pedido ainda.</p> : orders.map((order) => (
-            <article key={order.id} className="rounded-lg bg-white border border-[#E7DCCB] p-4">
+            <article key={order.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4">
               <div className="flex justify-between gap-3">
                 <div>
                   <h2 className="font-black">Pedido #{order.id.slice(0, 8)}</h2>
@@ -512,11 +513,15 @@ export default function CustomerApp() {
         </section>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E7DCCB] p-3">
-        <div className="mx-auto flex max-w-md justify-around">
-          <button onClick={() => setStep("menu")} className="flex flex-col items-center text-xs font-bold" style={{ color: step === "menu" ? theme.primary : theme.secondary }}><Home size={22} />Cardapio</button>
-          <button onClick={() => setStep("cart")} className="flex flex-col items-center text-xs font-bold" style={{ color: step === "cart" ? theme.primary : theme.secondary }}><ShoppingCart size={22} />Carrinho</button>
-          <button onClick={() => setStep("orders")} className="flex flex-col items-center text-xs font-bold" style={{ color: step === "orders" ? theme.primary : theme.secondary }}><ListOrdered size={22} />Conta</button>
+      <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-[#E7DCCB] bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(61,26,10,0.10)] backdrop-blur">
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => setStep("menu")} className={cn("tap-target flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "menu" && "bg-[#fff8f6]")} style={{ color: step === "menu" ? theme.primary : theme.secondary }}><Home size={22} />Cardapio</button>
+          <button onClick={() => setStep("cart")} className={cn("tap-target relative flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "cart" && "bg-[#fff8f6]")} style={{ color: step === "cart" ? theme.primary : theme.secondary }}>
+            <ShoppingCart size={22} />
+            Carrinho
+            {cartItemsCount > 0 && <span className="absolute right-4 top-1 rounded-full px-1.5 py-0.5 text-[10px] font-black text-white" style={{ backgroundColor: theme.primary }}>{cartItemsCount}</span>}
+          </button>
+          <button onClick={() => setStep("orders")} className={cn("tap-target flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "orders" && "bg-[#fff8f6]")} style={{ color: step === "orders" ? theme.primary : theme.secondary }}><ListOrdered size={22} />Conta</button>
         </div>
       </nav>
     </main>

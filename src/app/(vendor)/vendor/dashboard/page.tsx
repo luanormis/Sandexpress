@@ -774,7 +774,7 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col lg:flex-row font-sans">
+    <div className="min-h-app bg-white flex flex-col lg:flex-row font-sans">
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -795,7 +795,7 @@ export default function VendorDashboard() {
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm relative",
+                "tap-target w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm relative",
                 activeTab === tab.id ? "bg-[#FF6B00] text-white shadow-md" : "text-gray-600 hover:bg-gray-200"
               )}
             >
@@ -810,7 +810,7 @@ export default function VendorDashboard() {
           ))}
         </nav>
         <div className="p-4 border-t border-gray-200">
-          <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50">
+          <button className="tap-target w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-red-500 text-sm font-bold transition-colors rounded-lg hover:bg-red-50">
             <LogOut size={18} /> Sair
           </button>
         </div>
@@ -819,9 +819,9 @@ export default function VendorDashboard() {
       {/* Main Content */}
       <main className="min-w-0 flex-1 overflow-hidden flex flex-col">
         {/* Header */}
-        <header className="min-h-16 sm:min-h-20 border-b border-gray-100 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 bg-white shrink-0">
+        <header className="min-h-16 border-b border-gray-100 flex items-center justify-between gap-3 bg-white px-3 pt-safe sm:min-h-20 sm:px-6 lg:px-8 shrink-0">
           <div className="flex min-w-0 items-center gap-3">
-            <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-xl bg-gray-100 p-3 text-gray-700 lg:hidden" aria-label="Abrir menu">
+            <button type="button" onClick={() => setSidebarOpen(true)} className="tap-target rounded-xl bg-gray-100 p-3 text-gray-700 lg:hidden" aria-label="Abrir menu">
               <Menu size={20} />
             </button>
             <h2 className="truncate text-xl sm:text-2xl font-bold font-display text-gray-800">
@@ -837,7 +837,7 @@ export default function VendorDashboard() {
         </header>
 
         {/* Tab Contents */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gray-50">
+          <div className="flex-1 overflow-auto bg-gray-50 p-3 pb-[calc(100px+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(104px+env(safe-area-inset-bottom))] lg:pb-6">
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
@@ -1513,6 +1513,29 @@ export default function VendorDashboard() {
           )}
         </div>
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+              className={cn(
+                "tap-target relative flex min-w-[74px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-black",
+                activeTab === tab.id ? "bg-[#FF6B00] text-white shadow-sm" : "text-gray-500"
+              )}
+            >
+              <tab.icon size={19} />
+              <span className="mt-0.5 max-w-[68px] truncate">{tab.label}</span>
+              {tab.id === "orders" && newOrderCount > 0 && activeTab !== "orders" && (
+                <span className="absolute right-2 top-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                  {newOrderCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* ========== MODAL: ADD/EDIT PRODUCT ========== */}
       {showProductModal && (
