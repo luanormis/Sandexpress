@@ -76,6 +76,7 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [adminDataError, setAdminDataError] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorActionLoading, setVendorActionLoading] = useState<string | null>(null);
@@ -95,12 +96,18 @@ export default function AdminDashboard() {
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
 
-  // Load platform report
+  const handleAdminSessionExpired = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem("admin_token");
+    setAdminPassword("");
+    setAuthError("Sessao expirada. Entre novamente para carregar os dados.");
+  };
+
   useEffect(() => {
-    if (activeTab === "analytics" || activeTab === "overview") {
+    if (isAuthenticated && (activeTab === "analytics" || activeTab === "overview")) {
       loadPlatformReport();
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   // Admin login
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -109,11 +116,13 @@ export default function AdminDashboard() {
     try {
       const res = await fetch("/api/auth/admin", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword }),
       });
       if (res.ok) {
         setIsAuthenticated(true);
+        setAdminDataError("");
         sessionStorage.setItem("admin_token", "authenticated");
         await loadVendors();
         await loadPlatformReport();
@@ -126,22 +135,36 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (sessionStorage.getItem("admin_token")) {
+    async function restoreAdminSession() {
+      const res = await fetch("/api/auth/admin", { credentials: "include" });
+      if (!res.ok) {
+        sessionStorage.removeItem("admin_token");
+        return;
+      }
       setIsAuthenticated(true);
-      loadVendors();
-      loadPlatformReport();
+      sessionStorage.setItem("admin_token", "authenticated");
+      await loadVendors();
+      await loadPlatformReport();
     }
+    restoreAdminSession();
   }, []);
 
   const loadVendors = async () => {
     try {
-      const res = await fetch('/api/vendors');
-      if (res.ok) {
-        const data = await res.json();
-        setVendors(data);
+      const res = await fetch('/api/vendors', { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        handleAdminSessionExpired();
+        return;
       }
+      if (!res.ok) {
+        setAdminDataError(data.error || "Nao foi possivel carregar quiosques.");
+        return;
+      }
+      setVendors(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load vendors:', err);
+      setAdminDataError("Erro de rede ao carregar quiosques.");
     }
   };
 
@@ -152,13 +175,21 @@ export default function AdminDashboard() {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.set(key, value);
       });
-      const res = await fetch(`/api/reports/platform${params.toString() ? `?${params.toString()}` : ''}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPlatformReport(data);
+      const res = await fetch(`/api/reports/platform${params.toString() ? `?${params.toString()}` : ''}`, { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        handleAdminSessionExpired();
+        return;
       }
+      if (!res.ok) {
+        setAdminDataError(data.error || "Nao foi possivel carregar analytics.");
+        return;
+      }
+      setPlatformReport(data);
+      setAdminDataError("");
     } catch (err) {
       console.error('Failed to load platform report:', err);
+      setAdminDataError("Erro de rede ao carregar analytics.");
     } finally {
       setAnalyticsLoading(false);
     }
@@ -169,6 +200,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`/api/vendors/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -225,6 +257,7 @@ export default function AdminDashboard() {
       setRegError("");
       const res = await fetch("/api/vendors/register", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(regForm),
       });
@@ -342,6 +375,12 @@ export default function AdminDashboard() {
           </button>
           <h2 className="text-2xl sm:text-3xl font-display font-bold capitalize">{TABS.find(t => t.id === activeTab)?.label}</h2>
         </div>
+
+        {adminDataError && (
+          <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-950/40 p-4 text-sm font-bold text-red-200">
+            {adminDataError}
+          </div>
+        )}
 
         {/* ========== OVERVIEW ========== */}
         {activeTab === "overview" && (
