@@ -1598,7 +1598,7 @@ function OrderModal({
             </div>
           </div>
           {order.notes && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">
+            <div className="whitespace-pre-line rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">
               {order.notes}
             </div>
           )}

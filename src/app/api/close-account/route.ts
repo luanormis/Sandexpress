@@ -4,6 +4,15 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
+function toMoney(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? Number(numeric.toFixed(2)) : 0;
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
 /**
  * POST /api/close-account
  * Fechar conta do cliente (após pagamento confirmado)
@@ -18,7 +27,19 @@ const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { vendor_id, umbrella_id, customer_phone, payment_method, notes, request_only } = body;
+    const {
+      vendor_id,
+      umbrella_id,
+      customer_phone,
+      payment_method,
+      notes,
+      request_only,
+      payment_amount,
+      service_fee_amount,
+      service_fee_enabled,
+      split_people,
+      split_mode,
+    } = body;
 
     if (!vendor_id || (!umbrella_id && !customer_phone)) {
       return NextResponse.json(
@@ -81,12 +102,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (request_only) {
+      const paymentAmount = toMoney(payment_amount);
+      const serviceFeeAmount = toMoney(service_fee_amount);
+      const splitPeople = Math.max(1, Math.min(50, Number(split_people || 1)));
+      const requestedTotal = Number(selectedOrder.total || 0) + serviceFeeAmount;
+      const remainingAmount = Math.max(requestedTotal - paymentAmount, 0);
+      const closeSummary = [
+        notes || 'Fechamento solicitado pelo cliente',
+        '--- Resumo solicitado pelo cliente ---',
+        `Valor da conta: ${formatMoney(Number(selectedOrder.total || 0))}`,
+        `10% do garcom: ${service_fee_enabled === false ? 'dispensado' : formatMoney(serviceFeeAmount)}`,
+        `Total com ajustes: ${formatMoney(requestedTotal)}`,
+        split_mode === 'split'
+          ? `Divisao: ${splitPeople} pessoas - ${formatMoney(requestedTotal / splitPeople)} por pessoa`
+          : split_mode === 'custom'
+            ? `Pagamento parcial solicitado: ${formatMoney(paymentAmount)}`
+            : `Pagamento integral solicitado: ${formatMoney(requestedTotal)}`,
+        remainingAmount > 0 ? `Saldo restante apos este pagamento: ${formatMoney(remainingAmount)}` : 'Pagamento cobre o total solicitado',
+      ].join('\n');
       const { data: requested, error: requestErr } = await supabaseAdmin
         .from('orders')
         .update({
           status: 'closing_requested',
           close_requested_at: new Date().toISOString(),
-          notes: notes || 'Fechamento solicitado pelo cliente',
+          notes: closeSummary,
           updated_at: new Date().toISOString(),
         } as any)
         .eq('id', selectedOrder.id)
