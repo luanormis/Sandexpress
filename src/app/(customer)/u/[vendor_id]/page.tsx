@@ -73,6 +73,7 @@ export default function CustomerApp() {
   const [customPaymentAmount, setCustomPaymentAmount] = useState("");
 
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
+  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
   const ordersTotal = orders
     .filter((order) => BILLABLE_STATUSES.has(order.status))
@@ -389,7 +390,7 @@ export default function CustomerApp() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-[#fff8f6] pb-28 text-[#1F2933] shadow-2xl">
+    <main className="mx-auto min-h-screen max-w-md bg-[#fff8f6] pb-48 text-[#1F2933] shadow-2xl">
       <header className="sticky top-0 z-20 border-b border-[#E7DCCB] bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -587,11 +588,33 @@ export default function CustomerApp() {
         </section>
       )}
 
-      <nav className="fixed bottom-0 left-1/2 right-auto w-full max-w-md -translate-x-1/2 border-t border-[#E7DCCB] bg-white p-3 shadow-[0_-12px_24px_rgba(0,0,0,0.08)]">
-        <div className="mx-auto flex max-w-md justify-around">
+      <nav className="fixed bottom-0 left-1/2 right-auto z-30 w-full max-w-md -translate-x-1/2 border-t border-[#E7DCCB] bg-white shadow-[0_-12px_24px_rgba(0,0,0,0.08)]">
+        <div className="border-b border-[#E7DCCB] bg-[#FFF8F0] p-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3 shadow-sm">
+            <button type="button" onClick={() => setStep("cart")} className="min-w-0 flex-1 text-left">
+              <p className="text-xs font-black uppercase" style={{ color: theme.secondary }}>
+                Carrinho {cartItemsCount > 0 ? `(${cartItemsCount})` : ""}
+              </p>
+              <p className="truncate text-2xl font-black" style={{ color: theme.primary }}>{formatCurrency(cartTotal)}</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => (cart.length > 0 ? createOrder() : setStep("menu"))}
+              disabled={loading}
+              className="shrink-0 rounded-xl px-5 py-4 text-sm font-black text-white disabled:opacity-60"
+              style={{ backgroundColor: cart.length > 0 ? theme.primary : theme.secondary }}
+            >
+              {cart.length > 0 ? "Pedir" : "Cardapio"}
+            </button>
+          </div>
+        </div>
+        <div className="mx-auto flex max-w-md justify-around p-3">
           <button onClick={() => setStep("menu")} className="flex min-w-20 flex-col items-center gap-1 text-sm font-black" style={{ color: step === "menu" ? theme.primary : theme.secondary }}><Home size={24} />Cardapio</button>
-          <button onClick={() => setStep("cart")} className="flex min-w-20 flex-col items-center gap-1 text-sm font-black" style={{ color: step === "cart" ? theme.primary : theme.secondary }}><ShoppingCart size={24} />Carrinho</button>
-          <button onClick={() => setStep("orders")} className="flex min-w-20 flex-col items-center gap-1 text-sm font-black" style={{ color: step === "orders" ? theme.primary : theme.secondary }}><ListOrdered size={24} />Conta</button>
+          <button onClick={() => setStep("cart")} className="relative flex min-w-20 flex-col items-center gap-1 text-sm font-black" style={{ color: step === "cart" ? theme.primary : theme.secondary }}>
+            {cartItemsCount > 0 && <span className="absolute right-3 top-0 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] text-white" style={{ backgroundColor: theme.primary }}>{cartItemsCount}</span>}
+            <ShoppingCart size={24} />Carrinho
+          </button>
+          <button onClick={() => setStep("orders")} className="flex min-w-20 flex-col items-center gap-1 text-sm font-black" style={{ color: step === "orders" ? theme.primary : theme.secondary }}><ListOrdered size={24} />Pedir conta</button>
         </div>
       </nav>
     </main>
