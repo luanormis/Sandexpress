@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { Bell, Home, ListOrdered, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 type Product = {
   id: string;
@@ -85,11 +86,13 @@ export default function CustomerApp() {
     secondary: vendor?.secondary_color || "#82533f",
     logo: vendor?.logo_url || "/sandexpress-logo.svg",
   };
+  const customerThemeVars = {
+    "--customer-primary": theme.primary,
+    "--customer-secondary": theme.secondary,
+  } as CSSProperties;
   const sandExpressMark = (
-    <div className="fixed bottom-3 left-0 right-0 z-30 flex justify-center pointer-events-none">
-      <div className="rounded-full border border-white/60 bg-white/90 px-3 py-1 text-[11px] font-black shadow-sm" style={{ color: theme.secondary }}>
-        SandExpress
-      </div>
+    <div className="customer-brand-watermark">
+      <span>SandExpress</span>
     </div>
   );
 
@@ -311,21 +314,23 @@ export default function CustomerApp() {
 
   if (step === "welcome") {
     return (
-      <main className="min-h-app pt-safe text-white flex flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: theme.primary }}>
-        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-xl overflow-hidden" style={{ color: theme.primary }}>
-          {theme.logo ? (
-            <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-3" />
-          ) : (
-            <UtensilsCrossed size={46} />
-          )}
-        </div>
-        <p className="mt-6 text-xs font-black uppercase text-white/70">SandExpress</p>
-        <h1 className="mt-2 max-w-sm text-4xl font-black leading-tight">{vendor?.name || "Carregando quiosque..."}</h1>
-        {error && <p className="mt-4 rounded-lg bg-white/15 px-4 py-3 text-sm">{error}</p>}
-        <button onClick={() => setStep("login")} className="tap-target mt-10 w-full max-w-sm rounded-full bg-white py-4 font-black shadow-lg active:scale-[0.98]" style={{ color: theme.primary }}>
-          Comecar pedido
-        </button>
-        <InstallShortcutButton context="customer" className="mt-4 w-full max-w-sm text-[#1F2933]" />
+      <main className="customer-app customer-welcome" style={customerThemeVars}>
+        <section className="customer-welcome__content">
+          <div className="customer-logo">
+            {theme.logo ? (
+              <img src={theme.logo} alt="Logo do quiosque" />
+            ) : (
+              <UtensilsCrossed size="2.875rem" />
+            )}
+          </div>
+          <p className="customer-brand-label">SandExpress</p>
+          <h1 className="customer-title">{vendor?.name || "Carregando quiosque..."}</h1>
+          {error && <p className="customer-error">{error}</p>}
+          <button onClick={() => setStep("login")} className="customer-action">
+            Comecar pedido
+          </button>
+          <InstallShortcutButton context="customer" className="customer-action" />
+        </section>
         {sandExpressMark}
       </main>
     );
@@ -333,52 +338,50 @@ export default function CustomerApp() {
 
   if (step === "login") {
     return (
-      <main className="min-h-app bg-[#fff8f6] px-4 py-6 pt-safe">
-        <section className="mx-auto max-w-md rounded-2xl bg-white p-5 shadow-sm border border-[#E7DCCB] sm:mt-8 sm:p-6">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-[#E7DCCB] bg-white">
-              <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
+      <main className="customer-app customer-login" style={customerThemeVars}>
+        <section className="customer-login__panel">
+          <div className="customer-login__brand">
+            <div className="customer-logo customer-logo--small">
+              <img src={theme.logo} alt="Logo do quiosque" />
             </div>
-            <div>
-              <p className="text-[11px] font-black uppercase" style={{ color: theme.secondary }}>SandExpress</p>
-              <h1 className="text-2xl font-black">{vendor?.name || "Quiosque"}</h1>
-              <p className="text-sm font-bold" style={{ color: theme.secondary }}>Abrir comanda</p>
+            <div className="customer-login__brand-text">
+              <p className="customer-login__kicker">SandExpress</p>
+              <h1 className="customer-login__title">{vendor?.name || "Quiosque"}</h1>
+              <p className="customer-login__subtitle">Abrir comanda</p>
             </div>
           </div>
-          <p className="mt-2" style={{ color: theme.secondary }}>Informe os dados para iniciar.</p>
-          <div className="mt-6 space-y-4">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="tap-target w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" style={{ borderColor: "#E7DCCB" }} />
-            <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="tap-target w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" />
-            <div className="rounded-lg border border-[#E7DCCB] bg-white p-3">
-              <p className="mb-2 text-sm font-bold" style={{ color: theme.secondary }}>Quantidade de pessoas</p>
-              <div className="grid grid-cols-[44px_1fr_44px] items-center gap-3">
+          <p className="customer-login__subtitle">Informe os dados para iniciar.</p>
+          <div className="customer-form">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="customer-input" />
+            <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="customer-input" />
+            <div className="customer-stepper">
+              <p className="customer-stepper__label">Quantidade de pessoas</p>
+              <div className="customer-stepper__control">
                 <button
                   type="button"
                   onClick={() => setPartySize((value) => Math.max(1, value - 1))}
                   disabled={partySize <= 1}
-                  className="h-11 rounded-lg border border-[#E7DCCB] bg-[#fff8f6] text-2xl font-black disabled:opacity-40"
-                  style={{ color: theme.primary }}
+                  className="customer-stepper__button"
                   aria-label="Diminuir quantidade de pessoas"
                 >
                   -
                 </button>
-                <div className="h-11 rounded-lg bg-[#FFF8F0] px-3 text-center text-2xl font-black leading-[44px] text-[#1F2933]">
+                <div className="customer-stepper__value">
                   {partySize}
                 </div>
                 <button
                   type="button"
                   onClick={() => setPartySize((value) => Math.min(50, value + 1))}
                   disabled={partySize >= 50}
-                  className="h-11 rounded-lg border border-[#E7DCCB] bg-[#fff8f6] text-2xl font-black disabled:opacity-40"
-                  style={{ color: theme.primary }}
+                  className="customer-stepper__button"
                   aria-label="Aumentar quantidade de pessoas"
                 >
                   +
                 </button>
               </div>
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <button disabled={loading} onClick={startTab} className="tap-target w-full rounded-xl py-4 font-black text-white disabled:opacity-60 active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>
+            {error && <p className="customer-error">{error}</p>}
+            <button disabled={loading} onClick={startTab} className="customer-primary-button">
               {loading ? "Abrindo..." : "Abrir comanda"}
             </button>
           </div>
@@ -389,83 +392,73 @@ export default function CustomerApp() {
   }
 
   return (
-    <main className="mobile-app-panel bg-[#fff8f6] pb-[calc(96px+env(safe-area-inset-bottom))] text-[#1F2933]">
-      <header className="sticky top-0 z-20 border-b border-[#E7DCCB] bg-white/95 p-4 pt-safe backdrop-blur">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E7DCCB] bg-white">
-              <img src={theme.logo} alt="Logo do quiosque" className="h-full w-full object-contain p-1.5" />
+    <main className="customer-app customer-shell" style={customerThemeVars}>
+      <header className="customer-topbar">
+        <div className="customer-topbar__main">
+          <div className="customer-identity">
+            <div className="customer-avatar">
+              <img src={theme.logo} alt="Logo do quiosque" />
             </div>
-            <div className="min-w-0">
-            <p className="text-xs uppercase font-bold" style={{ color: theme.secondary }}>Guarda-sol {umbrella?.number || ""}</p>
-            <h1 className="truncate text-xl font-black">{customerName || "Cliente"}</h1>
-            {currentOrderId && <p className="text-[11px] font-bold" style={{ color: theme.secondary }}>Pedido #{currentOrderId.slice(0, 8)}</p>}
+            <div>
+              <p className="customer-kicker">Guarda-sol {umbrella?.number || ""}</p>
+              <h1 className="customer-name">{customerName || "Cliente"}</h1>
+              {currentOrderId && <p className="customer-note">Pedido #{currentOrderId.slice(0, 8)}</p>}
             </div>
           </div>
-          <div className="grid shrink-0 grid-cols-2 gap-2">
-            <button onClick={requestCloseAccount} disabled={loading} className="tap-target rounded-xl px-3 py-2 text-xs font-black text-white disabled:opacity-60" style={{ backgroundColor: theme.secondary }}>
+          <div className="customer-actions">
+            <button onClick={requestCloseAccount} disabled={loading} className="customer-icon-button customer-icon-button--secondary">
               Conta
             </button>
-            <button onClick={callWaiter} className="tap-target rounded-xl px-3 py-2 text-xs font-black text-white inline-flex items-center justify-center gap-1" style={{ backgroundColor: theme.primary }}>
-              <Bell size={16} /> Garcom
+            <button onClick={callWaiter} className="customer-icon-button">
+              <Bell size="1.125rem" /> Garcom
             </button>
           </div>
         </div>
-        {waiterCalled && <p className="mt-3 rounded-lg bg-[#FFF2E5] px-3 py-2 text-sm font-semibold" style={{ color: theme.secondary }}>Garcom chamado.</p>}
-        {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
-        <div className="mt-3 rounded-2xl border border-[#E7DCCB] bg-[#FFF8F0] px-3 py-2">
-          <p className="text-xs font-bold uppercase" style={{ color: theme.secondary }}>Total da conta</p>
-          <p className="text-2xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
+        {waiterCalled && <p className="customer-feedback">Garcom chamado.</p>}
+        {error && <p className="customer-error">{error}</p>}
+        <div className="customer-total-card">
+          <p className="customer-kicker">Total da conta</p>
+          <strong>{formatCurrency(openTotal)}</strong>
           {pendingOrdersTotal > 0 && (
-            <p className="text-[11px] font-bold" style={{ color: theme.secondary }}>
+            <p className="customer-small">
               {formatCurrency(pendingOrdersTotal)} aguardando entrega
             </p>
           )}
         </div>
         {latestOrder && (
-          <div className="mt-3 rounded-lg border border-[#E7DCCB] bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase" style={{ color: theme.secondary }}>Status do pedido</p>
-            <p className="text-sm font-black" style={{ color: theme.primary }}>
+          <div className="customer-status-card">
+            <p className="customer-kicker">Status do pedido</p>
+            <strong>
               Pedido #{latestOrder.id.slice(0, 8)} - {ORDER_STATUS_LABELS[latestOrder.status] || latestOrder.status}
-            </p>
+            </strong>
           </div>
         )}
       </header>
 
       {step === "menu" && (
-        <section className="p-4 space-y-4">
-          <div className="rounded-2xl bg-white p-4 border border-[#E7DCCB]">
-            <p className="text-sm" style={{ color: theme.secondary }}>Total em aberto</p>
-            <p className="text-3xl font-black" style={{ color: theme.primary }}>{formatCurrency(openTotal)}</p>
-            {pendingOrdersTotal > 0 && (
-              <p className="mt-1 text-xs font-bold" style={{ color: theme.secondary }}>
-                Pedidos em preparo/entrega entram na conta quando forem entregues.
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+        <section className="customer-content">
+          <div className="customer-category-rail">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={cn("tap-target shrink-0 rounded-full px-4 py-2 text-sm font-bold", activeCategory === category ? "text-white" : "bg-white")}
-                style={activeCategory === category ? { backgroundColor: theme.primary } : { color: theme.secondary }}
+                className={`customer-chip${activeCategory === category ? " is-active" : ""}`}
               >
                 {category}
               </button>
             ))}
           </div>
-          <div className="space-y-3">
+          <div className="customer-list">
             {products.filter((p) => activeCategory === "Todos" || p.category === activeCategory).map((product) => (
-              <article key={product.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4">
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <h2 className="font-black">{product.name}</h2>
-                    <p className="mt-1 text-sm" style={{ color: theme.secondary }}>{product.description}</p>
-                  </div>
-                  <p className="font-black" style={{ color: theme.primary }}>{formatCurrency(Number(product.promotional_price ?? product.price))}</p>
+              <article key={product.id} className="customer-product-row">
+                <div className="customer-product-info">
+                  <h2 className="customer-product-name">{product.name}</h2>
+                  {product.description && <p className="customer-product-description">{product.description}</p>}
                 </div>
-                <button onClick={() => addToCart(product)} className="tap-target mt-4 w-full rounded-xl px-4 py-3 text-sm font-black text-white active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>Adicionar</button>
+                <div className="customer-product-side">
+                  <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
+                  <button onClick={() => addToCart(product)} className="customer-add-button">Adicionar</button>
+                </div>
               </article>
             ))}
           </div>
@@ -473,56 +466,62 @@ export default function CustomerApp() {
       )}
 
       {step === "cart" && (
-        <section className="p-4 space-y-4">
-          {cart.length === 0 ? <p className="rounded-lg bg-white p-6 text-center" style={{ color: theme.secondary }}>Carrinho vazio.</p> : cart.map((item) => (
-            <article key={item.product.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-black">{item.product.name}</h2>
-                <p className="text-sm" style={{ color: theme.secondary }}>{formatCurrency(Number(item.product.promotional_price ?? item.product.price) * item.quantity)}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => updateQuantity(item.product.id, -1)} className="tap-target rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>-</button>
-                <span className="font-black">{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.product.id, 1)} className="tap-target rounded-full bg-[#fff8f6] px-3 py-1 font-black" style={{ color: theme.primary }}>+</button>
-              </div>
-            </article>
-          ))}
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" rows={3} className="w-full rounded-xl border border-[#E7DCCB] p-4 outline-none" />
-          <button onClick={createOrder} disabled={loading || cart.length === 0} className="tap-target w-full rounded-xl py-4 font-black text-white disabled:opacity-60 active:scale-[0.98]" style={{ backgroundColor: theme.primary }}>Enviar pedido</button>
+        <section className="customer-content">
+          <div className="customer-list">
+            {cart.length === 0 ? <p className="customer-empty">Carrinho vazio.</p> : cart.map((item) => (
+              <article key={item.product.id} className="customer-cart-row">
+                <div className="customer-cart-info">
+                  <h2 className="customer-cart-name">{item.product.name}</h2>
+                  <p className="customer-cart-meta">{formatCurrency(Number(item.product.promotional_price ?? item.product.price) * item.quantity)}</p>
+                </div>
+                <div className="customer-qty">
+                  <button onClick={() => updateQuantity(item.product.id, -1)} className="customer-qty-button" aria-label={`Remover ${item.product.name}`}>-</button>
+                  <span>{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.product.id, 1)} className="customer-qty-button" aria-label={`Adicionar ${item.product.name}`}>+</button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" rows={3} className="customer-textarea" />
+          <button onClick={createOrder} disabled={loading || cart.length === 0} className="customer-primary-button">Enviar pedido</button>
         </section>
       )}
 
       {step === "orders" && (
-        <section className="p-4 space-y-3">
-          {orders.length === 0 ? <p className="rounded-lg bg-white p-6 text-center" style={{ color: theme.secondary }}>Nenhum pedido ainda.</p> : orders.map((order) => (
-            <article key={order.id} className="rounded-2xl bg-white border border-[#E7DCCB] p-4">
-              <div className="flex justify-between gap-3">
-                <div>
-                  <h2 className="font-black">Pedido #{order.id.slice(0, 8)}</h2>
-                  <p className="text-sm" style={{ color: theme.secondary }}>
+        <section className="customer-content">
+          <div className="customer-list">
+            {orders.length === 0 ? <p className="customer-empty">Nenhum pedido ainda.</p> : orders.map((order) => (
+              <article key={order.id} className="customer-order-row">
+                <div className="customer-order-info">
+                  <h2 className="customer-order-title">Pedido #{order.id.slice(0, 8)}</h2>
+                  <p className="customer-order-meta">
                     {ORDER_STATUS_LABELS[order.status] || order.status}
                   </p>
                   {BILLABLE_STATUSES.has(order.status) && (
-                    <p className="mt-1 text-[11px] font-black" style={{ color: theme.primary }}>Contabilizado na conta</p>
+                    <p className="customer-small">Contabilizado na conta</p>
                   )}
                 </div>
-                <p className="font-black" style={{ color: theme.primary }}>{formatCurrency(Number(order.total || 0))}</p>
-              </div>
-            </article>
-          ))}
+                <p className="customer-order-price customer-price">{formatCurrency(Number(order.total || 0))}</p>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 
-      <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-[#E7DCCB] bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(61,26,10,0.10)] backdrop-blur">
-        <div className="grid grid-cols-3 gap-2">
-          <button onClick={() => setStep("menu")} className={cn("tap-target flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "menu" && "bg-[#fff8f6]")} style={{ color: step === "menu" ? theme.primary : theme.secondary }}><Home size={22} />Cardapio</button>
-          <button onClick={() => setStep("cart")} className={cn("tap-target relative flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "cart" && "bg-[#fff8f6]")} style={{ color: step === "cart" ? theme.primary : theme.secondary }}>
-            <ShoppingCart size={22} />
-            Carrinho
-            {cartItemsCount > 0 && <span className="absolute right-4 top-1 rounded-full px-1.5 py-0.5 text-[10px] font-black text-white" style={{ backgroundColor: theme.primary }}>{cartItemsCount}</span>}
-          </button>
-          <button onClick={() => setStep("orders")} className={cn("tap-target flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-black", step === "orders" && "bg-[#fff8f6]")} style={{ color: step === "orders" ? theme.primary : theme.secondary }}><ListOrdered size={22} />Conta</button>
-        </div>
+      <nav className="customer-tabbar" aria-label="Navegacao do pedido">
+        <button onClick={() => setStep("menu")} className={`customer-tab${step === "menu" ? " is-active" : ""}`}>
+          <Home size="1.5rem" />
+          Cardapio
+        </button>
+        <button onClick={() => setStep("cart")} className={`customer-tab${step === "cart" ? " is-active" : ""}`}>
+          <ShoppingCart size="1.5rem" />
+          Carrinho
+          {cartItemsCount > 0 && <span className="customer-badge">{cartItemsCount}</span>}
+        </button>
+        <button onClick={() => setStep("orders")} className={`customer-tab${step === "orders" ? " is-active" : ""}`}>
+          <ListOrdered size="1.5rem" />
+          Conta
+        </button>
       </nav>
     </main>
   );
