@@ -6,6 +6,7 @@ import {
   X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { PLAN_PRICES } from "@/lib/plans";
 
 // ---------- TYPES ----------
 interface Vendor {
@@ -22,6 +23,7 @@ interface Vendor {
   subscription_status: string;
   plan_type: string | null;
   trial_ends_at: string | null;
+  plan_expires_at: string | null;
   is_active: boolean;
   max_umbrellas: number;
   created_at: string;
@@ -63,6 +65,47 @@ const TABS = [
   { id: "analytics", label: "Analytics", icon: TrendingUp },
   { id: "new", label: "Novo Quiosque", icon: Plus },
 ];
+
+const ANNUAL_PLAN_TYPES = new Set(["annual", "12months"]);
+
+function isAnnualPlan(planType: string | null) {
+  return ANNUAL_PLAN_TYPES.has(planType || "");
+}
+
+function getVendorPlanLabel(vendor: Vendor) {
+  if (isAnnualPlan(vendor.plan_type)) return "Anual";
+  if (vendor.plan_type === "monthly") return "Mensal";
+  if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") return "Teste";
+  return vendor.plan_type || "Sem plano";
+}
+
+function getVendorMonthlyAmount(vendor: Vendor) {
+  if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") return 0;
+  return isAnnualPlan(vendor.plan_type) ? PLAN_PRICES.annualMonthly : PLAN_PRICES.monthly;
+}
+
+function getRemainingAnnualInstallments(vendor: Vendor) {
+  if (!isAnnualPlan(vendor.plan_type)) return null;
+  if (!vendor.plan_expires_at) return 12;
+  const expiresAt = new Date(vendor.plan_expires_at).getTime();
+  if (!Number.isFinite(expiresAt)) return 12;
+  const daysLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / 86400000));
+  return Math.min(12, Math.max(0, Math.ceil(daysLeft / 30.44)));
+}
+
+function getVendorBillingSummary(vendor: Vendor) {
+  if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") {
+    return vendor.trial_ends_at
+      ? `Teste ate ${new Date(vendor.trial_ends_at).toLocaleDateString("pt-BR")}`
+      : "Teste gratis";
+  }
+  if (isAnnualPlan(vendor.plan_type)) {
+    const remaining = getRemainingAnnualInstallments(vendor);
+    const suffix = remaining === 1 ? "parcela restante" : "parcelas restantes";
+    return `${remaining ?? 12} ${suffix}`;
+  }
+  return "Cobranca mensal";
+}
 
 // =========================================================
 // MAIN COMPONENT
@@ -277,6 +320,7 @@ export default function AdminDashboard() {
           subscription_status: "trial",
           plan_type: "trial",
           trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(),
+          plan_expires_at: null,
           is_active: true,
           max_umbrellas: 50,
           created_at: new Date().toISOString(),
@@ -500,19 +544,23 @@ export default function AdminDashboard() {
 
             {/* Vendors table */}
             <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-x-auto">
-              <table className="min-w-[760px] w-full text-left">
+              <table className="min-w-[920px] w-full text-left">
                 <thead className="bg-gray-950 text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="p-4">Quiosque</th>
                     <th className="p-4">Responsável</th>
                     <th className="p-4">Cidade</th>
                     <th className="p-4">Plano</th>
+                    <th className="p-4">Assinatura</th>
                     <th className="p-4">Status</th>
                     <th className="p-4">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVendors.map(v => (
+                  {filteredVendors.map(v => {
+                    const monthlyAmount = getVendorMonthlyAmount(v);
+                    const billingSummary = getVendorBillingSummary(v);
+                    return (
                     <tr key={v.id} className="border-t border-gray-700 hover:bg-gray-750 transition-colors">
                       <td className="p-4">
                         <p className="font-bold">{v.name}</p>
@@ -525,17 +573,21 @@ export default function AdminDashboard() {
                       <td className="p-4 text-gray-300">{v.city ? `${v.city}/${v.state}` : "—"}</td>
                       <td className="p-4">
                         <span className={cn("text-xs font-bold px-2 py-1 rounded capitalize", {
-                          "bg-green-500/20 text-green-400": v.plan_type === "monthly" || v.plan_type === "12months",
+                          "bg-green-500/20 text-green-400": v.plan_type === "monthly" || isAnnualPlan(v.plan_type),
                           "bg-amber-500/20 text-amber-400": v.plan_type === "trial",
                           "bg-gray-500/20 text-gray-400": !v.plan_type,
                         })}>
-                          {v.plan_type === "12months" ? "Anual" : v.plan_type === "monthly" ? "Mensal" : v.plan_type || "—"}
+                          {getVendorPlanLabel(v)}
                         </span>
-                        {v.trial_ends_at && (
+                        {v.plan_expires_at && isAnnualPlan(v.plan_type) && (
                           <p className="text-[10px] text-gray-500 mt-1">
-                            Trial até {new Date(v.trial_ends_at).toLocaleDateString("pt-BR")}
+                            Vigente ate {new Date(v.plan_expires_at).toLocaleDateString("pt-BR")}
                           </p>
                         )}
+                      </td>
+                      <td className="p-4">
+                        <p className="font-bold text-green-400">{monthlyAmount > 0 ? `${formatCurrency(monthlyAmount)}/mes` : "R$ 0,00"}</p>
+                        <p className="mt-1 text-xs text-gray-500">{billingSummary}</p>
                       </td>
                       <td className="p-4">
                         {v.subscription_status === "active" && v.is_active ? (
@@ -586,7 +638,8 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1046,6 +1099,13 @@ export default function AdminDashboard() {
                     "text-orange-400": selectedVendor.subscription_status === "overdue",
                     "text-red-400": selectedVendor.subscription_status === "blocked",
                   })}>{selectedVendor.subscription_status}</p>
+                </div>
+                <div className="bg-gray-700/50 p-4 rounded-xl">
+                  <p className="text-xs text-gray-400 font-bold mb-1">Assinatura mensal</p>
+                  <p className="font-bold text-green-400">
+                    {getVendorMonthlyAmount(selectedVendor) > 0 ? `${formatCurrency(getVendorMonthlyAmount(selectedVendor))}/mes` : "R$ 0,00"}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">{getVendorBillingSummary(selectedVendor)}</p>
                 </div>
                 <div className="bg-gray-700/50 p-4 rounded-xl">
                   <p className="text-xs text-gray-400 font-bold mb-1">Máx. Guarda-Sóis</p>
