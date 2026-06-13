@@ -80,10 +80,9 @@ export default function CustomerApp() {
     .filter((order) => !BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
   const openTotal = ordersTotal + cartTotal;
-  const latestOrder = orders[0];
   const theme = {
-    primary: vendor?.primary_color || "#ff6b00",
-    secondary: vendor?.secondary_color || "#82533f",
+    primary: "#ff6b00",
+    secondary: "#82533f",
     logo: vendor?.logo_url || "/sandexpress-logo.svg",
   };
   const customerThemeVars = {
@@ -407,7 +406,7 @@ export default function CustomerApp() {
           </div>
           <div className="customer-actions">
             <button onClick={requestCloseAccount} disabled={loading} className="customer-icon-button customer-icon-button--secondary">
-              Conta
+              Fechar conta
             </button>
             <button onClick={callWaiter} className="customer-icon-button">
               <Bell size="1.125rem" /> Garcom
@@ -425,14 +424,6 @@ export default function CustomerApp() {
             </p>
           )}
         </div>
-        {latestOrder && (
-          <div className="customer-status-card">
-            <p className="customer-kicker">Status do pedido</p>
-            <strong>
-              Pedido #{latestOrder.id.slice(0, 8)} - {ORDER_STATUS_LABELS[latestOrder.status] || latestOrder.status}
-            </strong>
-          </div>
-        )}
       </header>
 
       {step === "menu" && (

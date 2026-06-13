@@ -189,7 +189,7 @@ input[type="number"] {
 
 .customer-welcome__content,
 .customer-login__panel {
-  width: min(100%, 28rem);
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -494,11 +494,19 @@ input[type="number"] {
 .customer-icon-button {
   border: 0;
   border-radius: 1rem;
-  padding: 0 0.8rem;
+  width: clamp(5.9rem, 24vw, 7.3rem);
+  min-height: clamp(4.7rem, 18vw, 5.3rem);
+  padding: 0 clamp(0.65rem, 2.8vw, 0.9rem);
   background: var(--customer-primary);
   color: #ffffff;
-  font-size: clamp(0.72rem, 0.68rem + 0.2vw, 0.84rem);
+  font-size: clamp(0.95rem, 3.8vw, 1.12rem);
   font-weight: 950;
+  line-height: 1.12;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
 }
 
 .customer-icon-button--secondary {
@@ -737,15 +745,10 @@ input[type="number"] {
 
 @media (min-width: 768px) {
   .customer-app {
-    max-width: 30rem;
-    margin-inline: auto;
-    box-shadow: 0 2rem 6rem rgba(31, 41, 51, 0.16);
+    width: 100%;
   }
 
   .customer-tabbar {
-    left: 50%;
-    right: auto;
-    width: 30rem;
-    transform: translateX(-50%);
+    width: 100%;
   }
 }
