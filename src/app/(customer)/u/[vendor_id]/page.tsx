@@ -65,6 +65,10 @@ export default function CustomerApp() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [notes, setNotes] = useState("");
+  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
+  const [splitMode, setSplitMode] = useState<"full" | "partial" | "split">("full");
+  const [splitPeople, setSplitPeople] = useState(2);
+  const [partialAmount, setPartialAmount] = useState("");
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +83,16 @@ export default function CustomerApp() {
   const pendingOrdersTotal = orders
     .filter((order) => !BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
-  const openTotal = ordersTotal + cartTotal;
+  const openTotal = ordersTotal + pendingOrdersTotal + cartTotal;
+  const serviceFeeAmount = serviceFeeEnabled ? Number((openTotal * 0.1).toFixed(2)) : 0;
+  const billTotal = Number((openTotal + serviceFeeAmount).toFixed(2));
+  const parsedPartialAmount = Math.max(0, Number(partialAmount.replace(",", ".")) || 0);
+  const requestedPaymentAmount = splitMode === "partial"
+    ? Math.min(parsedPartialAmount, billTotal)
+    : splitMode === "split"
+      ? Number((billTotal / Math.max(1, splitPeople)).toFixed(2))
+      : billTotal;
+  const remainingAfterPayment = Math.max(0, Number((billTotal - requestedPaymentAmount).toFixed(2)));
   const theme = {
     primary: "#ff6b00",
     secondary: "#82533f",
@@ -278,6 +291,16 @@ export default function CustomerApp() {
 
   async function requestCloseAccount() {
     if (!vendor) return;
+    if (openTotal <= 0) {
+      setError("Ainda nao ha valor em aberto para pedir a conta.");
+      setStep("orders");
+      return;
+    }
+    if (cart.length > 0) {
+      setError("Envie ou remova os itens do carrinho antes de pedir a conta.");
+      setStep("cart");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -285,7 +308,17 @@ export default function CustomerApp() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendor.id, umbrella_id: umbrellaId, request_only: true, notes: "Fechamento solicitado pelo cliente" }),
+        body: JSON.stringify({
+          vendor_id: vendor.id,
+          umbrella_id: umbrellaId,
+          request_only: true,
+          notes: "Fechamento solicitado pelo cliente",
+          payment_amount: requestedPaymentAmount,
+          service_fee_amount: serviceFeeAmount,
+          service_fee_enabled: serviceFeeEnabled,
+          split_people: splitPeople,
+          split_mode: splitMode === "partial" ? "custom" : splitMode,
+        }),
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
@@ -306,9 +339,38 @@ export default function CustomerApp() {
     }
   }
 
-  function callWaiter() {
-    setWaiterCalled(true);
-    window.setTimeout(() => setWaiterCalled(false), 5000);
+  async function callWaiter() {
+    if (!vendor || !customerId) {
+      setError("Abra a comanda antes de chamar o garcom.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/waiter-call", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendor.id, customer_id: customerId, umbrella_id: umbrellaId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para chamar o garcom.");
+        return;
+      }
+      if (!res.ok) {
+        setError(data.error || "Nao foi possivel chamar o garcom.");
+        return;
+      }
+      setWaiterCalled(true);
+      if (data.order?.id) {
+        setCurrentOrderId(data.order.id);
+        await loadCustomerOrders(customerId, vendor.id);
+      }
+      window.setTimeout(() => setWaiterCalled(false), 8000);
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (step === "welcome") {
@@ -480,6 +542,89 @@ export default function CustomerApp() {
 
       {step === "orders" && (
         <section className="customer-content">
+          <div className="customer-bill-panel">
+            <div className="customer-bill-row">
+              <span>Conta</span>
+              <strong>{formatCurrency(openTotal)}</strong>
+            </div>
+            <label className="customer-fee-toggle">
+              <input
+                type="checkbox"
+                checked={serviceFeeEnabled}
+                onChange={(event) => setServiceFeeEnabled(event.target.checked)}
+              />
+              <span>Incluir 10% do garcom</span>
+              <strong>{formatCurrency(serviceFeeAmount)}</strong>
+            </label>
+            <div className="customer-bill-total">
+              <span>Total a pagar</span>
+              <strong>{formatCurrency(billTotal)}</strong>
+            </div>
+
+            <div className="customer-pay-modes" aria-label="Modo de pagamento">
+              <button type="button" onClick={() => setSplitMode("full")} className={splitMode === "full" ? "is-active" : ""}>
+                Total
+              </button>
+              <button type="button" onClick={() => setSplitMode("partial")} className={splitMode === "partial" ? "is-active" : ""}>
+                Parcial
+              </button>
+              <button type="button" onClick={() => setSplitMode("split")} className={splitMode === "split" ? "is-active" : ""}>
+                Dividir
+              </button>
+            </div>
+
+            {splitMode === "partial" && (
+              <input
+                value={partialAmount}
+                inputMode="decimal"
+                onChange={(event) => setPartialAmount(event.target.value.replace(/[^\d,\.]/g, ""))}
+                placeholder="Valor parcial"
+                className="customer-input customer-money-input"
+              />
+            )}
+
+            {splitMode === "split" && (
+              <div className="customer-stepper customer-split-stepper">
+                <p className="customer-stepper__label">Pessoas no guarda-sol</p>
+                <div className="customer-stepper__control">
+                  <button
+                    type="button"
+                    onClick={() => setSplitPeople((value) => Math.max(1, value - 1))}
+                    className="customer-stepper__button"
+                    aria-label="Diminuir pessoas para divisao"
+                  >
+                    -
+                  </button>
+                  <input
+                    value={splitPeople}
+                    inputMode="numeric"
+                    onChange={(event) => setSplitPeople(Math.max(1, Math.min(50, Number(event.target.value.replace(/\D/g, "")) || 1)))}
+                    className="customer-stepper__input"
+                    aria-label="Quantidade de pessoas para divisao"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSplitPeople((value) => Math.min(50, value + 1))}
+                    className="customer-stepper__button"
+                    aria-label="Aumentar pessoas para divisao"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="customer-bill-summary">
+              <span>{splitMode === "split" ? "Valor por pessoa" : splitMode === "partial" ? "Pagamento agora" : "Pagamento solicitado"}</span>
+              <strong>{formatCurrency(requestedPaymentAmount)}</strong>
+              {remainingAfterPayment > 0 && <small>Saldo restante: {formatCurrency(remainingAfterPayment)}</small>}
+            </div>
+
+            <button onClick={requestCloseAccount} disabled={loading || openTotal <= 0} className="customer-primary-button customer-close-button">
+              {loading ? "Enviando..." : "Pedir conta"}
+            </button>
+          </div>
+
           <div className="customer-list">
             {orders.length === 0 ? <p className="customer-empty">Nenhum pedido ainda.</p> : orders.map((order) => (
               <article key={order.id} className="customer-order-row">

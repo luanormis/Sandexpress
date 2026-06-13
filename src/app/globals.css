@@ -154,7 +154,7 @@ input[type="number"] {
   overflow-x: hidden;
   color: var(--customer-text);
   background: var(--customer-bg);
-  font-size: clamp(0.9375rem, 0.9rem + 0.1875vw, 1.0625rem);
+  font-size: clamp(1.06rem, 0.98rem + 0.38vw, 1.28rem);
   line-height: 1.35;
 }
 
@@ -311,7 +311,7 @@ input[type="number"] {
 
 .customer-login__title {
   margin: 0.15rem 0 0;
-  font-size: clamp(1.55rem, 7vw, 2.25rem);
+  font-size: clamp(1.85rem, 8.2vw, 2.6rem);
   line-height: 1;
   font-weight: 950;
 }
@@ -337,7 +337,8 @@ input[type="number"] {
   color: var(--customer-text);
   outline: none;
   padding: clamp(0.85rem, 3.8vw, 1.05rem);
-  font-weight: 750;
+  font-size: clamp(1.05rem, 4.3vw, 1.28rem);
+  font-weight: 800;
 }
 
 .customer-input:focus,
@@ -395,6 +396,7 @@ input[type="number"] {
   padding: clamp(0.9rem, 3.8vw, 1.1rem);
   background: var(--customer-primary);
   color: #ffffff;
+  font-size: clamp(1.06rem, 4.6vw, 1.35rem);
   font-weight: 950;
 }
 
@@ -473,7 +475,7 @@ input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(1.15rem, 5.6vw, 1.6rem);
+  font-size: clamp(1.38rem, 6.6vw, 1.9rem);
   line-height: 1;
   font-weight: 950;
 }
@@ -541,7 +543,7 @@ input[type="number"] {
   display: block;
   margin-top: 0.15rem;
   color: var(--customer-primary);
-  font-size: clamp(1.65rem, 8vw, 2.35rem);
+  font-size: clamp(2.15rem, 10vw, 3rem);
   line-height: 1;
   font-weight: 950;
 }
@@ -624,7 +626,7 @@ input[type="number"] {
 .customer-cart-name,
 .customer-order-title {
   margin: 0;
-  font-size: clamp(1rem, 4.5vw, 1.22rem);
+  font-size: clamp(1.18rem, 5.2vw, 1.45rem);
   font-weight: 950;
 }
 
@@ -649,7 +651,7 @@ input[type="number"] {
 
 .customer-price {
   color: var(--customer-primary);
-  font-size: clamp(1rem, 4.5vw, 1.22rem);
+  font-size: clamp(1.22rem, 5.6vw, 1.55rem);
   font-weight: 950;
   white-space: nowrap;
 }
@@ -660,7 +662,7 @@ input[type="number"] {
   background: var(--customer-primary);
   color: #ffffff;
   padding: 0 clamp(0.9rem, 4vw, 1.2rem);
-  font-size: clamp(0.78rem, 0.74rem + 0.2vw, 0.9rem);
+  font-size: clamp(0.95rem, 4vw, 1.12rem);
   font-weight: 950;
 }
 
@@ -717,8 +719,137 @@ input[type="number"] {
   background: transparent;
   color: var(--customer-secondary);
   padding: 0.35rem 0.25rem;
-  font-size: clamp(0.68rem, 0.64rem + 0.2vw, 0.78rem);
+  font-size: clamp(0.82rem, 0.78rem + 0.25vw, 0.96rem);
   font-weight: 950;
+}
+
+.customer-bill-panel {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.8rem, 3.2vw, 1.1rem);
+  border: 0.0625rem solid var(--customer-border);
+  border-radius: 1.35rem;
+  background: #ffffff;
+  padding: clamp(0.95rem, 4vw, 1.25rem);
+  box-shadow: 0 0.75rem 2rem rgba(31, 41, 51, 0.06);
+}
+
+.customer-bill-row,
+.customer-fee-toggle,
+.customer-bill-total,
+.customer-bill-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(0.65rem, 2.8vw, 1rem);
+}
+
+.customer-bill-row span,
+.customer-fee-toggle span,
+.customer-bill-total span,
+.customer-bill-summary span {
+  color: var(--customer-secondary);
+  font-weight: 950;
+}
+
+.customer-bill-row strong,
+.customer-fee-toggle strong {
+  color: var(--customer-text);
+  font-size: clamp(1.1rem, 4.8vw, 1.35rem);
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.customer-fee-toggle {
+  min-height: 3.25rem;
+  border-radius: 1rem;
+  background: #fff8f0;
+  padding: 0 clamp(0.75rem, 3vw, 1rem);
+  user-select: none;
+}
+
+.customer-fee-toggle input {
+  width: 1.35rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  accent-color: var(--customer-primary);
+}
+
+.customer-bill-total {
+  border-top: 0.0625rem solid var(--customer-border);
+  padding-top: clamp(0.75rem, 3vw, 1rem);
+}
+
+.customer-bill-total strong,
+.customer-bill-summary strong {
+  color: var(--customer-primary);
+  font-size: clamp(1.75rem, 8vw, 2.35rem);
+  line-height: 1;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.customer-pay-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.45rem, 2vw, 0.65rem);
+}
+
+.customer-pay-modes button {
+  border: 0.0625rem solid var(--customer-border);
+  border-radius: 1rem;
+  background: #fff8f0;
+  color: var(--customer-secondary);
+  font-size: clamp(0.92rem, 4vw, 1.08rem);
+  font-weight: 950;
+}
+
+.customer-pay-modes button.is-active {
+  border-color: var(--customer-primary);
+  background: var(--customer-primary);
+  color: #ffffff;
+}
+
+.customer-money-input {
+  text-align: center;
+  font-size: clamp(1.45rem, 6.5vw, 1.9rem);
+  font-weight: 950;
+}
+
+.customer-split-stepper {
+  background: #fff8f0;
+}
+
+.customer-stepper__input {
+  min-height: 3rem;
+  width: 100%;
+  border: 0;
+  border-radius: 1rem;
+  background: #ffffff;
+  color: var(--customer-text);
+  text-align: center;
+  font-size: clamp(1.45rem, 7vw, 2rem);
+  font-weight: 950;
+  outline: none;
+}
+
+.customer-bill-summary {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  border-radius: 1rem;
+  background: #fff8f0;
+  padding: clamp(0.8rem, 3vw, 1rem);
+}
+
+.customer-bill-summary small {
+  flex-basis: 100%;
+  color: var(--customer-secondary);
+  font-size: clamp(0.88rem, 3.6vw, 1.05rem);
+  font-weight: 900;
+}
+
+.customer-close-button {
+  min-height: 3.6rem;
 }
 
 .customer-tab.is-active {
