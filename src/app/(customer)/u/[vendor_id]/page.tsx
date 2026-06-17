@@ -12,6 +12,7 @@ type Product = {
   name: string;
   category: string;
   description: string | null;
+  image_url?: string | null;
   price: number;
   promotional_price: number | null;
 };
@@ -35,6 +36,8 @@ type CustomerVendor = {
   secondary_color?: string | null;
   logo_url?: string | null;
 };
+
+type FeatureFlags = Record<string, boolean>;
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   received: "Pedido recebido",
@@ -73,6 +76,7 @@ export default function CustomerApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [waiterCalled, setWaiterCalled] = useState(false);
+  const [features, setFeatures] = useState<FeatureFlags>({});
 
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
@@ -107,6 +111,7 @@ export default function CustomerApp() {
       <span>SandExpress</span>
     </div>
   );
+  const featureEnabled = (key: string) => features[key] !== false;
 
   function resetExpiredCustomerSession(message = "Sua sessao expirou. Abra a comanda novamente para enviar pedidos.") {
     sessionStorage.removeItem(`sandexpress_user_${umbrellaId}`);
@@ -157,6 +162,7 @@ export default function CustomerApp() {
         setUmbrella(data.umbrella);
         setVendor(data.vendor);
         setProducts(data.products || []);
+        setFeatures(data.features || {});
 
         const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
         if (saved) {
@@ -339,9 +345,13 @@ export default function CustomerApp() {
     }
   }
 
-  async function callWaiter() {
+  async function requestService(requestType: "waiter_call" | "cleaning_request" | "umbrella_transfer") {
     if (!vendor || !customerId) {
-      setError("Abra a comanda antes de chamar o garcom.");
+      setError("Abra a comanda antes de solicitar atendimento.");
+      return;
+    }
+    if (!featureEnabled(requestType)) {
+      setError("Este modulo esta desativado para este quiosque.");
       return;
     }
     setLoading(true);
@@ -351,15 +361,15 @@ export default function CustomerApp() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendor.id, customer_id: customerId, umbrella_id: umbrellaId }),
+        body: JSON.stringify({ vendor_id: vendor.id, customer_id: customerId, umbrella_id: umbrellaId, request_type: requestType }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401 || res.status === 403) {
-        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para chamar o garcom.");
+        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para solicitar atendimento.");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Nao foi possivel chamar o garcom.");
+        setError(data.error || "Nao foi possivel solicitar atendimento.");
         return;
       }
       setWaiterCalled(true);
@@ -371,6 +381,10 @@ export default function CustomerApp() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function callWaiter() {
+    return requestService("waiter_call");
   }
 
   if (step === "welcome") {
@@ -470,12 +484,26 @@ export default function CustomerApp() {
             <button onClick={requestCloseAccount} disabled={loading} className="customer-icon-button customer-icon-button--secondary">
               Fechar conta
             </button>
-            <button onClick={callWaiter} className="customer-icon-button">
-              <Bell size="1.125rem" /> Garcom
-            </button>
+            {featureEnabled("waiter_call") && (
+              <button onClick={callWaiter} className="customer-icon-button">
+                <Bell size="1.125rem" /> Atendente
+              </button>
+            )}
           </div>
         </div>
-        {waiterCalled && <p className="customer-feedback">Garcom chamado.</p>}
+        <div className="customer-service-actions" aria-label="Solicitacoes do guarda-sol">
+          {featureEnabled("cleaning_request") && (
+            <button type="button" onClick={() => requestService("cleaning_request")}>
+              Limpeza
+            </button>
+          )}
+          {featureEnabled("umbrella_transfer") && (
+            <button type="button" onClick={() => requestService("umbrella_transfer")}>
+              Trocar guarda-sol
+            </button>
+          )}
+        </div>
+        {waiterCalled && <p className="customer-feedback">Solicitacao enviada ao quiosque.</p>}
         {error && <p className="customer-error">{error}</p>}
         <div className="customer-total-card">
           <p className="customer-kicker">Total da conta</p>
@@ -504,6 +532,11 @@ export default function CustomerApp() {
           <div className="customer-list">
             {products.filter((p) => activeCategory === "Todos" || p.category === activeCategory).map((product) => (
               <article key={product.id} className="customer-product-row">
+                {product.image_url && (
+                  <div className="customer-product-media">
+                    <img src={product.image_url} alt={product.name} />
+                  </div>
+                )}
                 <div className="customer-product-info">
                   <h2 className="customer-product-name">{product.name}</h2>
                   {product.description && <p className="customer-product-description">{product.description}</p>}

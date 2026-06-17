@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth-session';
 import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
 
@@ -81,6 +82,12 @@ export async function POST(req: NextRequest) {
 
     if (!name || !phone || !vendor_id) {
       return NextResponse.json({ error: 'name, phone e vendor_id sao obrigatorios.' }, { status: 400 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'login')) {
+      return NextResponse.json(featureDisabledResponse('login'), { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
     const cleanPhone = String(phone).replace(/\D/g, '');

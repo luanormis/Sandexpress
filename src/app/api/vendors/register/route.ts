@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { getAppBaseUrl, sendEmail } from '@/lib/email';
 import { buildVendorVerificationEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { DEFAULT_MENU } from '@/lib/default-menu';
+import { buildTenantFeatureRows } from '@/lib/features';
+import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
 
 async function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest) {
     }
     if (!cleanCpf && !cleanCnpj) {
       return NextResponse.json({ error: 'Informe CPF ou CNPJ para o cadastro do quiosque.' }, { status: 400 });
+    }
+    if (body.terms_accepted !== true) {
+      return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso para concluir o cadastro.' }, { status: 400 });
     }
 
     const duplicateFilters = [
@@ -155,17 +159,22 @@ export async function POST(req: NextRequest) {
 
     if (vendorError) throw vendorError;
 
-    const { error: productsError } = await (supabaseAdmin.from('products') as any).insert(
-      DEFAULT_MENU.map((item) => ({
-        tenant_id: tenant.id,
-        vendor_id: vendor.id,
-        ...item,
-        active: true,
-        stock_quantity: null,
-        blocked_by_stock: false,
-      }))
-    );
-    if (productsError) throw productsError;
+    const termsAcceptance = buildTermsAcceptanceSnapshot({
+      vendorId: vendor.id,
+      tenantId: tenant.id,
+      body,
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip'),
+      userAgent: req.headers.get('user-agent'),
+    });
+    const { error: termsError } = await supabaseAdmin
+      .from('terms_acceptances')
+      .insert(termsAcceptance);
+    if (termsError && !['42P01', 'PGRST205', '42703'].includes(termsError.code)) throw termsError;
+
+    const { error: featuresError } = await supabaseAdmin
+      .from('tenant_features')
+      .insert(buildTenantFeatureRows(tenant.id));
+    if (featuresError && !['42P01', 'PGRST205'].includes(featuresError.code)) throw featuresError;
 
     const verificationUrl = `${getAppBaseUrl(req)}/api/vendors/verify-email?token=${encodeURIComponent(verificationToken)}`;
     const verificationEmail = buildVendorVerificationEmail({

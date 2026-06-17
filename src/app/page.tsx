@@ -15,7 +15,7 @@ export default function LandingPage() {
   const [regSuccess, setRegSuccess] = useState(false);
   const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean; verificationUrl?: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false,
   });
   const [loading, setLoading] = useState(false);
   const [registerError, setRegisterError] = useState("");
@@ -33,6 +33,10 @@ export default function LandingPage() {
     }
     if (form.password !== form.password_confirm) {
       setRegisterError("A senha e a confirmacao nao conferem.");
+      return;
+    }
+    if (!form.terms_accepted) {
+      setRegisterError("Marque que voce leu e concorda com os Termos de Uso para concluir o cadastro.");
       return;
     }
     setLoading(true);
@@ -283,7 +287,7 @@ export default function LandingPage() {
                         : "Email de validacao nao enviado. Configure RESEND_API_KEY para disparos reais."}
                     </p>
                     {regCredentials.verificationUrl && (
-                      <p className="mt-2 break-words text-xs font-bold text-[#FF6B00]">Link local de teste: {regCredentials.verificationUrl}</p>
+                      <p className="mt-2 break-words text-xs font-bold text-[#FF6B00]">Link local de verificacao: {regCredentials.verificationUrl}</p>
                     )}
                   </div>
                 )}
@@ -409,6 +413,22 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
+                  <label className="flex gap-3 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-sm font-bold text-gray-700">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={form.terms_accepted}
+                      onChange={e => setForm(p => ({ ...p, terms_accepted: e.target.checked }))}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[#FF6B00]"
+                    />
+                    <span>
+                      Li e concordo com os{" "}
+                      <Link href="/termos-de-uso" target="_blank" className="text-[#FF6B00] underline underline-offset-2">
+                        Termos de Uso do SandExpress
+                      </Link>
+                      , incluindo o uso dos dados do cadastro para operacao, pedidos, relatorios e suporte.
+                    </span>
+                  </label>
                   {registerError && (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                       {registerError}

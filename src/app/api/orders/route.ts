@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
@@ -24,6 +25,10 @@ export async function GET(req: NextRequest) {
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+    }
+
+    if (!await vendorFeatureEnabled(vendor_id, 'operational_dashboard')) {
+      return NextResponse.json(featureDisabledResponse('operational_dashboard'), { status: 403 });
     }
 
     let query = supabaseAdmin
@@ -80,6 +85,10 @@ export async function POST(req: NextRequest) {
       if (session.vendor_id !== vendor_id || session.customer_id !== customer_id) {
         return NextResponse.json({ error: 'Sessão do cliente inválida para este pedido.' }, { status: 403 });
       }
+    }
+
+    if (!await vendorFeatureEnabled(vendor_id, 'orders')) {
+      return NextResponse.json(featureDisabledResponse('orders'), { status: 403 });
     }
 
     // Validar guarda-sol pertence ao vendor

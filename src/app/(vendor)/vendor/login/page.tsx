@@ -88,7 +88,7 @@ export default function VendorLogin() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(result.error || "Nao foi possivel enviar a recuperacao.");
-        if (result.reset_url) setRecoveryMessage(`Link local de teste: ${result.reset_url}`);
+        if (result.reset_url) setRecoveryMessage(`Link local de recuperacao: ${result.reset_url}`);
         return;
       }
       setRecoveryMessage(result.message || "Se o email estiver cadastrado, enviaremos um link de recuperacao.");

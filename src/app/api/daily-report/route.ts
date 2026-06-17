@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchArchivedOrders } from '@/lib/order-archive';
 
 type PaymentSummary = Record<string, { count: number; total: number }>;
 
@@ -25,7 +26,13 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   if (ordersErr) throw ordersErr;
 
-  const completedOrders = orders || [];
+  const archivedOrders = await fetchArchivedOrders({
+    vendorId,
+    startDate: startOfDay,
+    endDate: endOfDay,
+  });
+
+  const completedOrders = [...(orders || []), ...archivedOrders.filter((order: any) => order.status === 'completed')];
   const totalRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
   const totalItems = completedOrders.reduce((sum: number, order: any) => {
     return sum + (order.order_items || []).reduce((itemSum: number, item: any) => itemSum + Number(item.quantity || 0), 0);
@@ -66,7 +73,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
       if (!productId) return;
       if (!productsMap[productId]) {
         productsMap[productId] = {
-          name: productNameMap[productId] || 'Produto desconhecido',
+          name: productNameMap[productId] || item.products?.name || 'Produto desconhecido',
           quantity: 0,
           revenue: 0,
           product_id: productId,

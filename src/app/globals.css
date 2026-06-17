@@ -44,6 +44,8 @@
     max-width: 100%;
     background: var(--background);
     overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
   }
 
   body {
@@ -52,7 +54,9 @@
     background: var(--background);
     color: var(--foreground);
     overflow-x: hidden;
-    overscroll-behavior-y: none;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    touch-action: pan-y;
     -webkit-tap-highlight-color: transparent;
     @apply font-sans antialiased;
   }
@@ -190,6 +194,7 @@ input[type="number"] {
 .customer-welcome__content,
 .customer-login__panel {
   width: 100%;
+  max-width: calc(100vw - 2rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -406,6 +411,7 @@ input[type="number"] {
 }
 
 .customer-error {
+  width: 100%;
   margin: 0;
   border-radius: 0.9rem;
   background: #fff1f1;
@@ -413,6 +419,17 @@ input[type="number"] {
   padding: clamp(0.75rem, 3vw, 1rem);
   font-size: clamp(0.82rem, 0.78rem + 0.2vw, 0.95rem);
   font-weight: 850;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.customer-welcome .customer-error {
+  width: calc(100vw - 3rem) !important;
+  max-width: 22rem;
+  align-self: center;
+  text-align: center;
+  line-height: 1.25;
 }
 
 .customer-shell {
@@ -881,5 +898,310 @@ input[type="number"] {
 
   .customer-tabbar {
     width: 100%;
+  }
+}
+
+/* SandExpress reference rebuild: solar concierge + beach-tech operations */
+.customer-app {
+  --customer-primary: #ff5a00;
+  --customer-secondary: #a33a00;
+  --customer-bg: #fff6f2;
+  --customer-surface: #ffffff;
+  --customer-border: rgba(226, 191, 176, 0.42);
+  --customer-text: #201512;
+  --customer-muted: #6b5147;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.12), transparent 34rem),
+    linear-gradient(180deg, #fff8f6 0%, #fff2ed 100%);
+}
+
+.customer-welcome {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.26), transparent 16rem),
+    linear-gradient(145deg, #ff6b00 0%, #b94700 100%);
+}
+
+.customer-login {
+  background:
+    radial-gradient(circle at 80% 0%, rgba(255, 106, 0, 0.12), transparent 22rem),
+    linear-gradient(180deg, #fff8f6 0%, #fff1eb 100%);
+}
+
+.customer-topbar {
+  inset-inline: clamp(0.8rem, 3vw, 1.4rem);
+  top: calc(env(safe-area-inset-top) + 0.85rem);
+  border: 0;
+  border-radius: 2.6rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 1.4rem 3.4rem rgba(61, 26, 10, 0.09);
+}
+
+.customer-shell {
+  padding-top: clamp(15.5rem, 52vw, 19rem);
+}
+
+.customer-service-actions {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.customer-service-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.customer-service-actions button {
+  flex: 1 0 auto;
+  border: 0;
+  border-radius: 999rem;
+  background: #fff2eb;
+  color: var(--customer-secondary);
+  padding: 0 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.customer-content {
+  gap: clamp(1.2rem, 4vw, 1.55rem);
+}
+
+.customer-category-rail {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 10rem);
+  z-index: 10;
+  margin-inline: -0.15rem;
+  padding: 0.2rem 0.15rem 0.45rem;
+  background: linear-gradient(180deg, rgba(255, 246, 242, 0.94), rgba(255, 246, 242, 0.72));
+  backdrop-filter: blur(0.7rem);
+}
+
+.customer-chip {
+  min-height: 3.35rem;
+  border: 0;
+  background: #ffffff;
+  color: #4d3329;
+  box-shadow: inset 0 0 0 0.0625rem rgba(226, 191, 176, 0.55);
+}
+
+.customer-list:has(.customer-product-row) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.9rem, 3vw, 1.25rem);
+}
+
+.customer-product-row {
+  min-height: 14.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: 2.25rem;
+  background: #ffffff;
+  padding: 0.8rem;
+  box-shadow: 0 1.25rem 2.8rem rgba(61, 26, 10, 0.08);
+}
+
+.customer-product-row:first-child {
+  grid-column: 1 / -1;
+}
+
+.customer-product-media {
+  width: 100%;
+  aspect-ratio: 1.32;
+  overflow: hidden;
+  border-radius: 1.7rem;
+  background: linear-gradient(135deg, #fff2eb, #ffffff);
+}
+
+.customer-product-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.customer-product-row:not(:has(.customer-product-media))::before {
+  content: "";
+  width: 100%;
+  aspect-ratio: 1.32;
+  border-radius: 1.7rem;
+  background:
+    radial-gradient(circle at 35% 34%, rgba(255, 106, 0, 0.24), transparent 22%),
+    linear-gradient(135deg, #fff1eb, #ffffff);
+}
+
+.customer-product-row:first-child .customer-product-media,
+.customer-product-row:first-child::before {
+  aspect-ratio: 1.85;
+}
+
+.customer-product-info,
+.customer-cart-info,
+.customer-order-info {
+  width: 100%;
+}
+
+.customer-product-side {
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.customer-price {
+  color: #ad2c00;
+}
+
+.customer-add-button {
+  min-width: 3.2rem;
+  width: 3.2rem;
+  padding: 0;
+  border-radius: 999rem;
+  font-size: 0;
+}
+
+.customer-add-button::before {
+  content: "+";
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.customer-cart-row,
+.customer-order-row,
+.customer-bill-panel,
+.customer-empty {
+  border: 0;
+  border-radius: 2rem;
+  box-shadow: 0 1.25rem 2.8rem rgba(61, 26, 10, 0.07);
+}
+
+.customer-bill-panel {
+  background: #ffffff;
+}
+
+.customer-tabbar {
+  inset-inline: clamp(1rem, 4vw, 1.6rem);
+  bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  width: auto;
+  border: 0;
+  border-radius: 999rem;
+  background: linear-gradient(135deg, #ff6b00, #b24a00);
+  box-shadow: 0 1.2rem 2.6rem rgba(178, 74, 0, 0.28);
+}
+
+.customer-tab {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.customer-tab.is-active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.vendor-ops-shell,
+.admin-ops-shell {
+  background:
+    radial-gradient(circle at 70% 0%, rgba(255, 106, 0, 0.08), transparent 28rem),
+    linear-gradient(180deg, #fff8f6 0%, #fff3ef 100%) !important;
+  color: #261812 !important;
+}
+
+.vendor-ops-shell aside,
+.admin-ops-shell aside {
+  margin: 1rem;
+  height: calc(100dvh - 2rem);
+  border: 0 !important;
+  border-radius: 2.5rem !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: #261812 !important;
+  box-shadow: 0 1.5rem 4rem rgba(61, 26, 10, 0.08) !important;
+  backdrop-filter: blur(1rem);
+}
+
+.vendor-ops-shell main,
+.admin-ops-shell main {
+  background: transparent !important;
+  color: #261812 !important;
+}
+
+.vendor-ops-shell h1,
+.vendor-ops-shell h2,
+.vendor-ops-shell h3,
+.admin-ops-shell h1,
+.admin-ops-shell h2,
+.admin-ops-shell h3 {
+  color: #201512 !important;
+  letter-spacing: 0;
+}
+
+.vendor-ops-shell [class*="bg-gray-"],
+.admin-ops-shell [class*="bg-gray-"] {
+  background-color: rgba(255, 255, 255, 0.84) !important;
+}
+
+.vendor-ops-shell [class*="border-gray-"],
+.admin-ops-shell [class*="border-gray-"] {
+  border-color: rgba(226, 191, 176, 0.48) !important;
+}
+
+.vendor-ops-shell [class*="text-gray-"],
+.admin-ops-shell [class*="text-gray-"] {
+  color: #6b5147 !important;
+}
+
+.vendor-ops-shell .bg-white,
+.admin-ops-shell .bg-white,
+.vendor-ops-shell section > div,
+.admin-ops-shell main > div > div[class*="bg-"] {
+  border-radius: 1.75rem;
+}
+
+.vendor-ops-shell button[class*="bg-[#FF6B00]"],
+.vendor-ops-shell .bg-\[\#FF6B00\],
+.admin-ops-shell .bg-blue-600,
+.admin-ops-shell button[class*="bg-blue-600"] {
+  background: linear-gradient(135deg, #ff6b00, #b34800) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0.85rem 1.9rem rgba(255, 106, 0, 0.22);
+}
+
+.vendor-ops-shell .rounded-2xl,
+.admin-ops-shell .rounded-2xl {
+  border-radius: 1.8rem !important;
+}
+
+.vendor-ops-shell .rounded-xl,
+.admin-ops-shell .rounded-xl {
+  border-radius: 1.1rem !important;
+}
+
+.vendor-ops-shell table,
+.admin-ops-shell table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.vendor-kanban-board {
+  min-width: 0;
+}
+
+.vendor-kanban-column {
+  max-width: none;
+  overflow: hidden;
+}
+
+.vendor-kanban-column h3 {
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.vendor-kanban-column h3 span + * {
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .vendor-kanban-board {
+    overflow-x: hidden;
   }
 }

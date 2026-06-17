@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { getPublicAppUrl } from '@/lib/public-url';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
@@ -21,6 +22,9 @@ export async function GET(req: NextRequest) {
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
@@ -47,6 +51,9 @@ export async function POST(req: NextRequest) {
     const session = getRequestSession(req);
     if (!canAccessVendor(session, body.vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(body.vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
     const { data: vendor, error: vendorErr } = await (supabaseAdmin.from('vendors') as any)

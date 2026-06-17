@@ -11,6 +11,11 @@ import { cn, formatCurrency } from "@/lib/utils";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
+const SERVICE_REQUEST_MARKERS = [
+  { marker: "[WAITER_CALL]", label: "Solicitando atendente", shortLabel: "Atendente", tone: "waiter" },
+  { marker: "[CLEANING_REQUEST]", label: "Solicitando limpeza", shortLabel: "Limpeza", tone: "waiter" },
+  { marker: "[UMBRELLA_TRANSFER]", label: "Solicitando troca de guarda-sol", shortLabel: "Troca", tone: "waiter" },
+];
 
 // ---------- TYPES ----------
 interface Product {
@@ -45,10 +50,14 @@ function hasWaiterCall(order?: Pick<Order, "notes"> | null) {
   return Boolean(order?.notes?.includes(WAITER_CALL_MARKER));
 }
 
+function getServiceRequest(order?: Pick<Order, "notes"> | null) {
+  return SERVICE_REQUEST_MARKERS.find(request => order?.notes?.includes(request.marker)) || null;
+}
+
 function getVisibleOrderNotes(notes?: string) {
   return (notes || "")
     .split("\n")
-    .filter(line => !line.includes(WAITER_CALL_MARKER))
+    .filter(line => !SERVICE_REQUEST_MARKERS.some(request => line.includes(request.marker)))
     .join("\n")
     .trim();
 }
@@ -249,16 +258,16 @@ export default function VendorDashboard() {
         let hasNewClosingRequest = false;
         let hasNewWaiterCall = false;
         data.forEach((order: Order) => {
-          const currentSignature = `${order.status}:${hasWaiterCall(order) ? "waiter" : "normal"}:${order.notes || ""}`;
+          const currentSignature = `${order.status}:${getServiceRequest(order)?.marker || "normal"}:${order.notes || ""}`;
           const previousStatus = knownOrderStatusesRef.current.get(order.id);
           nextStatusMap.set(order.id, currentSignature);
           if (!previousStatus && order.status === "received") hasNewOrder = true;
           if (!previousStatus && order.status === "closing_requested") hasNewClosingRequest = true;
-          if (!previousStatus && hasWaiterCall(order)) hasNewWaiterCall = true;
+          if (!previousStatus && getServiceRequest(order)) hasNewWaiterCall = true;
           if (previousStatus && !previousStatus.startsWith("closing_requested") && order.status === "closing_requested") {
             hasNewClosingRequest = true;
           }
-          if (previousStatus && !previousStatus.includes("waiter") && hasWaiterCall(order)) hasNewWaiterCall = true;
+          if (previousStatus && previousStatus.includes("normal") && getServiceRequest(order)) hasNewWaiterCall = true;
         });
         if (knownOrderStatusesRef.current.size > 0) {
           if (hasNewOrder) playNewOrderSound();
@@ -726,10 +735,17 @@ export default function VendorDashboard() {
     c.phone.includes(customerSearch)
   );
 
-  const renderCompactKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
-    const colOrders = orders.filter(o => o.status === status);
+  const renderCompactKanbanColumn = (
+    title: string,
+    filterOrder: (order: Order) => boolean,
+    nextAction: string,
+    nextStatus: string,
+    color: string,
+    options: { pulse?: boolean; paidAction?: boolean } = {}
+  ) => {
+    const colOrders = orders.filter(filterOrder);
     return (
-      <div className="bg-gray-100 rounded-lg p-3 flex flex-col h-[58vh] min-w-[220px] max-w-[240px]">
+      <div className="vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[22rem] lg:min-h-[calc(100vh-21rem)]">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
@@ -744,24 +760,24 @@ export default function VendorDashboard() {
               onClick={() => setSelectedOrder(order)}
               className={cn(
                 "w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
-                status === "received" && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
-                hasWaiterCall(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
+                options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
+                getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
               )}
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
                 <span className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={11}/> {order.time}</span>
               </div>
-              {hasWaiterCall(order) && (
+              {getServiceRequest(order) && (
                 <p className="mt-2 rounded-md bg-red-600 px-2 py-1 text-center text-xs font-black uppercase text-white animate-pulse">
-                  Solicitando garcom
+                  {getServiceRequest(order)?.label}
                 </p>
               )}
               <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
               <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
               <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
               <div className="mt-2 flex flex-col gap-1">
-                {status === 'closing_requested' ? (
+                {options.paidAction ? (
                   <span
                     onClick={(event) => { event.stopPropagation(); markAccountPaid(order); }}
                     className="w-full cursor-pointer rounded-md bg-green-600 px-2 py-1.5 text-center text-xs font-black text-white hover:bg-green-700"
@@ -810,7 +826,7 @@ export default function VendorDashboard() {
           {umbrellas.map(umbrella => {
             const order = orders.find(item => item.umbrella_id === umbrella.id);
             const closing = order?.status === 'closing_requested';
-            const waiterCall = hasWaiterCall(order);
+            const serviceRequest = getServiceRequest(order);
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
             return (
               <button
@@ -822,14 +838,14 @@ export default function VendorDashboard() {
                   umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
                   umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
                   umbrella.active && closing && "border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
-                  umbrella.active && waiterCall && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
+                  umbrella.active && serviceRequest && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
                 )}
-                title={waiterCall ? `Solicitando garcom - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
+                title={serviceRequest ? `${serviceRequest.label} - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
               >
                 {umbrella.number}
-                {waiterCall && (
+                {serviceRequest && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-white/95 px-1 py-0.5 text-[9px] font-black uppercase text-red-600">
-                    Garcom
+                    {serviceRequest.shortLabel}
                   </span>
                 )}
               </button>
@@ -841,7 +857,7 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="min-h-app bg-white flex flex-col lg:flex-row font-sans">
+    <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans">
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -910,12 +926,37 @@ export default function VendorDashboard() {
           {activeTab === "orders" && (
             <div className="space-y-4">
               {renderBeachMap()}
-              <div className="flex gap-3 overflow-x-auto pb-4">
-                {renderCompactKanbanColumn("Recebido", "received", "Iniciar", "preparing", "bg-blue-500")}
-                {renderCompactKanbanColumn("Preparando", "preparing", "Saiu", "delivering", "bg-yellow-500")}
-                {renderCompactKanbanColumn("Entregando", "delivering", "Entregue", "completed", "bg-purple-500")}
-                {renderCompactKanbanColumn("Conta Solicitada", "closing_requested", "Conta paga", "", "bg-orange-500")}
-                {renderCompactKanbanColumn("Entregue", "completed", "Solicitar conta", "closing_requested", "bg-green-500")}
+              <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-4">
+                {renderCompactKanbanColumn(
+                  "Mesa aberta",
+                  (order) => !order.paid && order.status !== "closing_requested" && Number(order.total || 0) <= 0,
+                  "",
+                  "",
+                  "bg-slate-500"
+                )}
+                {renderCompactKanbanColumn(
+                  "Recebido",
+                  (order) => !order.paid && ["received", "preparing", "delivering"].includes(order.status) && Number(order.total || 0) > 0,
+                  "Entregue",
+                  "completed",
+                  "bg-blue-500",
+                  { pulse: true }
+                )}
+                {renderCompactKanbanColumn(
+                  "Entregue",
+                  (order) => !order.paid && order.status === "completed",
+                  "Fechar conta",
+                  "closing_requested",
+                  "bg-green-500"
+                )}
+                {renderCompactKanbanColumn(
+                  "Fechar conta",
+                  (order) => !order.paid && order.status === "closing_requested",
+                  "Conta paga",
+                  "",
+                  "bg-orange-500",
+                  { paidAction: true }
+                )}
               </div>
             </div>
           )}
@@ -1651,6 +1692,7 @@ function OrderModal({
   onPaid: (order: Order) => Promise<void>;
   onWaiterDone: (order: Order) => Promise<void>;
 }) {
+  const serviceRequest = getServiceRequest(order);
   const next = order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
@@ -1673,15 +1715,15 @@ function OrderModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
         <div className="p-6 space-y-4">
-          {hasWaiterCall(order) && (
+          {serviceRequest && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-              <p className="text-sm font-black uppercase">Solicitando garcom</p>
-              <p className="mt-1 text-sm font-bold">Cliente pediu atendimento neste guarda-sol.</p>
+              <p className="text-sm font-black uppercase">{serviceRequest.label}</p>
+              <p className="mt-1 text-sm font-bold">Cliente pediu este atendimento no guarda-sol.</p>
               <button
                 onClick={() => onWaiterDone(order)}
                 className="mt-3 w-full rounded-xl bg-red-600 py-3 text-sm font-black text-white hover:bg-red-700"
               >
-                Garcom atendido
+                Atendimento resolvido
               </button>
             </div>
           )}
