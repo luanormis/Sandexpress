@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { purgeKiosk } from '@/lib/admin-data-erasure';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
+import { getAdminPassword } from '@/lib/runtime-config';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
 const ALLOWED_VENDOR_FIELDS = new Set([
@@ -79,5 +82,38 @@ export async function PATCH(
   } catch (err) {
     console.error('Vendor PATCH error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}
+
+function verifyAdminPassword(password: unknown) {
+  const provided = Buffer.from(String(password || ''));
+  const expected = Buffer.from(getAdminPassword());
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = getRequestSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    if (!verifyAdminPassword(body.admin_password)) {
+      return NextResponse.json({ error: 'Senha do admin invalida.' }, { status: 401 });
+    }
+    if (body.confirmation !== 'APAGAR QUIOSQUE') {
+      return NextResponse.json({ error: 'Digite APAGAR QUIOSQUE para confirmar.' }, { status: 400 });
+    }
+
+    const result = await purgeKiosk(id);
+    return NextResponse.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Vendor DELETE error:', err);
+    return NextResponse.json({ error: 'Erro ao apagar quiosque.' }, { status: 500 });
   }
 }

@@ -35,8 +35,8 @@ DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS umbrellas CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS vendor_users CASCADE;
+DROP TABLE IF EXISTS terms_acceptances CASCADE;
 DROP TABLE IF EXISTS vendors CASCADE;
-DROP TABLE IF EXISTS default_menu_items CASCADE;
 DROP TABLE IF EXISTS beaches CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 
@@ -132,6 +132,18 @@ CREATE TABLE vendors (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE terms_acceptances (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  terms_version TEXT NOT NULL,
+  accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  accepted_ip TEXT,
+  accepted_user_agent TEXT,
+  snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE vendor_users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -217,21 +229,6 @@ CREATE TABLE product_images (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE default_menu_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  category TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
-  promotional_price NUMERIC(10,2) CHECK (promotional_price IS NULL OR promotional_price >= 0),
-  image_url TEXT,
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  sort_order INTEGER NOT NULL DEFAULT 99,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(category, name)
-);
-
 CREATE TABLE vendor_plans (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   vendor_id UUID NOT NULL UNIQUE REFERENCES vendors(id) ON DELETE CASCADE,
@@ -243,6 +240,16 @@ CREATE TABLE vendor_plans (
   custom_theme TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE tenant_features (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  feature_key TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(tenant_id, feature_key)
 );
 
 -- =========================================================
@@ -383,10 +390,10 @@ CREATE INDEX idx_umbrellas_current_order ON umbrellas(current_order_id);
 CREATE INDEX idx_products_tenant_vendor_active_category ON products(tenant_id, vendor_id, active, category);
 CREATE INDEX idx_products_vendor_sort ON products(vendor_id, sort_order);
 CREATE INDEX idx_products_category ON products(vendor_id, category);
-CREATE INDEX idx_default_menu_items_active_sort ON default_menu_items(active, sort_order);
 CREATE INDEX idx_product_images_category ON product_images(category);
 CREATE INDEX idx_product_images_plan ON product_images(plan_type);
 CREATE INDEX idx_vendor_plans_vendor ON vendor_plans(vendor_id);
+CREATE INDEX idx_tenant_features_tenant_key ON tenant_features(tenant_id, feature_key);
 
 CREATE INDEX idx_orders_tenant_vendor_status_created ON orders(tenant_id, vendor_id, status, created_at DESC);
 CREATE INDEX idx_orders_tenant_umbrella_status ON orders(tenant_id, umbrella_id, status);
@@ -398,6 +405,8 @@ CREATE INDEX idx_order_items_product ON order_items(product_id);
 
 CREATE INDEX idx_daily_closings_tenant_date ON daily_closings(tenant_id, business_date DESC);
 CREATE INDEX idx_daily_closings_vendor_date ON daily_closings(vendor_id, business_date DESC);
+CREATE INDEX idx_terms_acceptances_vendor ON terms_acceptances(vendor_id, accepted_at DESC);
+CREATE INDEX idx_terms_acceptances_tenant ON terms_acceptances(tenant_id, accepted_at DESC);
 
 CREATE INDEX idx_adjustments_vendor ON account_adjustments(vendor_id);
 CREATE INDEX idx_adjustments_customer ON account_adjustments(customer_id);
@@ -427,8 +436,6 @@ CREATE TRIGGER trg_customers_updated_at BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON products
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_default_menu_items_updated_at BEFORE UPDATE ON default_menu_items
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_orders_updated_at BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_daily_closings_updated_at BEFORE UPDATE ON daily_closings
@@ -436,6 +443,8 @@ CREATE TRIGGER trg_daily_closings_updated_at BEFORE UPDATE ON daily_closings
 CREATE TRIGGER trg_account_adjustments_updated_at BEFORE UPDATE ON account_adjustments
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_vendor_plans_updated_at BEFORE UPDATE ON vendor_plans
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_tenant_features_updated_at BEFORE UPDATE ON tenant_features
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_rate_limit_buckets_updated_at BEFORE UPDATE ON rate_limit_buckets
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -446,7 +455,8 @@ CREATE TRIGGER trg_platform_settings_updated_at BEFORE UPDATE ON platform_settin
 -- VIEWS DO ADMIN
 -- =========================================================
 
-CREATE VIEW admin_product_sales_analytics AS
+CREATE VIEW admin_product_sales_analytics
+WITH (security_invoker = true) AS
 SELECT
   v.tenant_id,
   v.id AS vendor_id,
@@ -479,7 +489,8 @@ GROUP BY
   p.category,
   EXTRACT(HOUR FROM o.created_at);
 
-CREATE VIEW admin_daily_closing_analytics AS
+CREATE VIEW admin_daily_closing_analytics
+WITH (security_invoker = true) AS
 SELECT
   dc.tenant_id,
   dc.vendor_id,
@@ -513,12 +524,13 @@ ALTER TABLE vendor_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE umbrellas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE default_menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_closings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE terms_acceptances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE account_adjustments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendor_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_features ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
@@ -531,12 +543,13 @@ CREATE POLICY service_only_vendor_users ON vendor_users FOR ALL USING (FALSE) WI
 CREATE POLICY service_only_customers ON customers FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_umbrellas ON umbrellas FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_products ON products FOR ALL USING (FALSE) WITH CHECK (FALSE);
-CREATE POLICY service_only_default_menu_items ON default_menu_items FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_orders ON orders FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_order_items ON order_items FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_daily_closings ON daily_closings FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_terms_acceptances ON terms_acceptances FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_account_adjustments ON account_adjustments FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY service_only_vendor_plans ON vendor_plans FOR ALL USING (FALSE) WITH CHECK (FALSE);
+CREATE POLICY service_only_tenant_features ON tenant_features FOR ALL USING (FALSE) WITH CHECK (FALSE);
 CREATE POLICY product_images_public_select ON product_images FOR SELECT USING (TRUE);
 CREATE POLICY service_only_product_images_write ON product_images FOR INSERT WITH CHECK (FALSE);
 CREATE POLICY service_only_product_images_update ON product_images FOR UPDATE USING (FALSE) WITH CHECK (FALSE);
@@ -583,18 +596,33 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('product-images', 'product-images', TRUE)
 ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('order-archives', 'order-archives', FALSE)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
 DROP POLICY IF EXISTS product_images_storage_public_read ON storage.objects;
 DROP POLICY IF EXISTS product_images_storage_anon_upload ON storage.objects;
+DROP POLICY IF EXISTS product_images_storage_service_all ON storage.objects;
+DROP POLICY IF EXISTS order_archives_storage_service_all ON storage.objects;
 
 CREATE POLICY product_images_storage_public_read
   ON storage.objects
   FOR SELECT
   USING (bucket_id = 'product-images');
 
-CREATE POLICY product_images_storage_anon_upload
+CREATE POLICY product_images_storage_service_all
   ON storage.objects
-  FOR INSERT
+  FOR ALL
+  TO service_role
+  USING (bucket_id = 'product-images')
   WITH CHECK (bucket_id = 'product-images');
+
+CREATE POLICY order_archives_storage_service_all
+  ON storage.objects
+  FOR ALL
+  TO service_role
+  USING (bucket_id = 'order-archives')
+  WITH CHECK (bucket_id = 'order-archives');
 
 -- =========================================================
 -- CONFIGURACOES GLOBAIS DA PLATAFORMA
@@ -629,8 +657,8 @@ INSERT INTO platform_settings (key, value, description) VALUES
   '{
     "currency": "BRL",
     "trial_days": 3,
-    "monthly_price": 259.00,
-    "annual_monthly_price": 199.99,
+    "monthly_price": 499.99,
+    "annual_monthly_price": 299.99,
     "max_umbrellas": 50
   }'::jsonb,
   'Planos comerciais atuais: trial de 3 dias, mensal e anual ate 50 guarda-sois.'
@@ -653,8 +681,9 @@ SET value = EXCLUDED.value,
     updated_at = NOW();
 
 -- =========================================================
--- PRAIAS INICIAIS E CARDAPIO PADRAO GLOBAL
--- Novos quiosques nascem sem guarda-sois; o proprio quiosque cadastra cada um.
+-- PRAIAS INICIAIS
+-- Novos quiosques nascem sem produtos e sem guarda-sois.
+-- O proprio quiosque cadastra dados operacionais reais no painel.
 -- =========================================================
 
 INSERT INTO beaches (name, city, state, region, active) VALUES
@@ -668,85 +697,15 @@ SET region = EXCLUDED.region,
     active = EXCLUDED.active,
     updated_at = NOW();
 
-INSERT INTO default_menu_items (category, name, price, sort_order) VALUES
-  ('Porcoes','Isca de Peixe - Inteira',150,10),
-  ('Porcoes','Isca de Peixe - Meia',120,20),
-  ('Porcoes','Isca de Cacao - Inteira',150,30),
-  ('Porcoes','Isca de Cacao - Meia',120,40),
-  ('Porcoes','Porquinho - Inteira',150,50),
-  ('Porcoes','Porquinho - Meia',120,60),
-  ('Porcoes','Sardinha',150,70),
-  ('Porcoes','Manjubinha',150,80),
-  ('Porcoes','Camarao - Inteira',150,90),
-  ('Porcoes','Camarao - Meia',120,100),
-  ('Porcoes','Camarao Paulista',160,110),
-  ('Porcoes','Lula a Dore - Inteira',170,120),
-  ('Porcoes','Lula a Dore - Meia',140,130),
-  ('Porcoes','Frango a Passarinho',120,140),
-  ('Porcoes','File de Frango Acebolado',120,150),
-  ('Porcoes','File de Frango c/ Fritas',120,160),
-  ('Porcoes','Calabresa Acebolada',120,170),
-  ('Porcoes','Batata Frita - Inteira',80,180),
-  ('Porcoes','Batata Frita - Meia',50,190),
-  ('Porcoes','Batata Maluca com Bacon e Cheddar',100,200),
-  ('Porcoes','Cebola Empanada',50,210),
-  ('Porcoes','Contra File c/ Fritas',200,220),
-  ('Porcoes','Mega 2 Peixes com Fritas e Cebola',250,230),
-  ('Porcoes','Mega 4 Peixes com Fritas e Cebola',400,240),
-  ('Adicionais','Acrescimo de Fritas',10,250),
-  ('Pasteis','Pastel de Carne',15,260),
-  ('Pasteis','Pastel de Carne c/ Queijo ou Catupiry',18,270),
-  ('Pasteis','Pastel de Carne c/ Ovo',18,280),
-  ('Pasteis','Pastel de Queijo',15,290),
-  ('Pasteis','Pastel de Pizza',15,300),
-  ('Pasteis','Pastel de Frango',15,310),
-  ('Pasteis','Pastel de Frango c/ Queijo ou Catupiry',18,320),
-  ('Pasteis','Pastel de Calabresa',15,330),
-  ('Pasteis','Pastel de Calabresa c/ Queijo ou Catupiry',18,340),
-  ('Pasteis','Pastel de Camarao',25,350),
-  ('Pasteis','Pastel de Carne Seca',25,360),
-  ('Pasteis','Pastel de Nutella',22,370),
-  ('Pasteis','Pastel de Nutella c/ Morango',25,380),
-  ('Porcao de Pasteizinhos','Pasteizinhos 24 unidades',100,390),
-  ('Porcao de Pasteizinhos','Pasteizinhos 18 unidades',70,400),
-  ('Batidas e Caipirinhas','Vodka Absolut',50,410),
-  ('Batidas e Caipirinhas','Vodka Smirnoff',35,420),
-  ('Batidas e Caipirinhas','Saque',35,430),
-  ('Batidas e Caipirinhas','Pinga',25,440),
-  ('Batidas e Caipirinhas','Pina Colada',40,450),
-  ('Batidas e Caipirinhas','Espanhola',25,460),
-  ('Batidas e Caipirinhas','Tropical com 2 frutas - acrescimo',5,470),
-  ('Bebidas','Refrigerante Lata',8,480),
-  ('Bebidas','Skol',8,490),
-  ('Bebidas','Brahma',8,500),
-  ('Bebidas','Itaipava',8,510),
-  ('Bebidas','Heineken',12,520),
-  ('Bebidas','Budweiser',12,530),
-  ('Bebidas','Duplo Malte',12,540),
-  ('Bebidas','Original',12,550),
-  ('Bebidas','Cerveja sem Alcool',12,560),
-  ('Bebidas','Energetico',20,570),
-  ('Bebidas','Agua',5,580),
-  ('Bebidas','Agua c/ Gas',8,590),
-  ('Bebidas','H2OH',10,600),
-  ('Doses','Campari',20,610),
-  ('Doses','Whisky Red',30,620),
-  ('Doses','Smirnoff',15,630),
-  ('Doses','51 ou Velho Barreiro',5,640),
-  ('Doses','Gin com Tonica',35,650),
-  ('Sucos','Suco de Abacaxi',20,660),
-  ('Sucos','Suco de Caju',20,670),
-  ('Sucos','Suco de Coco',20,680),
-  ('Sucos','Suco de Kiwi',20,690),
-  ('Sucos','Suco de Laranja',20,700),
-  ('Sucos','Suco de Limao',20,710),
-  ('Sucos','Suco de Manga',20,720),
-  ('Sucos','Suco de Maracuja',20,730)
-ON CONFLICT (category, name) DO UPDATE
-SET price = EXCLUDED.price,
-    sort_order = EXCLUDED.sort_order,
-    active = TRUE,
-    updated_at = NOW();
+-- =========================================================
+-- GRANTS EXPLICITOS PARA SUPABASE DATA API
+-- RLS continua bloqueando anon/authenticated; service_role e usado pelas API routes.
+-- =========================================================
+
+GRANT USAGE ON SCHEMA public TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT SELECT ON product_images TO anon, authenticated;
 
 -- =========================================================
 -- ANALYZE
@@ -759,12 +718,13 @@ ANALYZE vendor_users;
 ANALYZE customers;
 ANALYZE umbrellas;
 ANALYZE products;
-ANALYZE default_menu_items;
 ANALYZE product_images;
 ANALYZE vendor_plans;
+ANALYZE tenant_features;
 ANALYZE orders;
 ANALYZE order_items;
 ANALYZE daily_closings;
+ANALYZE terms_acceptances;
 ANALYZE account_adjustments;
 ANALYZE rate_limit_buckets;
 ANALYZE analytics_events;

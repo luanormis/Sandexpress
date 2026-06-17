@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken, getRequestSession } from '@/lib/auth-session';
+import { getAdminPassword } from '@/lib/runtime-config';
 
 export async function GET(req: NextRequest) {
   const session = getRequestSession(req);
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Senha obrigatoria.' }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD || '95732';
+    const adminPassword = getAdminPassword();
 
     const providedBuffer = Buffer.from(String(password));
     const expectedBuffer = Buffer.from(adminPassword);

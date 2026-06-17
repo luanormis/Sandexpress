@@ -537,7 +537,7 @@ POST /api/auth/admin
 Regras:
 
 - Senha vem de `ADMIN_PASSWORD`.
-- Caso nao esteja configurada, o fallback local e `95732`.
+- Se `ADMIN_PASSWORD` nao estiver configurada, o login admin falha. Nao existe fallback local.
 - Sessao `admin_session` dura 12 horas.
 - Comparacao usa `crypto.timingSafeEqual`.
 

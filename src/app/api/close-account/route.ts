@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
       }
     } else if (session.role === 'customer' && session.vendor_id !== vendor_id) {
       return NextResponse.json({ error: 'Sessao de cliente invalida para este quiosque.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'cashier')) {
+      return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
     // 1. Encontrar a ordem aberta
@@ -227,6 +231,9 @@ export async function GET(req: NextRequest) {
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'cashier')) {
+      return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
     // Buscar ordem aberta

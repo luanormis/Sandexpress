@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { featureDisabledResponse, getTenantFeatureMap } from '@/lib/features';
 
 /**
  * GET /api/public/umbrella/[umbrellaId]?vendor_id=xxx
@@ -35,6 +36,14 @@ export async function GET(
 
     if (!umbrella.active) {
       return NextResponse.json({ error: 'Este guarda-sol esta inativo.' }, { status: 403 });
+    }
+
+    const features = await getTenantFeatureMap(umbrella.tenant_id);
+    if (!features.beach_umbrellas || !features.qr_code) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
+    }
+    if (!features.digital_menu) {
+      return NextResponse.json(featureDisabledResponse('digital_menu'), { status: 403 });
     }
 
     const { data: vendor, error: vendorError } = await supabaseAdmin
@@ -87,6 +96,7 @@ export async function GET(
         secondary_color: tenantTheme?.secondary_color || vendor.secondary_color || '#82533f',
         logo_url: tenantTheme?.logo_url || vendor.logo_url || '/sandexpress-logo.svg',
       },
+      features,
       products: visible,
     });
   } catch (err) {

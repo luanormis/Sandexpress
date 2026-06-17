@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
+import { getSessionSecret } from './runtime-config';
 
 export type SessionRole = 'admin' | 'vendor' | 'customer' | 'user';
 
@@ -13,14 +14,7 @@ export type SessionPayload = {
   exp: number;
 };
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  process.env.VENDOR_JWT_SECRET ||
-  'sandexpress-mvp-session-secret-change-this-in-vercel';
-
-if (process.env.NODE_ENV === 'production' && SESSION_SECRET.length < 32) {
-  throw new Error('SESSION_SECRET deve ter pelo menos 32 caracteres em producao.');
-}
+const SESSION_SECRET = getSessionSecret();
 
 function base64UrlEncode(input: string): string {
   return Buffer.from(input).toString('base64url');
