@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { fetchArchivedOrders } from '@/lib/order-archive';
 
 /**
  * GET /api/reports?vendor_id=xxx&period=month
@@ -47,7 +48,13 @@ export async function GET(req: NextRequest) {
       tenantId
     );
 
-    const allOrders: any[] = orders || [];
+    const archivedOrders = await fetchArchivedOrders({
+      vendorId: vendor_id,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+    });
+
+    const allOrders: any[] = [...(orders || []), ...archivedOrders];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
     const total_orders = allOrders.length;
     const avg_ticket = total_orders > 0 ? total_revenue / total_orders : 0;

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
-  X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu,
+  X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu, Trash2,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { PLAN_PRICES } from "@/lib/plans";
@@ -64,6 +65,7 @@ const TABS = [
   { id: "vendors", label: "Quiosques", icon: Store },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
   { id: "new", label: "Novo Quiosque", icon: Plus },
+  { id: "danger", label: "Risco", icon: Trash2 },
 ];
 
 const ANNUAL_PLAN_TYPES = new Set(["annual", "12months"]);
@@ -123,6 +125,14 @@ export default function AdminDashboard() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorActionLoading, setVendorActionLoading] = useState<string | null>(null);
+  const [dangerLoading, setDangerLoading] = useState<"customers" | "kiosk" | null>(null);
+  const [dangerForm, setDangerForm] = useState({
+    vendor_id: "",
+    admin_password: "",
+    customer_confirmation: "",
+    kiosk_confirmation: "",
+  });
+  const [dangerMessage, setDangerMessage] = useState("");
   const [analyticsFilters, setAnalyticsFilters] = useState({
     vendor_id: "",
     city: "",
@@ -134,7 +144,7 @@ export default function AdminDashboard() {
 
   // Registration form
   const [regForm, setRegForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false,
   });
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState("");
@@ -279,6 +289,68 @@ export default function AdminDashboard() {
     });
   };
 
+  const eraseCustomers = async () => {
+    setDangerLoading("customers");
+    setDangerMessage("");
+    try {
+      const res = await fetch("/api/admin/data-erasure/customers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vendor_id: dangerForm.vendor_id || undefined,
+          admin_password: dangerForm.admin_password,
+          confirmation: dangerForm.customer_confirmation,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDangerMessage(data.error || "Nao foi possivel apagar dados de clientes.");
+        return;
+      }
+      setDangerMessage(`${data.deleted_customers} clientes e ${data.deleted_orders} pedidos apagados.`);
+      await loadVendors();
+      await loadPlatformReport();
+    } catch {
+      setDangerMessage("Erro de rede ao apagar dados de clientes.");
+    } finally {
+      setDangerLoading(null);
+    }
+  };
+
+  const eraseKiosk = async () => {
+    if (!dangerForm.vendor_id) {
+      setDangerMessage("Selecione um quiosque antes de apagar.");
+      return;
+    }
+    setDangerLoading("kiosk");
+    setDangerMessage("");
+    try {
+      const res = await fetch(`/api/vendors/${dangerForm.vendor_id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_password: dangerForm.admin_password,
+          confirmation: dangerForm.kiosk_confirmation,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDangerMessage(data.error || "Nao foi possivel apagar o quiosque.");
+        return;
+      }
+      setDangerMessage(`Quiosque apagado. ${data.deleted_storage_files || 0} arquivos removidos do Storage.`);
+      setDangerForm({ vendor_id: "", admin_password: "", customer_confirmation: "", kiosk_confirmation: "" });
+      await loadVendors();
+      await loadPlatformReport();
+    } catch {
+      setDangerMessage("Erro de rede ao apagar o quiosque.");
+    } finally {
+      setDangerLoading(null);
+    }
+  };
+
   // Register vendor
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,6 +365,10 @@ export default function AdminDashboard() {
     }
     if (regForm.password !== regForm.password_confirm) {
       setRegError("A senha e a confirmacao nao conferem.");
+      return;
+    }
+    if (!regForm.terms_accepted) {
+      setRegError("Confirme que o responsavel leu e concordou com os Termos de Uso.");
       return;
     }
 
@@ -326,7 +402,7 @@ export default function AdminDashboard() {
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
-        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "" });
+        setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false });
       } else {
         const data = await res.json().catch(() => ({}));
         setRegError(data.error || "Nao foi possivel cadastrar o quiosque.");
@@ -361,7 +437,7 @@ export default function AdminDashboard() {
   // If not authenticated, show login
   if (!isAuthenticated) {
     return (
-      <div className="min-h-app bg-gray-900 flex items-center justify-center p-4 pt-safe">
+    <div className="admin-ops-shell min-h-app bg-gray-900 flex items-center justify-center p-4 pt-safe">
         <div className="bg-gray-800 rounded-2xl p-8 max-w-sm w-full border border-gray-700 shadow-2xl">
           <div className="flex items-center gap-3 mb-6 justify-center">
             <ShieldCheck size={32} className="text-blue-500" />
@@ -387,7 +463,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-app bg-gray-900 flex flex-col lg:flex-row text-white font-sans">
+    <div className="admin-ops-shell min-h-app bg-gray-900 flex flex-col lg:flex-row text-white font-sans">
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 bg-gray-950 flex flex-col border-r border-gray-800 shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -1022,6 +1098,22 @@ export default function AdminDashboard() {
                       />
                     </div>
                   </div>
+                  <label className="flex gap-3 rounded-xl border border-gray-700 bg-gray-900/60 p-4 text-sm font-bold text-gray-300">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={regForm.terms_accepted}
+                      onChange={e => setRegForm(p => ({ ...p, terms_accepted: e.target.checked }))}
+                      className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+                    />
+                    <span>
+                      O responsavel leu e concordou com os{" "}
+                      <Link href="/termos-de-uso" target="_blank" className="text-blue-400 underline underline-offset-2">
+                        Termos de Uso do SandExpress
+                      </Link>
+                      .
+                    </span>
+                  </label>
                 </div>
 
                 {regError && (
@@ -1037,10 +1129,102 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {/* ========== RISCO ========== */}
+        {activeTab === "danger" && (
+          <div className="max-w-3xl space-y-6">
+            <div className="rounded-2xl border border-red-500/40 bg-red-950/30 p-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 shrink-0 text-red-300" size={24} />
+                <div>
+                  <h3 className="text-xl font-display font-bold text-red-200">Acoes destrutivas</h3>
+                  <p className="mt-2 text-sm text-red-100/80">
+                    Estas operacoes apagam dados reais do Supabase e arquivos relacionados no Storage quando aplicavel.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6 space-y-4">
+              <label className="block text-sm font-bold text-gray-400">Quiosque</label>
+              <select
+                value={dangerForm.vendor_id}
+                onChange={e => setDangerForm(p => ({ ...p, vendor_id: e.target.value }))}
+                className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-blue-500"
+              >
+                <option value="">Todos os quiosques apenas para apagar clientes</option>
+                {vendors.map(vendor => (
+                  <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                ))}
+              </select>
+
+              <label className="block text-sm font-bold text-gray-400">Senha do admin</label>
+              <input
+                type="password"
+                value={dangerForm.admin_password}
+                onChange={e => setDangerForm(p => ({ ...p, admin_password: e.target.value }))}
+                className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-blue-500"
+                placeholder="Confirme a senha do admin"
+              />
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6 space-y-4">
+                <h3 className="text-lg font-display font-bold text-white">Apagar clientes</h3>
+                <p className="text-sm text-gray-400">
+                  Apaga clientes, pedidos e itens de pedido. Com quiosque selecionado, tambem remove arquivos arquivados daquele quiosque no Storage.
+                </p>
+                <input
+                  type="text"
+                  value={dangerForm.customer_confirmation}
+                  onChange={e => setDangerForm(p => ({ ...p, customer_confirmation: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-red-400"
+                  placeholder="APAGAR CLIENTES"
+                />
+                <button
+                  type="button"
+                  disabled={dangerLoading !== null}
+                  onClick={eraseCustomers}
+                  className="tap-target flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 font-bold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  <Trash2 size={18} /> {dangerLoading === "customers" ? "Apagando..." : "Apagar clientes"}
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6 space-y-4">
+                <h3 className="text-lg font-display font-bold text-white">Apagar quiosque completo</h3>
+                <p className="text-sm text-gray-400">
+                  Apaga o tenant/quiosque e todos os dados vinculados por cascata, incluindo clientes, pedidos, produtos, guarda-sois e arquivos do Storage.
+                </p>
+                <input
+                  type="text"
+                  value={dangerForm.kiosk_confirmation}
+                  onChange={e => setDangerForm(p => ({ ...p, kiosk_confirmation: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-red-400"
+                  placeholder="APAGAR QUIOSQUE"
+                />
+                <button
+                  type="button"
+                  disabled={dangerLoading !== null || !dangerForm.vendor_id}
+                  onClick={eraseKiosk}
+                  className="tap-target flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-3 font-bold text-white hover:bg-red-800 disabled:opacity-60"
+                >
+                  <Trash2 size={18} /> {dangerLoading === "kiosk" ? "Apagando..." : "Apagar quiosque"}
+                </button>
+              </div>
+            </div>
+
+            {dangerMessage && (
+              <div className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-bold text-gray-100">
+                {dangerMessage}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-800 bg-gray-950/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(0,0,0,0.28)] backdrop-blur lg:hidden">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {TABS.map(tab => (
             <button
               key={tab.id}

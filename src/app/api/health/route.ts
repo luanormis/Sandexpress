@@ -29,7 +29,7 @@ export async function GET() {
       supabaseAdmin.from('vendors').select('id').limit(1),
       supabaseAdmin.from('vendor_users').select('id').limit(1),
       supabaseAdmin.from('beaches').select('id').limit(1),
-      supabaseAdmin.from('default_menu_items').select('id').limit(1),
+      supabaseAdmin.from('tenant_features').select('id').limit(1),
     ]);
     const missingSchema = checks.some(({ error }) => ['42P01', 'PGRST205'].includes(error?.code));
     if (missingSchema) {
@@ -38,7 +38,7 @@ export async function GET() {
           status: 'degraded',
           ...base,
           database: 'schema_outdated',
-          hint: 'Rode infra/sql-iniciar-novo-projeto.sql no SQL Editor do Supabase para criar beaches, vendor_users e default_menu_items.',
+          hint: 'Rode infra/sql-iniciar-novo-projeto.sql no SQL Editor do Supabase para criar beaches, vendor_users e tenant_features.',
         },
         { status: 503 }
       );
