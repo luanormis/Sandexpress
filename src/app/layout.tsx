@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "Faça seu pedido diretamente da areia, sem enfrentar filas.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/sandexpress-logo.svg",
+    icon: "/logo-sandexpress.png",
     apple: "/icon-192.png",
   },
 };
@@ -29,8 +29,8 @@ export const viewport: Viewport = {
   themeColor: "#ff6b00",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth-session';
 import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
+import { consumeVerifiedOtp } from '@/lib/otp-challenges';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
 
@@ -77,15 +79,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
     }
 
-    const { name, phone, vendor_id, umbrella_id, party_size } = await req.json();
+    const { name, phone, vendor_id, umbrella_id, party_size, otp_challenge_id } = await req.json();
 
     if (!name || !phone || !vendor_id) {
       return NextResponse.json({ error: 'name, phone e vendor_id sao obrigatorios.' }, { status: 400 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'login')) {
+      return NextResponse.json(featureDisabledResponse('login'), { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
     const cleanPhone = String(phone).replace(/\D/g, '');
     if (String(name).trim().length < 2 || cleanPhone.length < 10) {
       return NextResponse.json({ error: 'Informe nome e celular validos.' }, { status: 400 });
+    }
+    if (!otp_challenge_id) {
+      return NextResponse.json({ error: 'Valide o celular por WhatsApp antes de continuar.' }, { status: 403 });
     }
 
     let tenantId: string | null = null;
@@ -121,6 +132,15 @@ export async function POST(req: NextRequest) {
     }
 
     const partySize = Math.max(1, Math.min(50, Number(party_size || 1)));
+    const otpOk = await consumeVerifiedOtp({
+      challengeId: String(otp_challenge_id),
+      phone: cleanPhone,
+      purpose: 'customer_login',
+      vendorId: vendor_id,
+    });
+    if (!otpOk) {
+      return NextResponse.json({ error: 'Codigo WhatsApp nao validado para este celular.' }, { status: 403 });
+    }
 
     const { data: existing } = await supabaseAdmin
       .from('customers')

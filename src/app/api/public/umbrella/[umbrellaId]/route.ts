@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { featureDisabledResponse, getTenantFeatureMap } from '@/lib/features';
 
 /**
  * GET /api/public/umbrella/[umbrellaId]?vendor_id=xxx
@@ -37,9 +38,17 @@ export async function GET(
       return NextResponse.json({ error: 'Este guarda-sol esta inativo.' }, { status: 403 });
     }
 
+    const features = await getTenantFeatureMap(umbrella.tenant_id);
+    if (!features.beach_umbrellas || !features.qr_code) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
+    }
+    if (!features.digital_menu) {
+      return NextResponse.json(featureDisabledResponse('digital_menu'), { status: 403 });
+    }
+
     const { data: vendor, error: vendorError } = await supabaseAdmin
       .from('vendors')
-      .select('id, tenant_id, name, primary_color, secondary_color, logo_url, is_active, subscription_status')
+      .select('id, tenant_id, name, primary_color, secondary_color, button_color, button_text_color, logo_url, is_active, subscription_status')
       .eq('id', umbrella.vendor_id)
       .eq('tenant_id', umbrella.tenant_id)
       .single();
@@ -53,7 +62,7 @@ export async function GET(
     }
 
     const { data: tenantTheme } = await (supabaseAdmin.from('tenants') as any)
-      .select('primary_color, secondary_color, logo_url')
+      .select('primary_color, secondary_color, button_color, button_text_color, logo_url')
       .eq('id', umbrella.tenant_id)
       .single();
 
@@ -85,8 +94,11 @@ export async function GET(
         name: vendor.name,
         primary_color: tenantTheme?.primary_color || vendor.primary_color || '#ff6b00',
         secondary_color: tenantTheme?.secondary_color || vendor.secondary_color || '#82533f',
-        logo_url: tenantTheme?.logo_url || vendor.logo_url || '/sandexpress-logo.svg',
+        button_color: tenantTheme?.button_color || (vendor as any).button_color || '#ff6b00',
+        button_text_color: tenantTheme?.button_text_color || (vendor as any).button_text_color || '#ffffff',
+        logo_url: tenantTheme?.logo_url || vendor.logo_url || '/logo-sandexpress.png',
       },
+      features,
       products: visible,
     });
   } catch (err) {

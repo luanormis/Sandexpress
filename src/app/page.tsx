@@ -15,10 +15,14 @@ export default function LandingPage() {
   const [regSuccess, setRegSuccess] = useState(false);
   const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean; verificationUrl?: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "",
+    name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false,
   });
   const [loading, setLoading] = useState(false);
   const [registerError, setRegisterError] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpChallengeId, setOtpChallengeId] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpMessage, setOtpMessage] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +39,21 @@ export default function LandingPage() {
       setRegisterError("A senha e a confirmacao nao conferem.");
       return;
     }
+    if (!form.terms_accepted) {
+      setRegisterError("Marque que voce leu e concorda com os Termos de Uso para concluir o cadastro.");
+      return;
+    }
+    if (!otpVerified || !otpChallengeId) {
+      setRegisterError("Valide o WhatsApp do responsavel antes de concluir o cadastro.");
+      return;
+    }
     setLoading(true);
     setRegisterError("");
     try {
       const res = await fetch("/api/vendors/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, otp_challenge_id: otpChallengeId }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -62,7 +74,79 @@ export default function LandingPage() {
     setLoading(false);
   };
 
-  const openModal = () => { setShowModal(true); setRegSuccess(false); setRegCredentials(null); setRegisterError(""); };
+  const sendRegisterOtp = async () => {
+    if (!form.owner_phone || form.owner_phone.replace(/\D/g, "").length < 10) {
+      setRegisterError("Informe um WhatsApp valido para enviar o codigo.");
+      return;
+    }
+    setLoading(true);
+    setRegisterError("");
+    setOtpMessage("");
+    setOtpVerified(false);
+    try {
+      const res = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: form.owner_phone,
+          purpose: "vendor_register",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRegisterError(data.error || "Nao foi possivel enviar o codigo.");
+        return;
+      }
+      setOtpChallengeId(data.challenge_id || "");
+      setOtpMessage("Codigo enviado pelo WhatsApp.");
+    } catch {
+      setRegisterError("Erro de rede ao enviar codigo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyRegisterOtp = async () => {
+    if (!otpChallengeId || otpCode.replace(/\D/g, "").length !== 6) {
+      setRegisterError("Informe o codigo de 6 digitos recebido no WhatsApp.");
+      return;
+    }
+    setLoading(true);
+    setRegisterError("");
+    setOtpMessage("");
+    try {
+      const res = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge_id: otpChallengeId,
+          code: otpCode.replace(/\D/g, ""),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRegisterError(data.error || "Codigo invalido.");
+        return;
+      }
+      setOtpVerified(true);
+      setOtpMessage("WhatsApp validado.");
+    } catch {
+      setRegisterError("Erro de rede ao validar codigo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openModal = () => {
+    setShowModal(true);
+    setRegSuccess(false);
+    setRegCredentials(null);
+    setRegisterError("");
+    setOtpCode("");
+    setOtpChallengeId("");
+    setOtpVerified(false);
+    setOtpMessage("");
+  };
 
   return (
     <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
@@ -71,7 +155,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
-              <Image src="/sandexpress-logo.svg" alt="SandExpress" width={42} height={42} priority className="drop-shadow-sm" />
+              <Image src="/logo-sandexpress.png" alt="SandExpress" width={76} height={43} priority className="drop-shadow-sm" />
               <span className="font-display font-bold text-xl sm:text-2xl text-[#261812]">SandExpress</span>
             </div>
           </div>
@@ -116,7 +200,7 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-br from-[#ff6b00] via-[#ffb693] to-[#fff8f6]" />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sand.png')] opacity-10 mix-blend-overlay"></div>
         <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
-          <Image src="/sandexpress-logo.svg" alt="" width={96} height={96} priority className="mx-auto mb-6 drop-shadow-xl" />
+          <Image src="/logo-sandexpress.png" alt="" width={128} height={72} priority className="mx-auto mb-6 drop-shadow-xl" />
           <span className="bg-white/45 text-[#572000] px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
             Seu quiosque vendendo mais, sem esforço.
@@ -283,7 +367,7 @@ export default function LandingPage() {
                         : "Email de validacao nao enviado. Configure RESEND_API_KEY para disparos reais."}
                     </p>
                     {regCredentials.verificationUrl && (
-                      <p className="mt-2 break-words text-xs font-bold text-[#FF6B00]">Link local de teste: {regCredentials.verificationUrl}</p>
+                      <p className="mt-2 break-words text-xs font-bold text-[#FF6B00]">Link local de verificacao: {regCredentials.verificationUrl}</p>
                     )}
                   </div>
                 )}
@@ -317,10 +401,45 @@ export default function LandingPage() {
                     <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp *</label>
                     <input
                       type="tel" required
-                      value={form.owner_phone} onChange={e => setForm(p => ({ ...p, owner_phone: e.target.value.replace(/\D/g, '') }))}
+                      value={form.owner_phone} onChange={e => {
+                        setForm(p => ({ ...p, owner_phone: e.target.value.replace(/\D/g, '') }));
+                        setOtpChallengeId("");
+                        setOtpVerified(false);
+                        setOtpMessage("");
+                      }}
                       className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                       placeholder="(11) 99999-9999"
                     />
+                  </div>
+                  <div className="rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Validacao WhatsApp *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                        placeholder="Codigo de 6 digitos"
+                      />
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={sendRegisterOtp}
+                        className="rounded-xl border-2 border-[#FF6B00] px-4 py-3 text-sm font-black text-[#FF6B00] disabled:opacity-50"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={loading || !otpChallengeId}
+                      onClick={verifyRegisterOtp}
+                      className="mt-2 w-full rounded-xl bg-[#3d1a0a] px-4 py-3 text-sm font-black text-white disabled:opacity-50"
+                    >
+                      {otpVerified ? "WhatsApp validado" : "Validar codigo"}
+                    </button>
+                    {otpMessage && <p className="mt-2 text-xs font-bold text-[#572000]">{otpMessage}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Email de Recuperacao *</label>
@@ -409,6 +528,22 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
+                  <label className="flex gap-3 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-sm font-bold text-gray-700">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={form.terms_accepted}
+                      onChange={e => setForm(p => ({ ...p, terms_accepted: e.target.checked }))}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[#FF6B00]"
+                    />
+                    <span>
+                      Li e concordo com os{" "}
+                      <Link href="/termos-de-uso" target="_blank" className="text-[#FF6B00] underline underline-offset-2">
+                        Termos de Uso do SandExpress
+                      </Link>
+                      , incluindo o uso dos dados do cadastro para operacao, pedidos, relatorios e suporte.
+                    </span>
+                  </label>
                   {registerError && (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                       {registerError}

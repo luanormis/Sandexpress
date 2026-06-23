@@ -13,6 +13,8 @@ export interface Vendor {
   logo_url?: string | null
   primary_color: string
   secondary_color?: string | null
+  button_color?: string | null
+  button_text_color?: string | null
   is_active: boolean
   subscription_status: 'trial' | 'active' | 'overdue' | 'blocked'
   max_umbrellas: number
@@ -31,6 +33,8 @@ export interface Tenant {
   beach_name?: string | null
   primary_color?: string | null
   secondary_color?: string | null
+  button_color?: string | null
+  button_text_color?: string | null
   logo_url?: string | null
   created_at?: string
 }
@@ -78,6 +82,7 @@ export interface Umbrella {
   location_hint?: string | null
   active: boolean
   qr_url?: string | null
+  qr_path?: string | null
   created_at?: string
 }
 
@@ -160,6 +165,8 @@ export interface AuthResponse {
 export interface KioskTheme {
   primary_color: string
   secondary_color: string
+  button_color: string
+  button_text_color: string
   logo_url?: string | null
   plan_type: 'trial' | 'plus'
 }

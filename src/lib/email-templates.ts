@@ -23,12 +23,19 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;');
 }
 
+function getBrandLogoUrl() {
+  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  return publicUrl ? `${publicUrl}/logo-sandexpress.png` : '/logo-sandexpress.png';
+}
+
 function shell(title: string, body: string) {
+  const logoUrl = getBrandLogoUrl();
   return `
     <div style="margin:0;padding:0;background:#fff8f6;font-family:Arial,sans-serif;color:#261812">
       <div style="max-width:560px;margin:0 auto;padding:28px 16px">
         <div style="background:#ffffff;border:1px solid #f0d5c8;border-radius:16px;padding:28px;line-height:1.5">
-          <p style="margin:0 0 12px;color:#ff6b00;font-size:13px;font-weight:700;text-transform:uppercase">SandExpress</p>
+          <img src="${escapeHtml(logoUrl)}" alt="SandExpress" width="128" height="72" style="display:block;margin:0 auto 16px;max-width:128px;height:auto" />
+          <p style="margin:0 0 12px;color:#ff6b00;font-size:13px;font-weight:700;text-transform:uppercase;text-align:center">SandExpress</p>
           <h1 style="margin:0 0 16px;font-size:24px;line-height:1.2;color:#261812">${escapeHtml(title)}</h1>
           ${body}
         </div>

@@ -25,6 +25,8 @@ export interface Database {
           logo_url: string | null
           primary_color: string
           secondary_color: string | null
+          button_color: string | null
+          button_text_color: string | null
           password_hash: string | null
           password_needs_reset: boolean
           password_reset_token: string | null
@@ -58,6 +60,8 @@ export interface Database {
           logo_url?: string | null
           primary_color?: string
           secondary_color?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
           password_hash?: string | null
           password_needs_reset?: boolean
           password_reset_token?: string | null
@@ -90,6 +94,8 @@ export interface Database {
           logo_url?: string | null
           primary_color?: string
           secondary_color?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
           password_hash?: string | null
           password_needs_reset?: boolean
           password_reset_token?: string | null
@@ -152,6 +158,7 @@ export interface Database {
           location_hint: string | null
           active: boolean | null
           qr_url: string | null
+          qr_path: string | null
           created_at: string | null
         }
         Insert: {
@@ -163,6 +170,7 @@ export interface Database {
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
+          qr_path?: string | null
           created_at?: string | null
         }
         Update: {
@@ -172,6 +180,7 @@ export interface Database {
           location_hint?: string | null
           active?: boolean | null
           qr_url?: string | null
+          qr_path?: string | null
         }
       }
       products: {
@@ -303,6 +312,8 @@ export interface Database {
           beach_name: string | null
           primary_color: string | null
           secondary_color: string | null
+          button_color: string | null
+          button_text_color: string | null
           logo_url: string | null
           created_at: string | null
         }
@@ -316,6 +327,8 @@ export interface Database {
           beach_name?: string | null
           primary_color?: string | null
           secondary_color?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
           logo_url?: string | null
           created_at?: string | null
         }
@@ -328,6 +341,8 @@ export interface Database {
           beach_name?: string | null
           primary_color?: string | null
           secondary_color?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
           logo_url?: string | null
         }
       }

@@ -36,11 +36,11 @@ export async function POST(
     }
 
     const ext = file.name.split('.').pop() || 'png';
-    const fileName = `${id}/logo-${Date.now()}.${ext}`;
+    const fileName = `logos/${id}/logo-${Date.now()}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadErr } = await supabaseAdmin.storage
-      .from('product-images')
+      .from('kiosk-assets')
       .upload(fileName, buffer, {
         contentType: file.type,
         upsert: true,
@@ -49,7 +49,7 @@ export async function POST(
     if (uploadErr) throw uploadErr;
 
     const { data: urlData } = supabaseAdmin.storage
-      .from('product-images')
+      .from('kiosk-assets')
       .getPublicUrl(fileName);
 
     const themeUpdate = {

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { getPublicAppUrl } from '@/lib/public-url';
+import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getPublicAppUrl } from '@/lib/public-url';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
@@ -21,6 +22,9 @@ export async function GET(req: NextRequest) {
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
     const { data, error } = await supabaseAdmin
@@ -48,9 +52,12 @@ export async function POST(req: NextRequest) {
     if (!canAccessVendor(session, body.vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
+    if (!await vendorFeatureEnabled(body.vendor_id, 'beach_umbrellas')) {
+      return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
+    }
 
     const { data: vendor, error: vendorErr } = await (supabaseAdmin.from('vendors') as any)
-      .select('tenant_id, max_umbrellas')
+      .select('tenant_id, max_umbrellas, name')
       .eq('id', body.vendor_id)
       .single();
     if (vendorErr || !vendor?.tenant_id) {
@@ -83,11 +90,13 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    const qrUrl = `${getPublicAppUrl(req)}/u/${data.vendor_id}/${data.id}`;
+    const qrOptions = { vendorName: vendor.name, umbrellaNumber: data.number };
+    const qrPath = buildUmbrellaQrTargetPath(data.vendor_id, data.id, qrOptions);
+    const qrUrl = buildUmbrellaQrTargetUrl(getPublicAppUrl(req), data.vendor_id, data.id, qrOptions);
     if (data.qr_url !== qrUrl) {
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('umbrellas')
-        .update({ qr_url: qrUrl })
+        .update({ qr_url: qrUrl, qr_path: qrPath })
         .eq('id', data.id)
         .select()
         .single();

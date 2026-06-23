@@ -1,10 +1,19 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { getAdminPassword } from '@/lib/runtime-config';
+import { verifyVendorPassword } from '@/lib/vendor-password';
 
 /** Campos permitidos para atualização de guarda-sol (whitelist contra mass-assignment) */
 const ALLOWED_UMBRELLA_FIELDS = new Set(['active', 'label', 'location_hint', 'qr_url']);
+
+function verifyPlainAdminPassword(password: unknown) {
+  const provided = Buffer.from(String(password || ''));
+  const expected = Buffer.from(getAdminPassword());
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+}
 
 /**
  * GET /api/umbrellas/[id]
@@ -123,6 +132,7 @@ export async function DELETE(
     if (!session) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
 
     const { id } = await params;
+    const body = await req.json().catch(() => ({}));
 
     const umbrellaLookup = await enforceTenantScope(
       supabaseAdmin.from('umbrellas').select('vendor_id, is_occupied').eq('id', id),
@@ -134,6 +144,31 @@ export async function DELETE(
     if (!canAccessVendor(session, umbrellaLookup.data.vendor_id)) {
       return NextResponse.json({ error: 'Não autorizado para este guarda-sol.' }, { status: 403 });
     }
+    if (session.role === 'admin') {
+      if (!verifyPlainAdminPassword(body.admin_password)) {
+        return NextResponse.json({ error: 'Senha do admin invalida.' }, { status: 401 });
+      }
+    } else {
+      const vendorPassword = String(body.vendor_password || body.admin_password || '');
+      if (!vendorPassword) {
+        return NextResponse.json({ error: 'Senha do admin do quiosque obrigatoria para excluir guarda-sol.' }, { status: 400 });
+      }
+
+      const { data: vendor, error: vendorError } = await supabaseAdmin
+        .from('vendors')
+        .select('password_hash')
+        .eq('id', umbrellaLookup.data.vendor_id)
+        .single();
+      if (vendorError || !vendor?.password_hash) {
+        return NextResponse.json({ error: 'Quiosque sem senha cadastrada para confirmar exclusao.' }, { status: 403 });
+      }
+
+      const passwordValid = await verifyVendorPassword(vendorPassword, vendor.password_hash);
+      if (!passwordValid) {
+        return NextResponse.json({ error: 'Senha do admin do quiosque invalida.' }, { status: 403 });
+      }
+    }
+
     if (umbrellaLookup.data.is_occupied) {
       return NextResponse.json({ error: 'Não é possível remover guarda-sol com conta aberta.' }, { status: 409 });
     }

@@ -11,6 +11,11 @@ import { cn, formatCurrency } from "@/lib/utils";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
+const SERVICE_REQUEST_MARKERS = [
+  { marker: "[WAITER_CALL]", label: "Solicitando atendente", shortLabel: "Atendente", tone: "waiter" },
+  { marker: "[CLEANING_REQUEST]", label: "Solicitando limpeza", shortLabel: "Limpeza", tone: "waiter" },
+  { marker: "[UMBRELLA_TRANSFER]", label: "Solicitando troca de guarda-sol", shortLabel: "Troca", tone: "waiter" },
+];
 
 // ---------- TYPES ----------
 interface Product {
@@ -23,6 +28,7 @@ interface Product {
   image_url: string;
   active: boolean;
   is_combo: boolean;
+  stock_tracking_enabled?: boolean;
   sort_order: number;
 }
 
@@ -45,10 +51,14 @@ function hasWaiterCall(order?: Pick<Order, "notes"> | null) {
   return Boolean(order?.notes?.includes(WAITER_CALL_MARKER));
 }
 
+function getServiceRequest(order?: Pick<Order, "notes"> | null) {
+  return SERVICE_REQUEST_MARKERS.find(request => order?.notes?.includes(request.marker)) || null;
+}
+
 function getVisibleOrderNotes(notes?: string) {
   return (notes || "")
     .split("\n")
-    .filter(line => !line.includes(WAITER_CALL_MARKER))
+    .filter(line => !SERVICE_REQUEST_MARKERS.some(request => line.includes(request.marker)))
     .join("\n")
     .trim();
 }
@@ -64,6 +74,7 @@ interface Umbrella {
   map_x?: number | null;
   map_y?: number | null;
   qr_url: string | null;
+  qr_path?: string | null;
   qr_image_url?: string;
 }
 
@@ -103,7 +114,12 @@ interface VendorUser {
 interface KioskTheme {
   primary_color: string;
   secondary_color: string;
+  button_color: string;
+  button_text_color: string;
   logo_url: string;
+  debit_card_fee_rate?: number;
+  credit_card_fee_rate?: number;
+  pix_fee_rate?: number;
   tenant_id?: string;
 }
 
@@ -112,7 +128,12 @@ const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Pe
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
   secondary_color: "#82533f",
-  logo_url: "/sandexpress-logo.svg",
+  button_color: "#ff6b00",
+  button_text_color: "#ffffff",
+  logo_url: "/logo-sandexpress.png",
+  debit_card_fee_rate: 0,
+  credit_card_fee_rate: 0,
+  pix_fee_rate: 0,
 };
 
 const BRAND_PALETTE = [
@@ -249,16 +270,16 @@ export default function VendorDashboard() {
         let hasNewClosingRequest = false;
         let hasNewWaiterCall = false;
         data.forEach((order: Order) => {
-          const currentSignature = `${order.status}:${hasWaiterCall(order) ? "waiter" : "normal"}:${order.notes || ""}`;
+          const currentSignature = `${order.status}:${getServiceRequest(order)?.marker || "normal"}:${order.notes || ""}`;
           const previousStatus = knownOrderStatusesRef.current.get(order.id);
           nextStatusMap.set(order.id, currentSignature);
           if (!previousStatus && order.status === "received") hasNewOrder = true;
           if (!previousStatus && order.status === "closing_requested") hasNewClosingRequest = true;
-          if (!previousStatus && hasWaiterCall(order)) hasNewWaiterCall = true;
+          if (!previousStatus && getServiceRequest(order)) hasNewWaiterCall = true;
           if (previousStatus && !previousStatus.startsWith("closing_requested") && order.status === "closing_requested") {
             hasNewClosingRequest = true;
           }
-          if (previousStatus && !previousStatus.includes("waiter") && hasWaiterCall(order)) hasNewWaiterCall = true;
+          if (previousStatus && previousStatus.includes("normal") && getServiceRequest(order)) hasNewWaiterCall = true;
         });
         if (knownOrderStatusesRef.current.size > 0) {
           if (hasNewOrder) playNewOrderSound();
@@ -331,7 +352,12 @@ export default function VendorDashboard() {
           tenant_id: data.tenant_id,
           primary_color: data.primary_color || DEFAULT_THEME.primary_color,
           secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+          button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
+          button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
           logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+          debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
+          credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
+          pix_fee_rate: Number(data.pix_fee_rate || 0),
         });
       }
     } catch (err) {
@@ -374,7 +400,12 @@ export default function VendorDashboard() {
         tenant_id: data.tenant_id,
         primary_color: data.primary_color || DEFAULT_THEME.primary_color,
         secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+        button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
+        button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
         logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+        debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
+        credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
+        pix_fee_rate: Number(data.pix_fee_rate || 0),
       });
       setThemeMessage("Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
     } catch {
@@ -655,6 +686,7 @@ export default function VendorDashboard() {
         ...u,
         qr_image_url: data.qr_image_url,
         qr_url: data.target_url,
+        qr_path: data.target_path,
       } : u));
     } catch (err) {
       console.error("Failed to generate QR:", err);
@@ -662,8 +694,45 @@ export default function VendorDashboard() {
     }
   };
 
+  const deleteUmbrella = async (umbrella: Umbrella) => {
+    if (umbrella.is_occupied || umbrella.current_order_id) {
+      return alert('Nao e possivel excluir guarda-sol com conta aberta.');
+    }
+
+    const confirmed = confirm(`Excluir definitivamente o guarda-sol ${umbrella.number}? Esta acao remove o QR gravado no banco.`);
+    if (!confirmed) return;
+
+    const vendorPassword = prompt('Digite a senha do admin do quiosque para confirmar a exclusao');
+    if (!vendorPassword) return;
+
+    try {
+      const res = await fetch(`/api/umbrellas/${umbrella.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_password: vendorPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return alert(data.error || 'Erro ao excluir guarda-sol.');
+      }
+      setUmbrellas(prev => prev.filter(u => u.id !== umbrella.id));
+    } catch (err) {
+      console.error('Delete umbrella error:', err);
+      alert('Erro de rede ao excluir guarda-sol.');
+    }
+  };
+
   const markAccountPaid = async (order: Order) => {
     if (!vendorId) return;
+    const method = prompt('Forma de pagamento: dinheiro, pix, debito ou credito', 'dinheiro');
+    if (!method) return;
+    const normalizedMethod = method.toLowerCase().includes('pix')
+      ? 'pix'
+      : method.toLowerCase().includes('deb')
+        ? 'debit_card'
+        : method.toLowerCase().includes('cred')
+          ? 'credit_card'
+          : 'cash';
     const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella}?`);
     if (!confirmed) return;
 
@@ -674,7 +743,7 @@ export default function VendorDashboard() {
         body: JSON.stringify({
           vendor_id: vendorId,
           umbrella_id: order.umbrella_id,
-          payment_method: 'cash',
+          payment_method: normalizedMethod,
           notes: order.notes || 'Conta paga no Kanban',
         }),
       });
@@ -726,10 +795,17 @@ export default function VendorDashboard() {
     c.phone.includes(customerSearch)
   );
 
-  const renderCompactKanbanColumn = (title: string, status: string, nextAction: string, nextStatus: string, color: string) => {
-    const colOrders = orders.filter(o => o.status === status);
+  const renderCompactKanbanColumn = (
+    title: string,
+    filterOrder: (order: Order) => boolean,
+    nextAction: string,
+    nextStatus: string,
+    color: string,
+    options: { pulse?: boolean; paidAction?: boolean } = {}
+  ) => {
+    const colOrders = orders.filter(filterOrder);
     return (
-      <div className="bg-gray-100 rounded-lg p-3 flex flex-col h-[58vh] min-w-[220px] max-w-[240px]">
+      <div className="vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[22rem] lg:min-h-[calc(100vh-21rem)]">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
@@ -744,24 +820,24 @@ export default function VendorDashboard() {
               onClick={() => setSelectedOrder(order)}
               className={cn(
                 "w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
-                status === "received" && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
-                hasWaiterCall(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
+                options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
+                getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
               )}
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
                 <span className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={11}/> {order.time}</span>
               </div>
-              {hasWaiterCall(order) && (
+              {getServiceRequest(order) && (
                 <p className="mt-2 rounded-md bg-red-600 px-2 py-1 text-center text-xs font-black uppercase text-white animate-pulse">
-                  Solicitando garcom
+                  {getServiceRequest(order)?.label}
                 </p>
               )}
               <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
               <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
               <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
               <div className="mt-2 flex flex-col gap-1">
-                {status === 'closing_requested' ? (
+                {options.paidAction ? (
                   <span
                     onClick={(event) => { event.stopPropagation(); markAccountPaid(order); }}
                     className="w-full cursor-pointer rounded-md bg-green-600 px-2 py-1.5 text-center text-xs font-black text-white hover:bg-green-700"
@@ -810,7 +886,7 @@ export default function VendorDashboard() {
           {umbrellas.map(umbrella => {
             const order = orders.find(item => item.umbrella_id === umbrella.id);
             const closing = order?.status === 'closing_requested';
-            const waiterCall = hasWaiterCall(order);
+            const serviceRequest = getServiceRequest(order);
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
             return (
               <button
@@ -822,14 +898,14 @@ export default function VendorDashboard() {
                   umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
                   umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
                   umbrella.active && closing && "border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
-                  umbrella.active && waiterCall && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
+                  umbrella.active && serviceRequest && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
                 )}
-                title={waiterCall ? `Solicitando garcom - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
+                title={serviceRequest ? `${serviceRequest.label} - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
               >
                 {umbrella.number}
-                {waiterCall && (
+                {serviceRequest && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-white/95 px-1 py-0.5 text-[9px] font-black uppercase text-red-600">
-                    Garcom
+                    {serviceRequest.shortLabel}
                   </span>
                 )}
               </button>
@@ -841,7 +917,7 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="min-h-app bg-white flex flex-col lg:flex-row font-sans">
+    <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans">
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -910,12 +986,37 @@ export default function VendorDashboard() {
           {activeTab === "orders" && (
             <div className="space-y-4">
               {renderBeachMap()}
-              <div className="flex gap-3 overflow-x-auto pb-4">
-                {renderCompactKanbanColumn("Recebido", "received", "Iniciar", "preparing", "bg-blue-500")}
-                {renderCompactKanbanColumn("Preparando", "preparing", "Saiu", "delivering", "bg-yellow-500")}
-                {renderCompactKanbanColumn("Entregando", "delivering", "Entregue", "completed", "bg-purple-500")}
-                {renderCompactKanbanColumn("Conta Solicitada", "closing_requested", "Conta paga", "", "bg-orange-500")}
-                {renderCompactKanbanColumn("Entregue", "completed", "Solicitar conta", "closing_requested", "bg-green-500")}
+              <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-4">
+                {renderCompactKanbanColumn(
+                  "Mesa aberta",
+                  (order) => !order.paid && order.status !== "closing_requested" && Number(order.total || 0) <= 0,
+                  "",
+                  "",
+                  "bg-slate-500"
+                )}
+                {renderCompactKanbanColumn(
+                  "Recebido",
+                  (order) => !order.paid && ["received", "preparing", "delivering"].includes(order.status) && Number(order.total || 0) > 0,
+                  "Entregue",
+                  "completed",
+                  "bg-blue-500",
+                  { pulse: true }
+                )}
+                {renderCompactKanbanColumn(
+                  "Entregue",
+                  (order) => !order.paid && order.status === "completed",
+                  "Fechar conta",
+                  "closing_requested",
+                  "bg-green-500"
+                )}
+                {renderCompactKanbanColumn(
+                  "Fechar conta",
+                  (order) => !order.paid && order.status === "closing_requested",
+                  "Conta paga",
+                  "",
+                  "bg-orange-500",
+                  { paidAction: true }
+                )}
               </div>
             </div>
           )}
@@ -1093,6 +1194,14 @@ export default function VendorDashboard() {
                           <QrCode size={18} /> Gerar QR Code
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => deleteUmbrella(u)}
+                        disabled={Boolean(u.is_occupied || u.current_order_id)}
+                        className="mt-4 w-full border border-red-200 bg-red-50 text-red-700 font-bold py-2 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 size={16} /> Excluir guarda-sol
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1143,6 +1252,40 @@ export default function VendorDashboard() {
                       />
                     </div>
                   </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Cor do botao</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.button_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.button_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Texto do botao</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.button_text_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.button_text_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
                 </div>
 
                 <div className="mt-5">
@@ -1153,7 +1296,7 @@ export default function VendorDashboard() {
                         key={color.value}
                         type="button"
                         title={color.name}
-                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value }))}
+                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value, button_color: color.value }))}
                         className="h-10 w-10 rounded-lg border border-gray-200 shadow-sm transition-transform hover:scale-105"
                         style={{ backgroundColor: color.value }}
                       />
@@ -1186,11 +1329,35 @@ export default function VendorDashboard() {
                       <input
                         value={themeForm.logo_url}
                         onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
-                        placeholder="/sandexpress-logo.svg ou https://..."
+                        placeholder="/logo-sandexpress.png ou https://..."
                         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
                       />
                       <span className="block text-xs font-semibold text-gray-500">Tambem e possivel colar uma URL manualmente.</span>
                     </label>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <h4 className="text-sm font-black text-gray-900">Taxas de recebimento</h4>
+                  <p className="mt-1 text-xs font-semibold text-gray-500">Percentual descontado para calcular o valor liquido no fechamento da conta.</p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {[
+                      ['pix_fee_rate', 'PIX'],
+                      ['debit_card_fee_rate', 'Debito'],
+                      ['credit_card_fee_rate', 'Credito'],
+                    ].map(([field, label]) => (
+                      <label key={field} className="space-y-1">
+                        <span className="text-xs font-black uppercase text-gray-600">{label} (%)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={Number(themeForm[field as keyof KioskTheme] || 0)}
+                          onChange={(event) => setThemeForm(prev => ({ ...prev, [field]: Number(event.target.value) || 0 }))}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -1202,7 +1369,7 @@ export default function VendorDashboard() {
                   type="submit"
                   disabled={themeSaving}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
-                  style={{ backgroundColor: themeForm.primary_color }}
+                  style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}
                 >
                   <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalizacao"}
                 </button>
@@ -1225,10 +1392,10 @@ export default function VendorDashboard() {
                     <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
                     <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(128.5)}</p>
                   </div>
-                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.primary_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}>
                     Abrir comanda
                   </button>
-                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.secondary_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.secondary_color, color: themeForm.button_text_color }}>
                     Fechar conta
                   </button>
                 </div>
@@ -1651,6 +1818,7 @@ function OrderModal({
   onPaid: (order: Order) => Promise<void>;
   onWaiterDone: (order: Order) => Promise<void>;
 }) {
+  const serviceRequest = getServiceRequest(order);
   const next = order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
@@ -1673,15 +1841,15 @@ function OrderModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
         <div className="p-6 space-y-4">
-          {hasWaiterCall(order) && (
+          {serviceRequest && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-              <p className="text-sm font-black uppercase">Solicitando garcom</p>
-              <p className="mt-1 text-sm font-bold">Cliente pediu atendimento neste guarda-sol.</p>
+              <p className="text-sm font-black uppercase">{serviceRequest.label}</p>
+              <p className="mt-1 text-sm font-bold">Cliente pediu este atendimento no guarda-sol.</p>
               <button
                 onClick={() => onWaiterDone(order)}
                 className="mt-3 w-full rounded-xl bg-red-600 py-3 text-sm font-black text-white hover:bg-red-700"
               >
-                Garcom atendido
+                Atendimento resolvido
               </button>
             </div>
           )}
@@ -1733,7 +1901,7 @@ function OrderModal({
 function ProductModal({ product, vendorId, onSave, onClose }: { product: Product | null; vendorId: string | null; onSave: (p: Product) => Promise<void> | void; onClose: () => void }) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
-    description: "", image_url: "", active: true, is_combo: false, sort_order: 99,
+    description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false, sort_order: 99,
   });
   const [uploading, setUploading] = useState(false);
 
@@ -1860,6 +2028,15 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
                 className="w-5 h-5 accent-[#FF6B00]"
               />
               <span className="text-sm font-bold text-gray-700">Disponível no cardápio</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(form.stock_tracking_enabled)}
+                onChange={e => setForm(prev => ({ ...prev, stock_tracking_enabled: e.target.checked }))}
+                className="w-5 h-5 accent-[#FF6B00]"
+              />
+              <span className="text-sm font-bold text-gray-700">Contabilizar estoque</span>
             </label>
           </div>
         </div>

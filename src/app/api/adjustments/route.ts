@@ -1,19 +1,6 @@
-import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-async function verifyVendorPassword(password: string, storedHash: string) {
-  const [salt, key] = storedHash.split(':');
-  if (!salt || !key) return false;
-  const derivedKey = (await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, derived) => {
-      if (err) reject(err);
-      else resolve(derived);
-    });
-  })) as Buffer;
-  const storedBuffer = Buffer.from(key, 'hex');
-  return storedBuffer.length === derivedKey.length && crypto.timingSafeEqual(storedBuffer, derivedKey);
-}
+import { verifyVendorPassword } from '@/lib/vendor-password';
 
 export async function GET(req: NextRequest) {
   try {

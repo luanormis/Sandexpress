@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
+import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
 
 /**
  * GET /api/qr?umbrella_id=xxx&format=svg|png
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const { data: umbrella, error } = await supabaseAdmin
       .from('umbrellas')
-      .select('id, tenant_id, vendor_id, number, active')
+      .select('id, tenant_id, vendor_id, number, active, vendors(name)')
       .eq('id', umbrellaId)
       .single();
 
@@ -38,11 +38,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 403 });
     }
 
-    const targetUrl = `${baseUrl.replace(/\/$/, '')}/u/${umbrella.vendor_id}/${umbrella.id}`;
+    const vendor = Array.isArray((umbrella as any).vendors) ? (umbrella as any).vendors[0] : (umbrella as any).vendors;
+    const qrOptions = { vendorName: vendor?.name || null, umbrellaNumber: umbrella.number };
+    const targetPath = buildUmbrellaQrTargetPath(umbrella.vendor_id, umbrella.id, qrOptions);
+    const targetUrl = buildUmbrellaQrTargetUrl(baseUrl, umbrella.vendor_id, umbrella.id, qrOptions);
 
     await supabaseAdmin
       .from('umbrellas')
-      .update({ qr_url: targetUrl })
+      .update({ qr_url: targetUrl, qr_path: targetPath })
       .eq('id', umbrella.id);
 
     if (format === 'png') {
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
         vendor_id: umbrella.vendor_id,
         number: umbrella.number,
         target_url: targetUrl,
+        target_path: targetPath,
         qr_image_url: dataUrl,
         format: 'png',
       });

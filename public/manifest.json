@@ -8,9 +8,9 @@
   "theme_color": "#FF6B00",
   "icons": [
     {
-      "src": "/sandexpress-logo.svg",
+      "src": "/logo-sandexpress.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {

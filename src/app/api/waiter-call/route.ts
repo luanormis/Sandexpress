@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
-const WAITER_MARKER = '[WAITER_CALL]';
+const SERVICE_REQUESTS = {
+  waiter_call: {
+    marker: '[WAITER_CALL]',
+    feature: 'waiter_call',
+    note: 'Cliente solicitou atendente',
+    message: 'Atendente solicitado no painel do quiosque.',
+  },
+  cleaning_request: {
+    marker: '[CLEANING_REQUEST]',
+    feature: 'cleaning_request',
+    note: 'Cliente solicitou limpeza',
+    message: 'Limpeza solicitada no painel do quiosque.',
+  },
+  umbrella_transfer: {
+    marker: '[UMBRELLA_TRANSFER]',
+    feature: 'umbrella_transfer',
+    note: 'Cliente solicitou troca de guarda-sol',
+    message: 'Troca de guarda-sol solicitada no painel do quiosque.',
+  },
+} as const;
 
 type WaiterCallBody = {
   vendor_id?: string;
   customer_id?: string;
   umbrella_id?: string;
+  request_type?: keyof typeof SERVICE_REQUESTS;
 };
 
 type OpenOrder = {
@@ -20,7 +41,8 @@ type OpenOrder = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { vendor_id, customer_id, umbrella_id } = (await req.json()) as WaiterCallBody;
+    const { vendor_id, customer_id, umbrella_id, request_type } = (await req.json()) as WaiterCallBody;
+    const serviceRequest = SERVICE_REQUESTS[request_type || 'waiter_call'] || SERVICE_REQUESTS.waiter_call;
 
     if (!vendor_id || !customer_id || !umbrella_id) {
       return NextResponse.json({ error: 'vendor_id, customer_id e umbrella_id sao obrigatorios.' }, { status: 400 });
@@ -32,6 +54,9 @@ export async function POST(req: NextRequest) {
     }
     if (session.role !== 'customer' || session.vendor_id !== vendor_id || session.customer_id !== customer_id) {
       return NextResponse.json({ error: 'Sessao de cliente invalida para chamar o garcom.' }, { status: 403 });
+    }
+    if (!await vendorFeatureEnabled(vendor_id, serviceRequest.feature)) {
+      return NextResponse.json(featureDisabledResponse(serviceRequest.feature), { status: 403 });
     }
 
     const { data: umbrella, error: umbrellaErr } = await supabaseAdmin
@@ -60,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (openErr) throw openErr;
 
-    const waiterNote = `${WAITER_MARKER} Cliente solicitou garcom em ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    const requestNote = `${serviceRequest.marker} ${serviceRequest.note} em ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
     let order = openOrders?.[0] as OpenOrder | undefined;
 
     if (order && order.customer_id !== customer_id) {
@@ -68,7 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (order) {
-      const nextNotes = [order.notes, waiterNote].filter(Boolean).join('\n');
+      const nextNotes = [order.notes, requestNote].filter(Boolean).join('\n');
       const { data: updatedOrder, error: updateErr } = await supabaseAdmin
         .from('orders')
         .update({
@@ -92,7 +117,7 @@ export async function POST(req: NextRequest) {
           total: 0,
           status: 'received',
           paid: false,
-          notes: waiterNote,
+          notes: requestNote,
         })
         .select()
         .single();
@@ -110,7 +135,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       order,
-      message: 'Garcom solicitado no painel do quiosque.',
+      request_type: request_type || 'waiter_call',
+      message: serviceRequest.message,
     });
   } catch (err) {
     console.error('Waiter call error:', err);

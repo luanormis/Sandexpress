@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchArchivedOrders } from '@/lib/order-archive';
 
 const PLAN_PRICES: Record<string, number> = {
-  monthly: 259,
-  '6months': 259,
-  '12months': 199.99,
+  monthly: 499.99,
+  '6months': 499.99,
+  annual: 299.99,
+  '12months': 299.99,
   trial: 0,
 };
 
@@ -99,7 +101,20 @@ export async function GET(req: NextRequest) {
     const { data: orders, error: ordersError } = await orderQuery;
     if (ordersError) throw ordersError;
 
-    const filteredOrders = (orders || []).filter((order: any) => selectedVendorIds.has(order.vendor_id));
+    const archiveEndDate = to
+      ? (() => {
+          const endDate = new Date(to);
+          endDate.setHours(23, 59, 59, 999);
+          return endDate.toISOString();
+        })()
+      : new Date().toISOString();
+    const archivedOrders = await fetchArchivedOrders({
+      vendorId: vendorId || undefined,
+      startDate: from || monthStart.toISOString(),
+      endDate: archiveEndDate,
+    });
+
+    const filteredOrders = [...(orders || []), ...archivedOrders].filter((order: any) => selectedVendorIds.has(order.vendor_id));
     const countedCustomers = new Set<string>();
     const productAgg = new Map<string, { product_id: string; name: string; category: string; quantity: number; revenue: number; orders: number }>();
     const categoryAgg = new Map<string, { category: string; quantity: number; revenue: number }>();

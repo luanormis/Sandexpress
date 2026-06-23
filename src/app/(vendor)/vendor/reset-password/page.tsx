@@ -89,7 +89,7 @@ export default function VendorResetPassword() {
   return (
     <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
       <div className="w-24 h-24 rounded-[32px] brand-card flex items-center justify-center mb-6">
-        <Image src="/sandexpress-logo.svg" alt="SandExpress" width={72} height={72} priority />
+        <Image src="/logo-sandexpress.png" alt="SandExpress" width={128} height={72} priority />
       </div>
       <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Recuperar senha</h1>
       <p className="text-gray-500 mb-8 max-w-sm">Crie uma nova senha para acessar o painel do quiosque.</p>

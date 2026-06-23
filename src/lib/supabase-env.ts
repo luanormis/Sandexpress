@@ -1,19 +1,24 @@
-const FALLBACK_SUPABASE_URL = 'https://invalid.supabase.co';
-
 export function getSupabaseUrl() {
   const value = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  if (!value) return FALLBACK_SUPABASE_URL;
+  if (!value) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL obrigatorio. Configure a URL real do projeto Supabase.');
+  }
 
   try {
     const url = new URL(value);
     if (url.protocol === 'http:' || url.protocol === 'https:') return value;
   } catch {
-    // The health route reports the exact setup problem without breaking build.
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL invalido. Use https://SEU-PROJETO.supabase.co.');
   }
 
-  return FALLBACK_SUPABASE_URL;
+  throw new Error('NEXT_PUBLIC_SUPABASE_URL invalido. Use https://SEU-PROJETO.supabase.co.');
 }
 
 export function isSupabaseUrlConfigured() {
-  return getSupabaseUrl() !== FALLBACK_SUPABASE_URL;
+  try {
+    getSupabaseUrl();
+    return true;
+  } catch {
+    return false;
+  }
 }
