@@ -3,19 +3,11 @@ import crypto from 'crypto';
 import { getAppBaseUrl, sendEmail } from '@/lib/email';
 import { buildVendorVerificationEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getRequestSession } from '@/lib/auth-session';
 import { buildTenantFeatureRows } from '@/lib/features';
 import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
-
-async function hashPassword(password: string) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = (await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  })) as Buffer;
-  return `${salt}:${derivedKey.toString('hex')}`;
-}
+import { consumeVerifiedOtp } from '@/lib/otp-challenges';
+import { hashPassword } from '@/lib/vendor-password';
 
 function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -40,6 +32,8 @@ export async function POST(req: NextRequest) {
     const cleanCpf = String(body.cpf || '').replace(/\D/g, '');
     const cleanCnpj = String(body.cnpj || '').replace(/\D/g, '');
     const documentLogin = String(body.document_login || cleanCnpj || cleanCpf || cleanPhone).trim();
+    const session = getRequestSession(req);
+    const isAdminCreate = session?.role === 'admin';
     if (!documentLogin) {
       return NextResponse.json({ error: 'Informe telefone, CPF ou CNPJ para criar o login.' }, { status: 400 });
     }
@@ -48,6 +42,9 @@ export async function POST(req: NextRequest) {
     }
     if (body.terms_accepted !== true) {
       return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso para concluir o cadastro.' }, { status: 400 });
+    }
+    if (!isAdminCreate && !body.otp_challenge_id) {
+      return NextResponse.json({ error: 'Valide o WhatsApp do responsavel antes de cadastrar o quiosque.' }, { status: 403 });
     }
 
     const duplicateFilters = [
@@ -87,6 +84,16 @@ export async function POST(req: NextRequest) {
     const cleanState = String(body.state).trim().toUpperCase();
     const cleanCity = String(body.city).trim();
     const cleanBeach = String(body.beach_name).trim();
+    if (!isAdminCreate) {
+      const otpOk = await consumeVerifiedOtp({
+        challengeId: String(body.otp_challenge_id),
+        phone: cleanPhone,
+        purpose: 'vendor_register',
+      });
+      if (!otpOk) {
+        return NextResponse.json({ error: 'Codigo WhatsApp nao validado para o responsavel.' }, { status: 403 });
+      }
+    }
 
     const { data: beach, error: beachError } = await (supabaseAdmin.from('beaches') as any)
       .upsert({
@@ -109,7 +116,9 @@ export async function POST(req: NextRequest) {
       beach_name: cleanBeach,
       primary_color: body.primary_color || '#ff6b00',
       secondary_color: body.secondary_color || '#82533f',
-      logo_url: body.logo_url || '/sandexpress-logo.svg',
+      button_color: body.button_color || body.primary_color || '#ff6b00',
+      button_text_color: body.button_text_color || '#ffffff',
+      logo_url: body.logo_url || '/logo-sandexpress.png',
     };
     if (beachId) tenantPayload.beach_id = beachId;
 
@@ -136,9 +145,11 @@ export async function POST(req: NextRequest) {
         city: cleanCity,
         state: cleanState,
         beach_name: cleanBeach,
-        logo_url: body.logo_url || '/sandexpress-logo.svg',
+        logo_url: body.logo_url || '/logo-sandexpress.png',
         primary_color: body.primary_color || '#ff6b00',
         secondary_color: body.secondary_color || '#82533f',
+        button_color: body.button_color || body.primary_color || '#ff6b00',
+        button_text_color: body.button_text_color || '#ffffff',
         password_hash: passwordHash,
         password_needs_reset: false,
         owner_email_verified: false,

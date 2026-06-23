@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { fetchArchivedOrders } from '@/lib/order-archive';
+import { returnBeachStockToPhysical } from '@/lib/stock-handler';
 
-type PaymentSummary = Record<string, { count: number; total: number }>;
+type PaymentSummary = Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
 
 function dayRange(dateStr: string) {
   return {
@@ -17,7 +18,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   const { data: orders, error: ordersErr } = await supabaseAdmin
     .from('orders')
-    .select('id, umbrella_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
+    .select('id, umbrella_id, customer_id, total, gross_total, payment_fee_amount, net_total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
     .eq('vendor_id', vendorId)
     .eq('status', 'completed')
     .gte('created_at', startOfDay)
@@ -34,6 +35,9 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   const completedOrders = [...(orders || []), ...archivedOrders.filter((order: any) => order.status === 'completed')];
   const totalRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
+  const totalGrossRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.gross_total || order.total || 0), 0);
+  const totalPaymentFees = completedOrders.reduce((sum: number, order: any) => sum + Number(order.payment_fee_amount || 0), 0);
+  const totalNetRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.net_total || order.total || 0), 0);
   const totalItems = completedOrders.reduce((sum: number, order: any) => {
     return sum + (order.order_items || []).reduce((itemSum: number, item: any) => itemSum + Number(item.quantity || 0), 0);
   }, 0);
@@ -43,8 +47,11 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
   const paymentMethods: PaymentSummary = {};
   completedOrders.forEach((order: any) => {
     const method = order.payment_method || 'cash';
-    if (!paymentMethods[method]) paymentMethods[method] = { count: 0, total: 0 };
+    if (!paymentMethods[method]) paymentMethods[method] = { count: 0, gross: 0, fees: 0, net: 0, total: 0 };
     paymentMethods[method].count += 1;
+    paymentMethods[method].gross += Number(order.gross_total || order.total || 0);
+    paymentMethods[method].fees += Number(order.payment_fee_amount || 0);
+    paymentMethods[method].net += Number(order.net_total || order.total || 0);
     paymentMethods[method].total += Number(order.total || 0);
   });
 
@@ -108,6 +115,9 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     customer_name: order.customers?.name || 'Nao identificado',
     customer_phone: order.customers?.phone || 'N/A',
     total: Number(order.total || 0),
+    gross_total: Number(order.gross_total || order.total || 0),
+    payment_fee_amount: Number(order.payment_fee_amount || 0),
+    net_total: Number(order.net_total || order.total || 0),
     status: order.status,
     payment_method: order.payment_method || 'cash',
     items_count: (order.order_items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0),
@@ -119,6 +129,9 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     summary: {
       total_orders: completedOrders.length,
       total_revenue: totalRevenue,
+      total_gross_revenue: totalGrossRevenue,
+      total_payment_fees: totalPaymentFees,
+      total_net_revenue: totalNetRevenue,
       total_items_sold: totalItems,
       avg_ticket: avgTicket,
       unique_customers: uniqueCustomers,
@@ -183,6 +196,9 @@ export async function POST(req: NextRequest) {
         business_date: dateStr,
         total_orders: report.summary.total_orders,
         total_revenue: report.summary.total_revenue,
+        total_gross_revenue: report.summary.total_gross_revenue,
+        total_payment_fees: report.summary.total_payment_fees,
+        total_net_revenue: report.summary.total_net_revenue,
         total_items_sold: report.summary.total_items_sold,
         avg_ticket: report.summary.avg_ticket,
         unique_customers: report.summary.unique_customers,
@@ -198,11 +214,13 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (closingErr) throw closingErr;
+    const stock_return = await returnBeachStockToPhysical(vendorId);
 
     return NextResponse.json({
       closed: true,
       closing,
       report,
+      stock_return,
       message: 'Fechamento do dia consolidado com sucesso.',
     });
   } catch (err) {

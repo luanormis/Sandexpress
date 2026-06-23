@@ -11,7 +11,10 @@ interface DailyReportData {
     total_items_sold: number;
     avg_ticket: number;
     unique_customers: number;
-    payment_methods: Record<string, { count: number; total: number }>;
+    total_gross_revenue?: number;
+    total_payment_fees?: number;
+    total_net_revenue?: number;
+    payment_methods: Record<string, { count: number; total: number; gross?: number; fees?: number; net?: number }>;
   };
   orders: Array<{
     id: string;
@@ -342,9 +345,9 @@ export default function DailyReportComponent() {
                 <div key={method} className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 font-medium uppercase">{method}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-2">{data.count}</p>
-                  <p className="text-sm text-gray-700 mt-1">
-                    R$ {data.total.toFixed(2)}
-                  </p>
+                  <p className="text-sm text-gray-700 mt-1">Bruto: R$ {(data.gross ?? data.total).toFixed(2)}</p>
+                  <p className="text-sm text-red-600 mt-1">Taxas: R$ {(data.fees ?? 0).toFixed(2)}</p>
+                  <p className="text-sm text-green-700 mt-1">Liquido: R$ {(data.net ?? data.total).toFixed(2)}</p>
                 </div>
               ))}
             </div>

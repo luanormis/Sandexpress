@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
+import { calculatePaymentBreakdown, toMoney } from '@/lib/payments';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
-
-function toMoney(value: unknown) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) && numeric > 0 ? Number(numeric.toFixed(2)) : 0;
-}
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -144,13 +140,34 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const { data: vendorPaymentConfig, error: vendorPaymentConfigErr } = await supabaseAdmin
+      .from('vendors')
+      .select('debit_card_fee_rate, credit_card_fee_rate, pix_fee_rate')
+      .eq('id', vendor_id)
+      .single();
+    if (vendorPaymentConfigErr) throw vendorPaymentConfigErr;
+
+    const payment = calculatePaymentBreakdown({
+      grossAmount: Number(selectedOrder.total || 0),
+      method: payment_method,
+      rates: {
+        debit_card: Number((vendorPaymentConfig as any)?.debit_card_fee_rate || 0),
+        credit_card: Number((vendorPaymentConfig as any)?.credit_card_fee_rate || 0),
+        pix: Number((vendorPaymentConfig as any)?.pix_fee_rate || 0),
+      },
+    });
+
     // 2. Atualizar ordem para completed e pago
     const { error: updateErr } = await supabaseAdmin
       .from('orders')
         .update({
           status: 'completed',
           paid: true,
-          payment_method: payment_method || 'cash',
+          payment_method: payment.payment_method,
+          gross_total: payment.gross_amount,
+          payment_fee_rate: payment.fee_rate,
+          payment_fee_amount: payment.fee_amount,
+          net_total: payment.net_amount,
           paid_at: new Date().toISOString(),
           notes: notes || null,
           updated_at: new Date().toISOString(),
@@ -194,9 +211,13 @@ export async function POST(req: NextRequest) {
           customer_phone: (selectedOrder as any).customers?.phone,
           umbrella_id: selectedOrder.umbrella_id,
           total: selectedOrder.total,
+          gross_total: payment.gross_amount,
+          payment_fee_rate: payment.fee_rate,
+          payment_fee_amount: payment.fee_amount,
+          net_total: payment.net_amount,
           status: 'completed',
           paid: true,
-          payment_method: payment_method || 'cash',
+          payment_method: payment.payment_method,
           closed_at: new Date().toISOString(),
         },
         message: `Conta fechada com sucesso! Guarda-sol ${selectedOrder.umbrella_id} liberado.`,

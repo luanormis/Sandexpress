@@ -16,6 +16,7 @@ describe('admin data erasure planning', () => {
   it('targets all storage prefixes that can hold kiosk data', () => {
     expect(buildKioskStoragePrefixes('vendor-123')).toEqual([
       { bucket: 'order-archives', prefix: 'vendor-123/' },
+      { bucket: 'kiosk-assets', prefix: 'logos/vendor-123/' },
       { bucket: 'product-images', prefix: 'products/vendor-123/' },
       { bucket: 'product-images', prefix: 'vendor-123/' },
       { bucket: 'product-images', prefix: 'logos/vendor-123/' },

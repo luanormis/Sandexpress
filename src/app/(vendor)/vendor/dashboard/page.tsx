@@ -28,6 +28,7 @@ interface Product {
   image_url: string;
   active: boolean;
   is_combo: boolean;
+  stock_tracking_enabled?: boolean;
   sort_order: number;
 }
 
@@ -73,6 +74,7 @@ interface Umbrella {
   map_x?: number | null;
   map_y?: number | null;
   qr_url: string | null;
+  qr_path?: string | null;
   qr_image_url?: string;
 }
 
@@ -112,7 +114,12 @@ interface VendorUser {
 interface KioskTheme {
   primary_color: string;
   secondary_color: string;
+  button_color: string;
+  button_text_color: string;
   logo_url: string;
+  debit_card_fee_rate?: number;
+  credit_card_fee_rate?: number;
+  pix_fee_rate?: number;
   tenant_id?: string;
 }
 
@@ -121,7 +128,12 @@ const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Pe
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
   secondary_color: "#82533f",
-  logo_url: "/sandexpress-logo.svg",
+  button_color: "#ff6b00",
+  button_text_color: "#ffffff",
+  logo_url: "/logo-sandexpress.png",
+  debit_card_fee_rate: 0,
+  credit_card_fee_rate: 0,
+  pix_fee_rate: 0,
 };
 
 const BRAND_PALETTE = [
@@ -340,7 +352,12 @@ export default function VendorDashboard() {
           tenant_id: data.tenant_id,
           primary_color: data.primary_color || DEFAULT_THEME.primary_color,
           secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+          button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
+          button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
           logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+          debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
+          credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
+          pix_fee_rate: Number(data.pix_fee_rate || 0),
         });
       }
     } catch (err) {
@@ -383,7 +400,12 @@ export default function VendorDashboard() {
         tenant_id: data.tenant_id,
         primary_color: data.primary_color || DEFAULT_THEME.primary_color,
         secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
+        button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
+        button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
         logo_url: data.logo_url || DEFAULT_THEME.logo_url,
+        debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
+        credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
+        pix_fee_rate: Number(data.pix_fee_rate || 0),
       });
       setThemeMessage("Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
     } catch {
@@ -664,6 +686,7 @@ export default function VendorDashboard() {
         ...u,
         qr_image_url: data.qr_image_url,
         qr_url: data.target_url,
+        qr_path: data.target_path,
       } : u));
     } catch (err) {
       console.error("Failed to generate QR:", err);
@@ -671,8 +694,45 @@ export default function VendorDashboard() {
     }
   };
 
+  const deleteUmbrella = async (umbrella: Umbrella) => {
+    if (umbrella.is_occupied || umbrella.current_order_id) {
+      return alert('Nao e possivel excluir guarda-sol com conta aberta.');
+    }
+
+    const confirmed = confirm(`Excluir definitivamente o guarda-sol ${umbrella.number}? Esta acao remove o QR gravado no banco.`);
+    if (!confirmed) return;
+
+    const vendorPassword = prompt('Digite a senha do admin do quiosque para confirmar a exclusao');
+    if (!vendorPassword) return;
+
+    try {
+      const res = await fetch(`/api/umbrellas/${umbrella.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_password: vendorPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return alert(data.error || 'Erro ao excluir guarda-sol.');
+      }
+      setUmbrellas(prev => prev.filter(u => u.id !== umbrella.id));
+    } catch (err) {
+      console.error('Delete umbrella error:', err);
+      alert('Erro de rede ao excluir guarda-sol.');
+    }
+  };
+
   const markAccountPaid = async (order: Order) => {
     if (!vendorId) return;
+    const method = prompt('Forma de pagamento: dinheiro, pix, debito ou credito', 'dinheiro');
+    if (!method) return;
+    const normalizedMethod = method.toLowerCase().includes('pix')
+      ? 'pix'
+      : method.toLowerCase().includes('deb')
+        ? 'debit_card'
+        : method.toLowerCase().includes('cred')
+          ? 'credit_card'
+          : 'cash';
     const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella}?`);
     if (!confirmed) return;
 
@@ -683,7 +743,7 @@ export default function VendorDashboard() {
         body: JSON.stringify({
           vendor_id: vendorId,
           umbrella_id: order.umbrella_id,
-          payment_method: 'cash',
+          payment_method: normalizedMethod,
           notes: order.notes || 'Conta paga no Kanban',
         }),
       });
@@ -1134,6 +1194,14 @@ export default function VendorDashboard() {
                           <QrCode size={18} /> Gerar QR Code
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => deleteUmbrella(u)}
+                        disabled={Boolean(u.is_occupied || u.current_order_id)}
+                        className="mt-4 w-full border border-red-200 bg-red-50 text-red-700 font-bold py-2 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 size={16} /> Excluir guarda-sol
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1184,6 +1252,40 @@ export default function VendorDashboard() {
                       />
                     </div>
                   </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Cor do botao</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.button_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.button_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-black text-gray-700">Texto do botao</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <input
+                        type="color"
+                        value={themeForm.button_text_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
+                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                      />
+                      <input
+                        value={themeForm.button_text_color}
+                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
+                      />
+                    </div>
+                  </label>
                 </div>
 
                 <div className="mt-5">
@@ -1194,7 +1296,7 @@ export default function VendorDashboard() {
                         key={color.value}
                         type="button"
                         title={color.name}
-                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value }))}
+                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value, button_color: color.value }))}
                         className="h-10 w-10 rounded-lg border border-gray-200 shadow-sm transition-transform hover:scale-105"
                         style={{ backgroundColor: color.value }}
                       />
@@ -1227,11 +1329,35 @@ export default function VendorDashboard() {
                       <input
                         value={themeForm.logo_url}
                         onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
-                        placeholder="/sandexpress-logo.svg ou https://..."
+                        placeholder="/logo-sandexpress.png ou https://..."
                         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
                       />
                       <span className="block text-xs font-semibold text-gray-500">Tambem e possivel colar uma URL manualmente.</span>
                     </label>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <h4 className="text-sm font-black text-gray-900">Taxas de recebimento</h4>
+                  <p className="mt-1 text-xs font-semibold text-gray-500">Percentual descontado para calcular o valor liquido no fechamento da conta.</p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {[
+                      ['pix_fee_rate', 'PIX'],
+                      ['debit_card_fee_rate', 'Debito'],
+                      ['credit_card_fee_rate', 'Credito'],
+                    ].map(([field, label]) => (
+                      <label key={field} className="space-y-1">
+                        <span className="text-xs font-black uppercase text-gray-600">{label} (%)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={Number(themeForm[field as keyof KioskTheme] || 0)}
+                          onChange={(event) => setThemeForm(prev => ({ ...prev, [field]: Number(event.target.value) || 0 }))}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -1243,7 +1369,7 @@ export default function VendorDashboard() {
                   type="submit"
                   disabled={themeSaving}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
-                  style={{ backgroundColor: themeForm.primary_color }}
+                  style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}
                 >
                   <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalizacao"}
                 </button>
@@ -1266,10 +1392,10 @@ export default function VendorDashboard() {
                     <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
                     <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(128.5)}</p>
                   </div>
-                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.primary_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}>
                     Abrir comanda
                   </button>
-                  <button className="w-full rounded-xl py-3 text-sm font-black text-white" style={{ backgroundColor: themeForm.secondary_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.secondary_color, color: themeForm.button_text_color }}>
                     Fechar conta
                   </button>
                 </div>
@@ -1775,7 +1901,7 @@ function OrderModal({
 function ProductModal({ product, vendorId, onSave, onClose }: { product: Product | null; vendorId: string | null; onSave: (p: Product) => Promise<void> | void; onClose: () => void }) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
-    description: "", image_url: "", active: true, is_combo: false, sort_order: 99,
+    description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false, sort_order: 99,
   });
   const [uploading, setUploading] = useState(false);
 
@@ -1902,6 +2028,15 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
                 className="w-5 h-5 accent-[#FF6B00]"
               />
               <span className="text-sm font-bold text-gray-700">Disponível no cardápio</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(form.stock_tracking_enabled)}
+                onChange={e => setForm(prev => ({ ...prev, stock_tracking_enabled: e.target.checked }))}
+                className="w-5 h-5 accent-[#FF6B00]"
+              />
+              <span className="text-sm font-bold text-gray-700">Contabilizar estoque</span>
             </label>
           </div>
         </div>

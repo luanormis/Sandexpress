@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { createSessionToken } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-async function verifyPassword(password: string, storedHash: string) {
-  const [salt, key] = storedHash.split(':');
-  if (!salt || !key) return false;
-  const derivedKey = (await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, derived) => {
-      if (err) reject(err);
-      else resolve(derived);
-    });
-  })) as Buffer;
-  return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
-}
+import { verifyVendorPassword } from '@/lib/vendor-password';
 
 function setVendorCookie(response: NextResponse, token: string) {
   response.cookies.set({
@@ -48,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     if (vendor?.password_hash) {
-      const passwordMatches = await verifyPassword(password, vendor.password_hash);
+      const passwordMatches = await verifyVendorPassword(password, vendor.password_hash);
       if (!passwordMatches) {
         return NextResponse.json({ error: 'Credenciais invalidas.' }, { status: 401 });
       }
@@ -83,7 +71,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Credenciais invalidas.' }, { status: 401 });
     }
 
-    const passwordMatches = await verifyPassword(password, user.password_hash);
+    const passwordMatches = await verifyVendorPassword(password, user.password_hash);
     if (!passwordMatches) {
       return NextResponse.json({ error: 'Credenciais invalidas.' }, { status: 401 });
     }

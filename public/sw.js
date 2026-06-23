@@ -1,7 +1,7 @@
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open('sandexpress-v2').then((cache) => {
-      return cache.addAll(['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/sandexpress-logo.svg']);
+    caches.open('sandexpress-v3').then((cache) => {
+      return cache.addAll(['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/logo-sandexpress.png']);
     })
   );
   self.skipWaiting();
@@ -10,7 +10,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== 'sandexpress-v2').map((key) => caches.delete(key))
+      keys.filter((key) => key !== 'sandexpress-v3').map((key) => caches.delete(key))
     ))
   );
   self.clients.claim();

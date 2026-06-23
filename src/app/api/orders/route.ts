@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id);
 
     const { data: dbProducts, error: prodErr } = await (supabaseAdmin.from('products') as any)
-      .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_quantity, vendor_id')
+      .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_tracking_enabled, stock_quantity, beach_stock_quantity, vendor_id')
       .in('id', productIds)
       .eq('vendor_id', vendor_id)
       .eq('tenant_id', (umbrella as any).tenant_id);
@@ -150,10 +150,11 @@ export async function POST(req: NextRequest) {
       if (!product) {
         return NextResponse.json({ error: `Produto ${item.product_id} não encontrado neste quiosque.` }, { status: 400 });
       }
-      if (!product.active || product.blocked_by_stock) {
+      if (!product.active || (product.stock_tracking_enabled && product.blocked_by_stock)) {
         return NextResponse.json({ error: `Produto indisponível.` }, { status: 400 });
       }
-      if (product.stock_quantity !== null && product.stock_quantity < item.quantity) {
+      const activeStock = Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0);
+      if (product.stock_tracking_enabled && activeStock < item.quantity) {
         return NextResponse.json({ error: `Estoque insuficiente.` }, { status: 400 });
       }
       const unit_price: number = Number(product.promotional_price ?? product.price);
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
           customer_id,
           umbrella_id,
           total,
+          gross_total: total,
           notes: notes || null,
         } as any)
         .select()
@@ -187,6 +189,7 @@ export async function POST(req: NextRequest) {
         .from('orders')
         .update({
           total: nextTotal,
+          gross_total: nextTotal,
           status: nextStatus,
           notes: nextNotes || null,
           updated_at: new Date().toISOString(),
@@ -213,11 +216,12 @@ export async function POST(req: NextRequest) {
     // Decrementar estoque
     for (const item of orderItems) {
       const product = productMap.get(item.product_id)!;
-      if (product.stock_quantity !== null) {
-        const newQty = product.stock_quantity - item.quantity;
+      if (product.stock_tracking_enabled) {
+        const newQty = Math.max(Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0) - item.quantity, 0);
         await supabaseAdmin
           .from('products')
           .update({
+            beach_stock_quantity: newQty,
             stock_quantity: newQty,
             blocked_by_stock: newQty <= 0,
             updated_at: new Date().toISOString(),

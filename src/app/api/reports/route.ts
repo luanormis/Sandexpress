@@ -56,6 +56,9 @@ export async function GET(req: NextRequest) {
 
     const allOrders: any[] = [...(orders || []), ...archivedOrders];
     const total_revenue = allOrders.reduce((acc, o) => acc + Number(o.total), 0);
+    const total_gross_revenue = allOrders.reduce((acc, o) => acc + Number(o.gross_total || o.total || 0), 0);
+    const total_payment_fees = allOrders.reduce((acc, o) => acc + Number(o.payment_fee_amount || 0), 0);
+    const total_net_revenue = allOrders.reduce((acc, o) => acc + Number(o.net_total || o.total || 0), 0);
     const total_orders = allOrders.length;
     const avg_ticket = total_orders > 0 ? total_revenue / total_orders : 0;
     const uniqueCustomerIds = new Set(allOrders.map(o => o.customer_id));
@@ -126,10 +129,24 @@ export async function GET(req: NextRequest) {
       .sort(([a], [b]) => Number(a.replace('h', '')) - Number(b.replace('h', '')))
       .map(([hour, orders]) => ({ hour, orders }));
 
+    const payment_methods = allOrders.reduce((acc, order) => {
+      const method = order.payment_method || 'cash';
+      if (!acc[method]) acc[method] = { count: 0, gross: 0, fees: 0, net: 0, total: 0 };
+      acc[method].count += 1;
+      acc[method].gross += Number(order.gross_total || order.total || 0);
+      acc[method].fees += Number(order.payment_fee_amount || 0);
+      acc[method].net += Number(order.net_total || order.total || 0);
+      acc[method].total += Number(order.total || 0);
+      return acc;
+    }, {} as Record<string, { count: number; gross: number; fees: number; net: number; total: number }>);
+
     return NextResponse.json({
       period,
       kpis: {
         total_revenue,
+        total_gross_revenue,
+        total_payment_fees,
+        total_net_revenue,
         total_orders,
         avg_ticket: Math.round(avg_ticket * 100) / 100,
         unique_customers: uniqueCustomerIds.size,
@@ -144,6 +161,7 @@ export async function GET(req: NextRequest) {
       top_products,
       top_customers,
       hourly_sales,
+      payment_methods,
     });
   } catch (err) {
     console.error('Reports error:', err);

@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { Bell, Home, ListOrdered, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
+import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
 
 type Product = {
@@ -34,6 +35,8 @@ type CustomerVendor = {
   name: string;
   primary_color?: string | null;
   secondary_color?: string | null;
+  button_color?: string | null;
+  button_text_color?: string | null;
   logo_url?: string | null;
 };
 
@@ -52,7 +55,8 @@ const BILLABLE_STATUSES = new Set(["completed", "closing_requested"]);
 
 export default function CustomerApp() {
   const params = useParams();
-  const umbrellaId = String(params.umbrella_id || params.vendor_id || "");
+  const rawUmbrellaSegment = String(params.umbrella_id || params.vendor_id || "");
+  const umbrellaId = extractUmbrellaIdFromRouteSegment(rawUmbrellaSegment);
   const routeVendorId = params.umbrella_id && params.vendor_id ? String(params.vendor_id) : "";
 
   const [step, setStep] = useState<"welcome" | "login" | "menu" | "cart" | "orders">("welcome");
@@ -64,6 +68,10 @@ export default function CustomerApp() {
   const [customerName, setCustomerName] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpChallengeId, setOtpChallengeId] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpMessage, setOtpMessage] = useState("");
   const [partySize, setPartySize] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -98,13 +106,17 @@ export default function CustomerApp() {
       : billTotal;
   const remainingAfterPayment = Math.max(0, Number((billTotal - requestedPaymentAmount).toFixed(2)));
   const theme = {
-    primary: "#ff6b00",
-    secondary: "#82533f",
-    logo: vendor?.logo_url || "/sandexpress-logo.svg",
+    primary: vendor?.primary_color || "#ff6b00",
+    secondary: vendor?.secondary_color || "#82533f",
+    button: vendor?.button_color || vendor?.primary_color || "#ff6b00",
+    buttonText: vendor?.button_text_color || "#ffffff",
+    logo: vendor?.logo_url || "/logo-sandexpress.png",
   };
   const customerThemeVars = {
     "--customer-primary": theme.primary,
     "--customer-secondary": theme.secondary,
+    "--customer-button": theme.button,
+    "--customer-button-text": theme.buttonText,
   } as CSSProperties;
   const sandExpressMark = (
     <div className="customer-brand-watermark">
@@ -152,7 +164,8 @@ export default function CustomerApp() {
           setError("QR antigo invalido. Gere um novo QR Code no painel do quiosque.");
           return;
         }
-        const vendorQuery = routeVendorId ? `?vendor_id=${encodeURIComponent(routeVendorId)}` : "";
+        const isUuidVendorRoute = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(routeVendorId);
+        const vendorQuery = isUuidVendorRoute ? `?vendor_id=${encodeURIComponent(routeVendorId)}` : "";
         const res = await fetch(`/api/public/umbrella/${umbrellaId}${vendorQuery}`);
         const data = await res.json();
         if (!res.ok) {
@@ -194,6 +207,10 @@ export default function CustomerApp() {
       setError("Informe nome e celular validos.");
       return;
     }
+    if (!otpVerified || !otpChallengeId) {
+      setError("Valide o codigo enviado no WhatsApp antes de abrir a comanda.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -208,6 +225,7 @@ export default function CustomerApp() {
           vendor_id: vendor.id,
           umbrella_id: umbrellaId,
           party_size: partySize,
+          otp_challenge_id: otpChallengeId,
         }),
       });
       const data = await res.json();
@@ -226,6 +244,71 @@ export default function CustomerApp() {
       }));
       await loadCustomerOrders(data.id || data.customer_id, vendor.id);
       setStep("menu");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendCustomerOtp() {
+    if (!vendor) return;
+    if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 10) {
+      setError("Informe nome e celular validos antes de enviar o codigo.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setOtpMessage("");
+    setOtpVerified(false);
+    try {
+      const res = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone,
+          purpose: "customer_login",
+          vendor_id: vendor.id,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Nao foi possivel enviar o codigo.");
+        return;
+      }
+      setOtpChallengeId(data.challenge_id || "");
+      setOtpMessage("Codigo enviado pelo WhatsApp.");
+    } catch {
+      setError("Erro de rede ao enviar codigo.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyCustomerOtp() {
+    if (!otpChallengeId || otpCode.replace(/\D/g, "").length !== 6) {
+      setError("Informe o codigo de 6 digitos.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setOtpMessage("");
+    try {
+      const res = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge_id: otpChallengeId,
+          code: otpCode.replace(/\D/g, ""),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Codigo invalido.");
+        return;
+      }
+      setOtpVerified(true);
+      setOtpMessage("WhatsApp validado.");
+    } catch {
+      setError("Erro de rede ao validar codigo.");
     } finally {
       setLoading(false);
     }
@@ -428,7 +511,37 @@ export default function CustomerApp() {
           <p className="customer-login__subtitle">Informe os dados para iniciar.</p>
           <div className="customer-form">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="customer-input" />
-            <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Celular" className="customer-input" />
+            <input
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value.replace(/\D/g, ""));
+                setOtpChallengeId("");
+                setOtpVerified(false);
+                setOtpMessage("");
+              }}
+              placeholder="Celular"
+              className="customer-input"
+            />
+            <div className="customer-stepper">
+              <p className="customer-stepper__label">Validacao por WhatsApp</p>
+              <div className="customer-stepper__control">
+                <input
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Codigo"
+                  className="customer-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" disabled={loading} onClick={sendCustomerOtp} className="customer-secondary-button">
+                  Enviar codigo
+                </button>
+                <button type="button" disabled={loading || !otpChallengeId} onClick={verifyCustomerOtp} className="customer-secondary-button">
+                  Validar
+                </button>
+              </div>
+              {otpMessage && <p className="customer-login__subtitle">{otpMessage}</p>}
+            </div>
             <div className="customer-stepper">
               <p className="customer-stepper__label">Quantidade de pessoas</p>
               <div className="customer-stepper__control">

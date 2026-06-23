@@ -7,9 +7,9 @@ type SendEmailInput = {
 
 export async function sendEmail({ to, subject, html, text }: SendEmailInput) {
   const resendKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || 'SandExpress <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM;
 
-  if (!resendKey) {
+  if (!resendKey || !from) {
     return {
       ok: false,
       reason: 'missing_provider',

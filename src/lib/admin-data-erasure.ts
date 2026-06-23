@@ -18,6 +18,7 @@ export function buildCustomerDatabaseDeletePlan() {
 export function buildKioskStoragePrefixes(vendorId: string): StoragePrefix[] {
   return [
     { bucket: ORDER_ARCHIVE_BUCKET, prefix: `${vendorId}/` },
+    { bucket: 'kiosk-assets', prefix: `logos/${vendorId}/` },
     { bucket: 'product-images', prefix: `products/${vendorId}/` },
     { bucket: 'product-images', prefix: `${vendorId}/` },
     { bucket: 'product-images', prefix: `logos/${vendorId}/` },

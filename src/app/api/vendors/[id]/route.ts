@@ -17,6 +17,8 @@ const ALLOWED_VENDOR_FIELDS = new Set([
   'logo_url',
   'primary_color',
   'secondary_color',
+  'button_color',
+  'button_text_color',
   'subscription_status',
   'is_active',
   'plan_type',

@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-
-async function hashPassword(password: string) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = (await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  })) as Buffer;
-  return `${salt}:${derivedKey.toString('hex')}`;
-}
+import { hashPassword } from '@/lib/vendor-password';
 
 export async function GET(req: NextRequest) {
   try {

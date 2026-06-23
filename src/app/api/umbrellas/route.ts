@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { getPublicAppUrl } from '@/lib/public-url';
+import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getPublicAppUrl } from '@/lib/public-url';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
 /**
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: vendor, error: vendorErr } = await (supabaseAdmin.from('vendors') as any)
-      .select('tenant_id, max_umbrellas')
+      .select('tenant_id, max_umbrellas, name')
       .eq('id', body.vendor_id)
       .single();
     if (vendorErr || !vendor?.tenant_id) {
@@ -90,11 +90,13 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    const qrUrl = `${getPublicAppUrl(req)}/u/${data.vendor_id}/${data.id}`;
+    const qrOptions = { vendorName: vendor.name, umbrellaNumber: data.number };
+    const qrPath = buildUmbrellaQrTargetPath(data.vendor_id, data.id, qrOptions);
+    const qrUrl = buildUmbrellaQrTargetUrl(getPublicAppUrl(req), data.vendor_id, data.id, qrOptions);
     if (data.qr_url !== qrUrl) {
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('umbrellas')
-        .update({ qr_url: qrUrl })
+        .update({ qr_url: qrUrl, qr_path: qrPath })
         .eq('id', data.id)
         .select()
         .single();

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Save } from "lucide-react";
 
 export default function KioskConfigPage() {
   const [name, setName] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#FF6B00");
   const [secondaryColor, setSecondaryColor] = useState("#394E59");
+  const [buttonColor, setButtonColor] = useState("#FF6B00");
+  const [buttonTextColor, setButtonTextColor] = useState("#FFFFFF");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -37,15 +38,15 @@ export default function KioskConfigPage() {
       let logoUrl = logoPreview;
 
       if (logoFile) {
-        const fileName = `logos/${vendorId}/${Date.now()}-${logoFile.name}`;
-        const { data, error } = await supabase.storage
-          .from("kiosk-uploads")
-          .upload(fileName, logoFile);
-
-        if (error) throw error;
-        logoUrl = supabase.storage
-          .from("kiosk-uploads")
-          .getPublicUrl(data.path).data.publicUrl;
+        const formData = new FormData();
+        formData.append("file", logoFile);
+        const logoResponse = await fetch(`/api/vendors/${vendorId}/theme/logo`, {
+          method: "POST",
+          body: formData,
+        });
+        const logoData = await logoResponse.json().catch(() => ({}));
+        if (!logoResponse.ok) throw new Error(logoData.error || "Erro ao subir logo.");
+        logoUrl = logoData.logo_url || logoUrl;
       }
 
       const response = await fetch(`/api/vendors/${vendorId}`, {
@@ -55,6 +56,8 @@ export default function KioskConfigPage() {
           name,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
+          button_color: buttonColor,
+          button_text_color: buttonTextColor,
           logo_url: logoUrl,
         }),
       });
@@ -139,6 +142,30 @@ export default function KioskConfigPage() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-2">
+              Cor do Botao
+            </label>
+            <input
+              type="color"
+              value={buttonColor}
+              onChange={(e) => setButtonColor(e.target.value)}
+              className="w-16 h-10 border border-gray-300 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Texto do Botao
+            </label>
+            <input
+              type="color"
+              value={buttonTextColor}
+              onChange={(e) => setButtonTextColor(e.target.value)}
+              className="w-16 h-10 border border-gray-300 rounded"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-2">Logo</label>
             <input
               type="file"
@@ -170,7 +197,8 @@ export default function KioskConfigPage() {
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="w-full bg-[#FF6B00] text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-[#E56000] disabled:opacity-50"
+            className="w-full font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ backgroundColor: buttonColor, color: buttonTextColor }}
           >
             <Save size={20} />
             {isLoading ? "Salvando..." : "Salvar Configurações"}

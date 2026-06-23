@@ -262,6 +262,8 @@ export default function CloseAccountModal() {
               <option value="transfer">🏦 Transferência</option>
               <option value="pix">📲 PIX</option>
               <option value="other">📝 Outro</option>
+              <option value="debit_card">Cartao de debito</option>
+              <option value="credit_card">Cartao de credito</option>
             </select>
           </div>
 

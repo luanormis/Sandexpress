@@ -50,7 +50,7 @@ O cliente deve conseguir:
 - Solicitar fechamento da conta.
 - Instalar atalho/PWA quando suportado pelo navegador.
 
-No MVP atual nao ha validacao real por WhatsApp/OTP. O login do cliente usa nome e celular, com validacao basica de tamanho e limpeza de caracteres nao numericos.
+O MVP atual tem validacao por WhatsApp/OTP via Meta Cloud API para cadastro publico e abertura de comanda. Sem as chaves da Meta preenchidas, o sistema principal continua compilando, mas o envio real de OTP fica bloqueado e o `/api/health` aponta a pendencia.
 
 ### Quiosque
 
@@ -352,6 +352,8 @@ O painel deve permitir:
 - Ativar/desativar guarda-sol.
 - Gerar QR Code.
 - Armazenar `qr_url` no banco.
+- Armazenar `qr_path` no banco.
+- Excluir guarda-sol somente com senha do admin do quiosque; admin da plataforma usa `ADMIN_PASSWORD`.
 
 Endpoints:
 
@@ -368,9 +370,14 @@ Regras do QR Code:
 
 - Em producao, `NEXT_PUBLIC_APP_URL` deve estar configurado.
 - QR Code so pode ser gerado para guarda-sol ativo.
-- O destino atual deve incluir `vendor_id` e `umbrella_id`.
+- O destino novo usa um caminho legivel por quiosque e guarda-sol: `/u/{slug-do-quiosque}/guarda-sol-{numero}-{umbrella_id}`.
+- Exemplo: `/u/quiosque-x/guarda-sol-123-00000000-0000-0000-0000-000000000000`.
+- O QR Code continua unico porque o UUID real do guarda-sol fica no final do caminho.
+- O sistema ainda aceita o QR antigo `/u/{vendor_id}/{umbrella_id}` para compatibilidade.
+- A geracao e feita no proprio codigo com a biblioteca gratuita `qrcode`; nao depende de ferramenta externa.
 - Formato SVG retorna imagem SVG.
 - Formato PNG retorna JSON com `qr_image_url` em data URL.
+- `DELETE /api/umbrellas/{id}` exige corpo JSON com `vendor_password` para sessao de quiosque ou `admin_password` para sessao admin, e recusa excluir guarda-sol com conta aberta.
 
 ### Abertura do dia e estoque
 
@@ -392,8 +399,20 @@ PUT /api/stock
 Campos envolvidos:
 
 - `products.stock_quantity`.
+- `products.stock_tracking_enabled`.
+- `products.physical_stock_quantity`.
+- `products.beach_stock_quantity`.
 - `products.blocked_by_stock`.
 - `products.updated_at`.
+
+Regras atuais:
+
+- Cada produto pode marcar se contabiliza estoque.
+- Estoque fisico representa a base/armazem.
+- Estoque praia representa o saldo ativo para venda no dia.
+- Na abertura do dia, a quantidade informada sai do estoque fisico e vai para o estoque praia.
+- Vendas descontam apenas do estoque praia e apenas de produtos com `stock_tracking_enabled`.
+- No fechamento do dia, a sobra do estoque praia volta para o estoque fisico.
 
 ### Fechamento de conta
 
@@ -425,10 +444,11 @@ Regras:
 Metodos de pagamento previstos:
 
 - Dinheiro.
-- Cartao.
-- Transferencia.
 - PIX.
-- Outro.
+- Cartao de debito.
+- Cartao de credito.
+
+O quiosque pode configurar taxas percentuais de PIX, debito e credito na area de personalizacao. Ao fechar conta, o sistema grava valor bruto, taxa, valor liquido e metodo de pagamento para alimentar os relatorios.
 
 ### Clientes
 
@@ -703,6 +723,9 @@ Campos principais:
 - `region`.
 - `beach_name`.
 - `primary_color`.
+- `secondary_color`.
+- `button_color`.
+- `button_text_color`.
 - `logo_url`.
 
 ### `vendors`
@@ -723,6 +746,8 @@ Campos principais:
 - `logo_url`.
 - `primary_color`.
 - `secondary_color`.
+- `button_color`.
+- `button_text_color`.
 - `password_hash`.
 - `password_needs_reset`.
 - `subscription_status`.
@@ -731,6 +756,18 @@ Campos principais:
 - `plan_expires_at`.
 - `max_umbrellas`.
 - `is_active`.
+
+### Dados reais e storage
+
+O script `infra/sql-iniciar-novo-projeto.sql` nao insere quiosques, praias, produtos, guarda-sois, clientes ou pedidos de exemplo. Ele cria somente estrutura, politicas, indices, buckets e configuracoes de plataforma necessarias para o sistema iniciar com dados reais.
+
+Buckets esperados no Supabase Storage:
+
+- `product-images`: imagens reais de produtos e galeria publica.
+- `kiosk-assets`: logos e assets reais dos quiosques, usando `logos/{vendor_id}/`.
+- `order-archives`: arquivos privados de auditoria/fechamento.
+
+Para bancos ja criados, rode `infra/sql-atualizacao-branding-quiosque-assets.sql` antes de testar upload de logo e cores de botao.
 
 ### `vendor_users`
 
@@ -778,6 +815,7 @@ Campos principais:
 - `location_hint`.
 - `active`.
 - `qr_url`.
+- `qr_path`.
 - `is_occupied`.
 - `current_order_id`.
 
@@ -929,6 +967,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 SESSION_SECRET=
 ADMIN_PASSWORD=
 NEXT_PUBLIC_APP_URL=
+META_WHATSAPP_PHONE_NUMBER_ID=
+META_WHATSAPP_ACCESS_TOKEN=
+META_GRAPH_API_VERSION=v25.0
+META_WHATSAPP_OTP_TEMPLATE_NAME=sandexpress_otp_ptbr
+META_WHATSAPP_OTP_TEMPLATE_LANGUAGE=pt_BR
+OTP_PEPPER=
+OTP_TTL_SECONDS=300
+RESEND_API_KEY=
+EMAIL_FROM=
 ```
 
 Recomendacoes:
@@ -936,7 +983,34 @@ Recomendacoes:
 - `SESSION_SECRET` deve ter pelo menos 32 caracteres em producao.
 - `ADMIN_PASSWORD` deve ser configurada em producao.
 - `NEXT_PUBLIC_APP_URL` deve apontar para o dominio publico usado nos QR Codes.
+- `OTP_PEPPER` deve ter pelo menos 32 caracteres e ser diferente de `SESSION_SECRET`.
+- `META_WHATSAPP_ACCESS_TOKEN` deve ser o token permanente do System User da Meta com permissao de WhatsApp.
+- `META_WHATSAPP_PHONE_NUMBER_ID` e o ID do numero conectado na Cloud API, nao o numero de telefone em si.
+- O template `META_WHATSAPP_OTP_TEMPLATE_NAME` precisa estar aprovado na Meta antes do envio real.
+- `RESEND_API_KEY` habilita recuperacao/cadastro com email real.
+- `EMAIL_FROM` e obrigatorio quando `RESEND_API_KEY` estiver configurado. Use um remetente de dominio verificado, como `SandExpress <noreply@seudominio.com.br>`.
 - Nunca versionar chaves reais de Supabase.
+
+## Logo oficial
+
+O logo oficial da marca fica publico em:
+
+```text
+/logo-sandexpress.png
+```
+
+Em emails e sistemas externos, use a URL absoluta do deploy:
+
+```text
+https://SEU-DOMINIO/logo-sandexpress.png
+```
+
+O SVG antigo foi mantido apenas como arquivo legado, mas os defaults do sistema, emails, PWA, telas e cadastro usam o PNG oficial.
+
+Passo a passo detalhado para pegar as chaves reais e preencher o ambiente:
+
+- `docs/configuracao-chaves-reais.md`.
+- `docs/banco-do-zero.md`.
 
 ## Como rodar localmente
 
@@ -980,10 +1054,15 @@ infra/
 Principais arquivos:
 
 - `infra/sql-iniciar-novo-projeto.sql`.
+- `infra/sql-atualizacao-branding-quiosque-assets.sql`.
 - `infra/sql-atualizacao-cardapio-por-quiosque.sql`.
 - `infra/sql-atualizacao-recuperacao-equipe.sql`.
 - `infra/cloudbuild/production.yaml`.
 - `infra/cloudbuild/staging.yaml`.
+
+O script principal de banco inicia o projeto sem quiosques, produtos, guarda-sois, pedidos ou praias pre-carregadas. Quiosques, produtos e guarda-sois devem ser cadastrados pelo painel com dados reais.
+
+Para banco existente, aplique tambem `infra/sql-atualizacao-branding-quiosque-assets.sql`. Essa migracao cria `button_color`, `button_text_color` e o bucket publico `kiosk-assets`, necessario para logo real do quiosque em `logos/{vendor_id}/`.
 
 ## Regras de seguranca
 
@@ -1023,15 +1102,47 @@ Implementado no codigo atual:
 - Relatorios do quiosque e relatorio diario.
 - Admin global com cadastro de quiosques e analytics.
 - PWA/atalho instalavel.
+- Branding por quiosque com logo propria, cor principal, cor secundaria, cor de botao e cor do texto do botao.
 
 Pontos que ainda dependem de integracao externa ou refinamento:
 
-- Envio real de WhatsApp/OTP.
+- Chaves reais da Meta WhatsApp Cloud API e template OTP aprovado para envio em producao.
 - Pagamento online por PIX/cartao.
 - Notificacoes push reais.
 - Tempo real por websocket/realtime para pedidos.
 - Automacao financeira completa de assinatura.
 - Auditoria avancada de usuarios e permissoes granulares por papel.
+
+## Prontidao para deploy
+
+Antes de publicar, chame:
+
+```text
+GET /api/health
+```
+
+O endpoint retorna:
+
+- `status: "blocked"` quando falta configuracao obrigatoria para o sistema rodar.
+- `status: "degraded"` quando o banco esta conectado, mas alguma integracao externa ainda esta pendente.
+- `status: "ok"` quando banco, schema e integracoes configuradas estao prontos.
+
+Campos importantes da resposta:
+
+- `readiness.required` - variaveis obrigatorias para operar com dados reais.
+- `readiness.external` - chaves externas como Meta WhatsApp/OTP.
+- `readiness.recommended` - configuracoes recomendadas para producao.
+- `database` - indica se o Supabase esta conectado, sem schema ou inacessivel.
+
+Passos para evoluir com seguranca:
+
+1. Preencher `.env.local` com Supabase real, `SESSION_SECRET`, `ADMIN_PASSWORD` e `NEXT_PUBLIC_APP_URL`.
+2. Rodar `infra/sql-iniciar-novo-projeto.sql` no SQL Editor do Supabase.
+3. Rodar `npm test`, `npm run lint` e `npm run build`.
+4. Abrir `/api/health` localmente e resolver tudo que aparecer em `readiness.required`.
+5. Criar/aprovar o template OTP na Meta e preencher `META_WHATSAPP_*` e `OTP_PEPPER`.
+6. Copiar as mesmas variaveis para o ambiente de deploy.
+7. Testar cadastro de quiosque, QR Code, abertura de comanda, pedido e fechamento de conta com dados reais.
 
 ## Checklist de aceite funcional
 
