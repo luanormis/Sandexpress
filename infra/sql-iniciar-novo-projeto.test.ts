@@ -2,14 +2,15 @@ import fs from 'fs';
 import path from 'path';
 
 const sql = fs.readFileSync(path.join(process.cwd(), 'infra/sql-iniciar-novo-projeto.sql'), 'utf8');
+const sqlWithoutFunctionBodies = sql.replace(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/gi, '');
 
 describe('sql-iniciar-novo-projeto', () => {
   it('starts without operational seed data for beaches, vendors, products, umbrellas or orders', () => {
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+beaches/i);
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+vendors/i);
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+products/i);
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+umbrellas/i);
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+orders/i);
+    expect(sqlWithoutFunctionBodies).not.toMatch(/INSERT\s+INTO\s+beaches/i);
+    expect(sqlWithoutFunctionBodies).not.toMatch(/INSERT\s+INTO\s+vendors/i);
+    expect(sqlWithoutFunctionBodies).not.toMatch(/INSERT\s+INTO\s+products/i);
+    expect(sqlWithoutFunctionBodies).not.toMatch(/INSERT\s+INTO\s+umbrellas/i);
+    expect(sqlWithoutFunctionBodies).not.toMatch(/INSERT\s+INTO\s+orders/i);
     expect(sql).not.toContain('default_city');
     expect(sql).not.toContain('default_state');
     expect(sql).not.toContain('default_beach');
@@ -44,6 +45,14 @@ describe('sql-iniciar-novo-projeto', () => {
     expect(sql).toContain('pix_fee_rate NUMERIC(5,2) NOT NULL DEFAULT 0');
   });
 
+  it('stores plan prices per vendor so future price changes do not rewrite existing clients', () => {
+    expect(sql).toContain('plan_monthly_price NUMERIC(10,2) NOT NULL DEFAULT 499.99');
+    expect(sql).toContain('plan_annual_monthly_price NUMERIC(10,2) NOT NULL DEFAULT 299.99');
+    expect(sql).toContain("'plans.current'");
+    expect(sql).toContain('"monthly_price": 499.99');
+    expect(sql).toContain('"annual_monthly_price": 299.99');
+  });
+
   it('supports scalable kiosk branding without operational seed data', () => {
     expect(sql).toContain("button_color TEXT NOT NULL DEFAULT '#ff6b00'");
     expect(sql).toContain("button_text_color TEXT NOT NULL DEFAULT '#ffffff'");
@@ -51,5 +60,16 @@ describe('sql-iniciar-novo-projeto', () => {
     expect(sql).toMatch(/CREATE\s+POLICY\s+kiosk_assets_storage_public_read/i);
     expect(sql).toContain('"button_color": "#ff6b00"');
     expect(sql).toContain('"button_text_color": "#ffffff"');
+  });
+
+  it('protects high concurrency order and rate-limit flows with database invariants', () => {
+    expect(sql).toMatch(/CREATE\s+UNIQUE\s+INDEX\s+idx_orders_one_open_per_umbrella/i);
+    expect(sql).toMatch(/WHERE\s+paid\s*=\s*FALSE\s+AND\s+status\s+IN\s+\('received',\s*'preparing',\s*'delivering',\s*'completed',\s*'closing_requested'\)/i);
+    expect(sql).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+create_customer_order/i);
+    expect(sql).toMatch(/FOR\s+UPDATE/i);
+    expect(sql).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+close_customer_account/i);
+    expect(sql).toMatch(/UPDATE\s+umbrellas[\s\S]*current_order_id\s*=\s*NULL/i);
+    expect(sql).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+consume_rate_limit/i);
+    expect(sql).toMatch(/ON\s+CONFLICT\s+\(key\)\s+DO\s+UPDATE/i);
   });
 });

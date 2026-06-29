@@ -1,4 +1,13 @@
-export const TERMS_VERSION = "2026-06-17";
+import crypto from "crypto";
+
+export const TERMS_VERSION = "2026-06-24";
+export const TERMS_DOCUMENT_TITLE = "Termos de Uso e Politica de Privacidade do SandExpress";
+export const TERMS_CONSENT_TEXT =
+  "Li e aceito os Termos de Uso e a Politica de Privacidade do SandExpress, incluindo o registro eletronico do aceite e o tratamento de dados pessoais para cadastro, autenticacao, pedidos, atendimento, relatorios, cobrancas, seguranca, suporte e cumprimento de obrigacoes legais.";
+export const TERMS_DOCUMENT_HASH = crypto
+  .createHash("sha256")
+  .update(`${TERMS_VERSION}:${TERMS_DOCUMENT_TITLE}:${TERMS_CONSENT_TEXT}`)
+  .digest("hex");
 
 export type TermsAcceptanceInput = {
   vendorId: string;
@@ -20,7 +29,10 @@ export function buildTermsAcceptanceSnapshot({ vendorId, tenantId, body, ip, use
     snapshot: {
       accepted_at: acceptedAt,
       terms_version: TERMS_VERSION,
+      document_title: TERMS_DOCUMENT_TITLE,
+      document_hash_sha256: TERMS_DOCUMENT_HASH,
       software: "SandExpress",
+      legal_basis: "Aceite eletronico dos Termos de Uso e da Politica de Privacidade",
       responsible: {
         name: String(body.owner_name || "").trim(),
         phone: String(body.owner_phone || "").trim(),
@@ -34,8 +46,7 @@ export function buildTermsAcceptanceSnapshot({ vendorId, tenantId, body, ip, use
         city: String(body.city || "").trim(),
         state: String(body.state || "").trim().toUpperCase(),
       },
-      consent_text:
-        "Li e concordo com os Termos de Uso do SandExpress, incluindo tratamento de dados para cadastro, pedidos, atendimento, pagamentos, relatorios e suporte.",
+      consent_text: TERMS_CONSENT_TEXT,
     },
   };
 }

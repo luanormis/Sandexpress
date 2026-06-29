@@ -63,6 +63,10 @@ function getVisibleOrderNotes(notes?: string) {
     .trim();
 }
 
+function isOrderEmpty(order: Pick<Order, "total" | "items">) {
+  return Number(order.total || 0) <= 0 || (order.items || []).length === 0;
+}
+
 interface Umbrella {
   id: string;
   vendor_id: string;
@@ -90,6 +94,12 @@ interface ReportData {
   top_products: { name: string; quantity: number; revenue: number }[];
   top_customers: { name: string; phone: string; visits: number; total_spent: number }[];
   hourly_sales: { hour: string; orders: number }[];
+  satisfaction?: {
+    average_rating: number;
+    total_responses: number;
+    distribution: Record<1 | 2 | 3 | 4 | 5, number>;
+    latest: { rating: number; comment: string | null; created_at: string; customer_name: string }[];
+  };
 }
 
 interface Customer {
@@ -504,6 +514,12 @@ export default function VendorDashboard() {
 
   // Order management
   const moveOrder = async (id: string, newStatus: string) => {
+    const currentOrder = orders.find(order => order.id === id);
+    if (currentOrder && isOrderEmpty(currentOrder) && ['preparing', 'delivering', 'completed', 'closing_requested'].includes(newStatus)) {
+      alert('Comanda vazia nao pode ir para preparo, entrega ou fechamento. Use "Liberar guarda-sol vazio".');
+      return;
+    }
+
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PATCH',
@@ -761,6 +777,41 @@ export default function VendorDashboard() {
     }
   };
 
+  const releaseEmptyUmbrella = async (order: Order) => {
+    if (!isOrderEmpty(order)) {
+      alert('Esta comanda possui consumo. Feche a conta normalmente.');
+      return;
+    }
+
+    const confirmed = confirm(`Liberar o guarda-sol ${order.umbrella} sem consumo?`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'cancelled',
+          notes: `${getVisibleOrderNotes(order.notes)}\nGuarda-sol liberado sem consumo pelo painel.`.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Nao foi possivel liberar o guarda-sol.');
+        return;
+      }
+      setOrders(prev => prev.filter(item => item.id !== order.id));
+      setUmbrellas(prev => prev.map(umbrella => umbrella.id === order.umbrella_id
+        ? { ...umbrella, is_occupied: false, current_order_id: null }
+        : umbrella
+      ));
+      setSelectedOrder(null);
+    } catch (err) {
+      console.error('Release empty umbrella error:', err);
+      alert('Erro de rede ao liberar guarda-sol.');
+    }
+  };
+
   const acknowledgeWaiterCall = async (order: Order) => {
     if (!vendorId) return;
     const cleanedNotes = (order.notes || "")
@@ -805,7 +856,7 @@ export default function VendorDashboard() {
   ) => {
     const colOrders = orders.filter(filterOrder);
     return (
-      <div className="vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[22rem] lg:min-h-[calc(100vh-21rem)]">
+      <div className="vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[16rem] lg:min-h-[calc(100vh-21rem)]">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
@@ -814,47 +865,68 @@ export default function VendorDashboard() {
           <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
         </div>
         <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
-          {colOrders.map(order => (
-            <button
-              key={order.id}
-              onClick={() => setSelectedOrder(order)}
-              className={cn(
-                "w-full bg-white p-3 rounded-lg shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
-                options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
-                getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
-                <span className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={11}/> {order.time}</span>
-              </div>
-              {getServiceRequest(order) && (
-                <p className="mt-2 rounded-md bg-red-600 px-2 py-1 text-center text-xs font-black uppercase text-white animate-pulse">
-                  {getServiceRequest(order)?.label}
-                </p>
-              )}
-              <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
-              <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
-              <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
-              <div className="mt-2 flex flex-col gap-1">
-                {options.paidAction ? (
-                  <span
-                    onClick={(event) => { event.stopPropagation(); markAccountPaid(order); }}
-                    className="w-full cursor-pointer rounded-md bg-green-600 px-2 py-1.5 text-center text-xs font-black text-white hover:bg-green-700"
-                  >
-                    Conta paga
-                  </span>
-                ) : nextStatus ? (
-                  <span
-                    onClick={(event) => { event.stopPropagation(); moveOrder(order.id, nextStatus); }}
-                    className="w-full cursor-pointer rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-center text-xs font-black text-gray-700 hover:bg-[#FF6B00] hover:text-white"
-                  >
-                    {nextAction}
-                  </span>
-                ) : null}
-              </div>
-            </button>
-          ))}
+          {colOrders.map(order => {
+            const emptyAccount = isOrderEmpty(order);
+            return (
+              <button
+                key={order.id}
+                onClick={() => setSelectedOrder(order)}
+                className={cn(
+                  "w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
+                  options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
+                  getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="bg-[#FF6B00] text-white text-[11px] font-bold px-2 py-1 rounded-md">#{order.umbrella}</span>
+                  <span className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={11}/> {order.time}</span>
+                </div>
+                {getServiceRequest(order) && (
+                  <p className="mt-2 rounded-md bg-red-600 px-2 py-1 text-center text-xs font-black uppercase text-white animate-pulse">
+                    {getServiceRequest(order)?.label}
+                  </p>
+                )}
+                {emptyAccount && (
+                  <p className="mt-2 rounded-md bg-gray-100 px-2 py-1 text-center text-xs font-black uppercase text-gray-500">
+                    Sem consumo
+                  </p>
+                )}
+                <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
+                <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
+                <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
+                <div className="mt-2 flex flex-col gap-1">
+                  {emptyAccount ? (
+                    <span
+                      onClick={(event) => { event.stopPropagation(); releaseEmptyUmbrella(order); }}
+                      role="button"
+                      tabIndex={0}
+                      className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-center text-sm font-black text-white hover:bg-slate-900"
+                    >
+                      Liberar guarda-sol vazio
+                    </span>
+                  ) : options.paidAction ? (
+                    <span
+                      onClick={(event) => { event.stopPropagation(); markAccountPaid(order); }}
+                      role="button"
+                      tabIndex={0}
+                      className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-green-600 px-3 py-2 text-center text-sm font-black text-white hover:bg-green-700"
+                    >
+                      Conta paga
+                    </span>
+                  ) : nextStatus ? (
+                    <span
+                      onClick={(event) => { event.stopPropagation(); moveOrder(order.id, nextStatus); }}
+                      role="button"
+                      tabIndex={0}
+                      className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-black text-gray-700 hover:bg-[#FF6B00] hover:text-white"
+                    >
+                      {nextAction}
+                    </span>
+                  ) : null}
+                </div>
+              </button>
+            );
+          })}
           {colOrders.length === 0 && (
             <div className="text-center py-8 text-gray-300">
               <ShoppingBag size={32} className="mx-auto mb-2 opacity-40" />
@@ -882,18 +954,19 @@ export default function VendorDashboard() {
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />Conta</span>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8 md:grid-cols-12">
+        <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8 md:grid-cols-12">
           {umbrellas.map(umbrella => {
             const order = orders.find(item => item.umbrella_id === umbrella.id);
             const closing = order?.status === 'closing_requested';
             const serviceRequest = getServiceRequest(order);
+            const emptyAccount = order ? isOrderEmpty(order) : false;
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
             return (
               <button
                 key={umbrella.id}
                 onClick={() => order ? setSelectedOrder(order) : undefined}
                 className={cn(
-                  "relative aspect-square rounded-lg border text-xs font-black transition-all",
+                  "relative aspect-square min-h-12 rounded-xl border text-sm font-black transition-all",
                   !umbrella.active && "border-gray-200 bg-gray-100 text-gray-300",
                   umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
                   umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
@@ -906,6 +979,11 @@ export default function VendorDashboard() {
                 {serviceRequest && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-white/95 px-1 py-0.5 text-[9px] font-black uppercase text-red-600">
                     {serviceRequest.shortLabel}
+                  </span>
+                )}
+                {!serviceRequest && emptyAccount && (
+                  <span className="absolute inset-x-1 bottom-1 rounded bg-white/90 px-1 py-0.5 text-[9px] font-black uppercase text-gray-500">
+                    Vazio
                   </span>
                 )}
               </button>
@@ -1485,7 +1563,7 @@ export default function VendorDashboard() {
                   </div>
 
                   {/* KPIs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                     <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Faturamento</p>
                       <p className="text-3xl font-display font-bold text-gray-900">{formatCurrency(reportData.kpis.total_revenue)}</p>
@@ -1501,6 +1579,34 @@ export default function VendorDashboard() {
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Clientes Únicos</p>
                       <p className="text-3xl font-display font-bold text-green-600">{reportData.kpis.unique_customers}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-gray-400 text-sm font-bold mb-1">Satisfacao</p>
+                      <p className="text-3xl font-display font-bold text-amber-500 flex items-center gap-2">
+                        <Star size={24} fill="currentColor" />
+                        {reportData.satisfaction?.average_rating || 0}
+                      </p>
+                      <p className="text-xs text-gray-400 font-bold">{reportData.satisfaction?.total_responses || 0} respostas</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Star size={18} className="text-[#FF6B00]" fill="currentColor" /> Pesquisa de Satisfacao</h4>
+                    <div className="space-y-3">
+                      {[5, 4, 3, 2, 1].map((rating) => {
+                        const count = reportData.satisfaction?.distribution?.[rating as 1 | 2 | 3 | 4 | 5] || 0;
+                        const total = reportData.satisfaction?.total_responses || 0;
+                        const width = total > 0 ? (count / total) * 100 : 0;
+                        return (
+                          <div key={rating} className="flex items-center gap-3">
+                            <span className="w-14 text-sm font-bold text-gray-500">{rating} estrela{rating > 1 ? "s" : ""}</span>
+                            <div className="flex-1 h-3 rounded-full bg-gray-100 overflow-hidden">
+                              <div className="h-full rounded-full bg-[#FF6B00]" style={{ width: `${width}%` }} />
+                            </div>
+                            <span className="w-8 text-right text-sm font-bold text-gray-700">{count}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -1787,6 +1893,7 @@ export default function VendorDashboard() {
           onClose={() => setSelectedOrder(null)}
           onMove={moveOrder}
           onPaid={markAccountPaid}
+          onReleaseEmpty={releaseEmptyUmbrella}
           onWaiterDone={acknowledgeWaiterCall}
         />
       )}
@@ -1810,16 +1917,19 @@ function OrderModal({
   onClose,
   onMove,
   onPaid,
+  onReleaseEmpty,
   onWaiterDone,
 }: {
   order: Order;
   onClose: () => void;
   onMove: (id: string, status: string) => Promise<void>;
   onPaid: (order: Order) => Promise<void>;
+  onReleaseEmpty: (order: Order) => Promise<void>;
   onWaiterDone: (order: Order) => Promise<void>;
 }) {
   const serviceRequest = getServiceRequest(order);
-  const next = order.status === 'received'
+  const emptyAccount = isOrderEmpty(order);
+  const next = emptyAccount ? null : order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
       ? { label: 'Saiu para entrega', status: 'delivering' }
@@ -1830,8 +1940,8 @@ function OrderModal({
           : null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-start p-6 border-b border-gray-100">
           <div>
             <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p>
@@ -1857,6 +1967,11 @@ function OrderModal({
             <p className="text-xs font-black uppercase text-[#82533F]">Total da conta</p>
             <p className="text-3xl font-black text-[#FF6B00]">{formatCurrency(order.total)}</p>
           </div>
+          {emptyAccount && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm font-bold text-gray-600">
+              Esta comanda esta sem consumo. Para nao enviar para preparo ou fechamento, libere o guarda-sol vazio.
+            </div>
+          )}
           <div>
             <h4 className="mb-2 text-sm font-black text-gray-700">Itens</h4>
             <div className="space-y-2">
@@ -1876,16 +1991,20 @@ function OrderModal({
             </div>
           )}
         </div>
-        <div className="flex gap-3 border-t border-gray-100 p-6">
-          <button onClick={onClose} className="flex-1 rounded-xl border-2 border-gray-200 py-3 font-bold text-gray-600 hover:bg-gray-50">
+        <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:p-6">
+          <button onClick={onClose} className="min-h-12 flex-1 rounded-xl border-2 border-gray-200 py-3 font-bold text-gray-600 hover:bg-gray-50">
             Fechar
           </button>
-          {order.status === 'closing_requested' ? (
-            <button onClick={() => onPaid(order)} className="flex-1 rounded-xl bg-green-600 py-3 font-black text-white hover:bg-green-700">
+          {emptyAccount ? (
+            <button onClick={() => onReleaseEmpty(order)} className="min-h-12 flex-1 rounded-xl bg-slate-800 py-3 font-black text-white hover:bg-slate-900">
+              Liberar guarda-sol vazio
+            </button>
+          ) : order.status === 'closing_requested' ? (
+            <button onClick={() => onPaid(order)} className="min-h-12 flex-1 rounded-xl bg-green-600 py-3 font-black text-white hover:bg-green-700">
               Conta paga
             </button>
           ) : next ? (
-            <button onClick={() => onMove(order.id, next.status)} className="flex-1 rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
+            <button onClick={() => onMove(order.id, next.status)} className="min-h-12 flex-1 rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
               {next.label}
             </button>
           ) : null}
@@ -1904,6 +2023,26 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
     description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false, sort_order: 99,
   });
   const [uploading, setUploading] = useState(false);
+  const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDefaultImages() {
+      try {
+        const res = await fetch(`/api/products/gallery?category=${encodeURIComponent(form.category)}&planType=free`);
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok) {
+          setDefaultImages(data?.data?.images || []);
+        }
+      } catch {
+        if (!cancelled) setDefaultImages([]);
+      }
+    }
+    loadDefaultImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.category]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1952,6 +2091,27 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
               </div>
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </label>
+            {defaultImages.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Imagens padrao</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {defaultImages.slice(0, 8).map((image) => (
+                    <button
+                      key={image.id}
+                      type="button"
+                      title={image.name}
+                      onClick={() => setForm(prev => ({ ...prev, image_url: image.image_url }))}
+                      className={cn(
+                        "aspect-square overflow-hidden rounded-lg border-2 bg-gray-50",
+                        form.image_url === image.image_url ? "border-[#FF6B00]" : "border-gray-200"
+                      )}
+                    >
+                      <img src={image.image_url} alt={image.name} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Name */}

@@ -42,7 +42,6 @@ export function useVendorAuth(): UseVendorAuthReturn {
         }
 
         sessionStorage.setItem("vendor_id", result.vendor_id);
-        sessionStorage.setItem("vendor_token", result.token);
         sessionStorage.setItem("vendor_name", result.vendor_name);
 
         if (result.must_change_password) {
@@ -62,7 +61,6 @@ export function useVendorAuth(): UseVendorAuthReturn {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("vendor_id");
-    sessionStorage.removeItem("vendor_token");
     sessionStorage.removeItem("vendor_name");
     router.push("/vendor/login");
   }, [router]);

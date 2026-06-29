@@ -3,56 +3,107 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 
-/**
- * PATCH /api/products/[id]
- * Atualiza um produto existente.
- *
- * DELETE /api/products/[id]
- * Remove um produto.
- */
+const ALLOWED_PRODUCT_FIELDS = new Set([
+  'name',
+  'description',
+  'price',
+  'promotional_price',
+  'category',
+  'image_url',
+  'is_default_image',
+  'active',
+  'is_combo',
+  'sort_order',
+  'stock_tracking_enabled',
+  'stock_quantity',
+  'physical_stock_quantity',
+  'beach_stock_quantity',
+  'blocked_by_stock',
+]);
+
+const OPTIONAL_PRODUCT_FIELDS = new Set([
+  'is_default_image',
+  'is_combo',
+  'sort_order',
+  'stock_tracking_enabled',
+  'stock_quantity',
+  'physical_stock_quantity',
+  'beach_stock_quantity',
+  'blocked_by_stock',
+  'promotional_price',
+]);
+
+function missingColumnFromError(error: any) {
+  if (!['42703', 'PGRST204'].includes(error?.code || '')) return null;
+  const message = String(error.message || '');
+  const quoted = message.match(/column "([^"]+)"/i);
+  if (quoted?.[1]) return quoted[1];
+  return Array.from(OPTIONAL_PRODUCT_FIELDS).find((column) => message.includes(column) || message.includes(`'${column}'`)) || null;
+}
+
+async function loadProductForWrite(req: NextRequest, id: string) {
+  const tenantId = getTenantIdFromRequest(req);
+  let query = supabaseAdmin
+    .from('products')
+    .select('id, vendor_id, tenant_id')
+    .eq('id', id);
+  if (tenantId) query = enforceTenantScope(query, tenantId);
+  return query.single();
+}
+
+function assertProductAccess(session: any, product: any) {
+  if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
+    return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
+  }
+  if (session.role === 'vendor' && session.vendor_id !== product.vendor_id) {
+    return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
+  }
+  return null;
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const session = getRequestSession(req);
-    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
 
-    const productLookup = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .select('vendor_id')
-        .eq('id', id),
-      tenantId
-    ).single();
+    const productLookup = await loadProductForWrite(req, id);
     if (productLookup.error || !productLookup.data) {
-      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
-    if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
-      return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
+    const accessError = assertProductAccess(session, productLookup.data);
+    if (accessError) return accessError;
+
+    const safeUpdate: Record<string, unknown> = {};
+    for (const field of ALLOWED_PRODUCT_FIELDS) {
+      if (field in body) safeUpdate[field] = body[field];
+    }
+    if (Object.keys(safeUpdate).length === 0) {
+      return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
 
-    const { data, error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .update({ ...body, updated_at: new Date().toISOString() })
+    let currentUpdate: Record<string, unknown> = { ...safeUpdate, updated_at: new Date().toISOString() };
+    let result: any = null;
+    for (let attempt = 0; attempt < OPTIONAL_PRODUCT_FIELDS.size + 1; attempt += 1) {
+      result = await (supabaseAdmin.from('products') as any)
+        .update(currentUpdate)
         .eq('id', id)
-        .select(),
-      tenantId
-    ).single();
+        .eq('tenant_id', productLookup.data.tenant_id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return NextResponse.json(data);
+      if (!result.error) break;
+      const missingColumn = missingColumnFromError(result.error);
+      if (!missingColumn || !OPTIONAL_PRODUCT_FIELDS.has(missingColumn)) break;
+      const { [missingColumn]: _removed, ...nextUpdate } = currentUpdate;
+      currentUpdate = nextUpdate;
+    }
+
+    if (result?.error) throw result.error;
+    return NextResponse.json(result.data);
   } catch (err) {
     console.error('Product PATCH error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -64,39 +115,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const session = getRequestSession(req);
-    if (!session || (session.role !== 'vendor' && session.role !== 'admin')) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
-
     const { id } = await params;
 
-    const productLookup = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .select('vendor_id')
-        .eq('id', id),
-      tenantId
-    ).single();
+    const productLookup = await loadProductForWrite(req, id);
     if (productLookup.error || !productLookup.data) {
-      return NextResponse.json({ error: 'Produto não encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
-    if (session.role === 'vendor' && session.vendor_id !== productLookup.data.vendor_id) {
-      return NextResponse.json({ error: 'Acesso negado para este produto.' }, { status: 403 });
-    }
+    const accessError = assertProductAccess(session, productLookup.data);
+    if (accessError) return accessError;
 
-    const { error } = await enforceTenantScope(
-      supabaseAdmin
-        .from('products')
-        .delete()
-        .eq('id', id),
-      tenantId
-    );
+    const { error } = await supabaseAdmin
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', productLookup.data.tenant_id);
 
     if (error) throw error;
     return NextResponse.json({ success: true });

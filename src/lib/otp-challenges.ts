@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase-admin';
 import { normalizeBrazilPhoneE164, OtpPurpose } from './otp';
+import { cleanupOtpChallenges } from './otp-cleanup';
 
 type ConsumeOtpInput = {
   challengeId: string;
@@ -18,6 +19,7 @@ type OtpChallengeLookup = {
 };
 
 export async function consumeVerifiedOtp(input: ConsumeOtpInput) {
+  await cleanupOtpChallenges();
   const phoneE164 = normalizeBrazilPhoneE164(input.phone);
   const { data, error } = await supabaseAdmin
     .from('otp_challenges')
@@ -30,14 +32,14 @@ export async function consumeVerifiedOtp(input: ConsumeOtpInput) {
   if (challenge.status !== 'verified') return false;
   if (challenge.purpose !== input.purpose) return false;
   if (challenge.phone_e164 !== phoneE164) return false;
-  if (input.vendorId && challenge.vendor_id !== input.vendorId) return false;
+  if (input.vendorId && challenge.vendor_id && challenge.vendor_id !== input.vendorId) return false;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return false;
 
-  const { error: updateError } = await supabaseAdmin
+  const { error: deleteError } = await supabaseAdmin
     .from('otp_challenges')
-    .update({ status: 'used', used_at: new Date().toISOString() })
+    .delete()
     .eq('id', input.challengeId)
     .eq('status', 'verified');
 
-  return !updateError;
+  return !deleteError;
 }

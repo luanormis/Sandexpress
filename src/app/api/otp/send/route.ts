@@ -9,6 +9,7 @@ import {
   isOtpPurpose,
   normalizeBrazilPhoneE164,
 } from '@/lib/otp';
+import { cleanupOtpChallenges, cleanupOtpForPhone } from '@/lib/otp-cleanup';
 import { sendMetaOtp } from '@/lib/meta-whatsapp';
 
 type OtpChallengeInsert = {
@@ -23,6 +24,15 @@ type OtpChallengeInsert = {
   created_user_agent: string | null;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getClientMeta(req: NextRequest) {
+  return {
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip'),
+    userAgent: (req.headers.get('user-agent') || '').slice(0, 300),
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (await isRateLimited(req, 'otp-send', 5, 10 * 60 * 1000)) {
@@ -34,8 +44,28 @@ export async function POST(req: NextRequest) {
     if (!isOtpPurpose(purpose)) {
       return NextResponse.json({ error: 'Finalidade de OTP invalida.' }, { status: 400 });
     }
+    if (body.vendor_id && !UUID_RE.test(String(body.vendor_id))) {
+      return NextResponse.json({ error: 'Quiosque invalido.' }, { status: 400 });
+    }
 
     const phoneE164 = normalizeBrazilPhoneE164(body.phone);
+    const vendorId = typeof body.vendor_id === 'string' ? body.vendor_id : null;
+    await cleanupOtpChallenges();
+    await cleanupOtpForPhone({ phoneE164, purpose, vendorId });
+
+    let tenantId: string | null = null;
+    if (vendorId) {
+      const { data: vendor, error: vendorError } = await supabaseAdmin
+        .from('vendors')
+        .select('tenant_id, is_active, subscription_status')
+        .eq('id', vendorId)
+        .single();
+      if (vendorError || !vendor || !vendor.is_active || vendor.subscription_status === 'blocked') {
+        return NextResponse.json({ error: 'Quiosque indisponivel para envio de codigo.' }, { status: 403 });
+      }
+      tenantId = vendor.tenant_id || null;
+    }
+
     const code = generateOtpCode();
     const ttlSeconds = Number(process.env.OTP_TTL_SECONDS || 300);
     const expiresAt = buildOtpExpiry(ttlSeconds).toISOString();
@@ -47,17 +77,18 @@ export async function POST(req: NextRequest) {
       language: process.env.META_WHATSAPP_OTP_TEMPLATE_LANGUAGE || 'pt_BR',
       code,
     });
+    const clientMeta = getClientMeta(req);
 
     const insertPayload: OtpChallengeInsert = {
-      tenant_id: typeof body.tenant_id === 'string' ? body.tenant_id : null,
-      vendor_id: typeof body.vendor_id === 'string' ? body.vendor_id : null,
+      tenant_id: tenantId,
+      vendor_id: vendorId,
       phone_e164: phoneE164,
       purpose,
       code_hash: hashOtpCode(code, pepper),
       provider_message_id: metaResult?.messages?.[0]?.id || null,
       expires_at: expiresAt,
-      created_ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip'),
-      created_user_agent: req.headers.get('user-agent'),
+      created_ip: clientMeta.ip,
+      created_user_agent: clientMeta.userAgent,
     };
 
     const { data, error } = await supabaseAdmin
@@ -70,7 +101,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ challenge_id: data.id, expires_at: data.expires_at });
   } catch (err) {
     console.error('OTP send error:', err);
-    const message = err instanceof Error ? err.message : 'Nao foi possivel enviar o codigo.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Nao foi possivel enviar o codigo agora.' }, { status: 500 });
   }
 }

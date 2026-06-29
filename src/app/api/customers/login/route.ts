@@ -3,7 +3,7 @@ import { createSessionToken } from '@/lib/auth-session';
 import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
-import { consumeVerifiedOtp } from '@/lib/otp-challenges';
+import { normalizeBrazilPhoneWithDdd } from '@/lib/phone';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
     }
 
-    const { name, phone, vendor_id, umbrella_id, party_size, otp_challenge_id } = await req.json();
+    const { name, phone, vendor_id, umbrella_id, party_size } = await req.json();
 
     if (!name || !phone || !vendor_id) {
       return NextResponse.json({ error: 'name, phone e vendor_id sao obrigatorios.' }, { status: 400 });
@@ -91,12 +91,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
 
-    const cleanPhone = String(phone).replace(/\D/g, '');
-    if (String(name).trim().length < 2 || cleanPhone.length < 10) {
-      return NextResponse.json({ error: 'Informe nome e celular validos.' }, { status: 400 });
+    let cleanPhone = '';
+    try {
+      cleanPhone = normalizeBrazilPhoneWithDdd(phone);
+    } catch {
+      return NextResponse.json({ error: 'Informe um telefone valido com DDD. Exemplo: 1196041957.' }, { status: 400 });
     }
-    if (!otp_challenge_id) {
-      return NextResponse.json({ error: 'Valide o celular por WhatsApp antes de continuar.' }, { status: 403 });
+    if (String(name).trim().length < 2) {
+      return NextResponse.json({ error: 'Informe nome completo valido.' }, { status: 400 });
     }
 
     let tenantId: string | null = null;
@@ -131,23 +133,14 @@ export async function POST(req: NextRequest) {
       tenantId = vendor?.tenant_id || null;
     }
 
-    const partySize = Math.max(1, Math.min(50, Number(party_size || 1)));
-    const otpOk = await consumeVerifiedOtp({
-      challengeId: String(otp_challenge_id),
-      phone: cleanPhone,
-      purpose: 'customer_login',
-      vendorId: vendor_id,
-    });
-    if (!otpOk) {
-      return NextResponse.json({ error: 'Codigo WhatsApp nao validado para este celular.' }, { status: 403 });
-    }
-
     const { data: existing } = await supabaseAdmin
       .from('customers')
       .select('*')
       .eq('vendor_id', vendor_id)
       .eq('phone', cleanPhone)
       .single();
+
+    const partySize = Math.max(1, Math.min(50, Number(party_size || 1)));
 
     if (umbrellaState?.is_occupied || umbrellaState?.current_order_id) {
       const { data: openOrders, error: openOrderError } = await supabaseAdmin

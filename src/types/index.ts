@@ -157,7 +157,6 @@ export interface AuthResponse {
   vendor_id: string
   vendor_name: string
   owner_name: string
-  token: string
   must_change_password: boolean
 }
 

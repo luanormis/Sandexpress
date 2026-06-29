@@ -3,14 +3,65 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const MAX_ORDER_ITEMS = 50;
+const MAX_ITEM_QUANTITY = 50;
+
+type IncomingOrderItem = {
+  product_id: string;
+  quantity: number;
+};
+
+function normalizeOrderItems(items: unknown): IncomingOrderItem[] | null {
+  if (!Array.isArray(items) || items.length === 0 || items.length > MAX_ORDER_ITEMS) return null;
+
+  const merged = new Map<string, number>();
+  for (const item of items) {
+    if (!item || typeof item !== 'object') return null;
+    const raw = item as { product_id?: unknown; quantity?: unknown };
+    const productId = String(raw.product_id || '').trim();
+    const quantity = Number(raw.quantity);
+    if (!UUID_RE.test(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ITEM_QUANTITY) {
+      return null;
+    }
+    merged.set(productId, (merged.get(productId) || 0) + quantity);
+  }
+
+  return Array.from(merged.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
+}
+
+function normalizeNotes(value: unknown) {
+  const text = String(value || '').trim();
+  return text ? text.slice(0, 500) : null;
+}
+
+function orderRpcStatus(message: string) {
+  if (
+    message.includes('conta aberta') ||
+    message.includes('fechamento') ||
+    message.includes('Estoque insuficiente')
+  ) {
+    return 409;
+  }
+  if (
+    message.includes('invalido') ||
+    message.includes('inativo') ||
+    message.includes('indisponivel') ||
+    message.includes('nao encontrado') ||
+    message.includes('nao pertence')
+  ) {
+    return 400;
+  }
+  return 500;
+}
 
 /**
  * GET /api/orders?vendor_id=xxx&status=received
- * Lista pedidos de um vendor, filtrável por status.
+ * Lista pedidos de um vendor, filtravel por status.
  *
  * POST /api/orders
- * Cria novo pedido. Preços lidos do banco — nunca confiados no body do cliente.
+ * Cria pedido por RPC transacional no Postgres para evitar corrida de estoque,
+ * total da comanda e comanda duplicada no mesmo guarda-sol.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -20,11 +71,11 @@ export async function GET(req: NextRequest) {
     const includePaid = searchParams.get('include_paid') === 'true';
 
     if (!vendor_id) {
-      return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
     }
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
+      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
 
     if (!await vendorFeatureEnabled(vendor_id, 'operational_dashboard')) {
@@ -70,20 +121,28 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { vendor_id, customer_id, umbrella_id, items, notes } = await req.json();
+    const normalizedItems = normalizeOrderItems(items);
+    const safeNotes = normalizeNotes(notes);
 
-    if (!vendor_id || !customer_id || !umbrella_id || !Array.isArray(items) || items.length === 0) {
+    if (
+      !UUID_RE.test(String(vendor_id || '')) ||
+      !UUID_RE.test(String(customer_id || '')) ||
+      !UUID_RE.test(String(umbrella_id || '')) ||
+      !normalizedItems
+    ) {
       return NextResponse.json({ error: 'Dados de pedido incompletos.' }, { status: 400 });
     }
+
     const session = getRequestSession(req);
     if (!session) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+      return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
     }
     if (session.role === 'vendor' && session.vendor_id !== vendor_id) {
-      return NextResponse.json({ error: 'Vendor não autorizado.' }, { status: 403 });
+      return NextResponse.json({ error: 'Vendor nao autorizado.' }, { status: 403 });
     }
     if (session.role === 'customer') {
       if (session.vendor_id !== vendor_id || session.customer_id !== customer_id) {
-        return NextResponse.json({ error: 'Sessão do cliente inválida para este pedido.' }, { status: 403 });
+        return NextResponse.json({ error: 'Sessao do cliente invalida para este pedido.' }, { status: 403 });
       }
     }
 
@@ -91,165 +150,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('orders'), { status: 403 });
     }
 
-    // Validar guarda-sol pertence ao vendor
-    const { data: umbrella, error: umbrellaErr } = await (supabaseAdmin.from('umbrellas') as any)
-      .select('id, tenant_id, vendor_id, is_occupied, current_order_id, active')
-      .eq('id', umbrella_id)
-      .eq('vendor_id', vendor_id)
-      .single();
+    const { data: order, error: orderErr } = await supabaseAdmin.rpc('create_customer_order', {
+      p_vendor_id: vendor_id,
+      p_customer_id: customer_id,
+      p_umbrella_id: umbrella_id,
+      p_items: normalizedItems,
+      p_notes: safeNotes,
+    });
 
-    if (umbrellaErr || !umbrella) {
-      return NextResponse.json({ error: 'Guarda-sol inválido para este quiosque.' }, { status: 400 });
-    }
-    if (!umbrella.active) {
-      return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 400 });
-    }
-
-    const { data: openOrders, error: openOrderErr } = await supabaseAdmin
-      .from('orders')
-      .select('id, customer_id, status, total, paid, notes')
-      .eq('vendor_id', vendor_id)
-      .eq('umbrella_id', umbrella_id)
-      .eq('paid', false)
-      .in('status', OPEN_ACCOUNT_STATUSES)
-      .order('created_at', { ascending: true })
-      .limit(1);
-
-    if (openOrderErr) throw openOrderErr;
-    const openOrder = openOrders?.[0] as any;
-    if (openOrder && openOrder.customer_id !== customer_id) {
-      return NextResponse.json({
-        error: 'Este guarda-sol esta com uma conta aberta. Ele sera liberado apos o pagamento.',
-      }, { status: 409 });
-    }
-    if (openOrder?.status === 'closing_requested') {
-      return NextResponse.json({ error: 'A conta deste guarda-sol ja esta em fechamento.' }, { status: 409 });
-    }
-
-    // Buscar preços reais dos produtos no banco (nunca confiar no cliente)
-    const productIds: string[] = items.map((i: { product_id: string }) => i.product_id);
-
-    const { data: dbProducts, error: prodErr } = await (supabaseAdmin.from('products') as any)
-      .select('id, tenant_id, price, promotional_price, active, blocked_by_stock, stock_tracking_enabled, stock_quantity, beach_stock_quantity, vendor_id')
-      .in('id', productIds)
-      .eq('vendor_id', vendor_id)
-      .eq('tenant_id', (umbrella as any).tenant_id);
-
-    if (prodErr || !dbProducts) {
-      return NextResponse.json({ error: 'Erro ao validar produtos.' }, { status: 500 });
-    }
-
-    const productMap = new Map((dbProducts as any[]).map((p) => [p.id, p]));
-
-    // Validar produtos e calcular total com preços do banco
-    const orderItems: { product_id: string; quantity: number; unit_price: number; subtotal: number }[] = [];
-    let total = 0;
-
-    for (const item of items) {
-      const product = productMap.get(item.product_id);
-      if (!product) {
-        return NextResponse.json({ error: `Produto ${item.product_id} não encontrado neste quiosque.` }, { status: 400 });
-      }
-      if (!product.active || (product.stock_tracking_enabled && product.blocked_by_stock)) {
-        return NextResponse.json({ error: `Produto indisponível.` }, { status: 400 });
-      }
-      const activeStock = Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0);
-      if (product.stock_tracking_enabled && activeStock < item.quantity) {
-        return NextResponse.json({ error: `Estoque insuficiente.` }, { status: 400 });
-      }
-      const unit_price: number = Number(product.promotional_price ?? product.price);
-      const subtotal = unit_price * item.quantity;
-      total += subtotal;
-      orderItems.push({ product_id: item.product_id, quantity: item.quantity, unit_price, subtotal });
-    }
-
-    let order = openOrder;
-    if (!order) {
-      const { data: newOrder, error: orderErr } = await supabaseAdmin
-        .from('orders')
-        .insert({
-          tenant_id: (umbrella as any).tenant_id,
-          vendor_id,
-          customer_id,
-          umbrella_id,
-          total,
-          gross_total: total,
-          notes: notes || null,
-        } as any)
-        .select()
-        .single();
-
-      if (orderErr) throw orderErr;
-      order = newOrder;
-    } else {
-      const nextTotal = Number(order.total || 0) + total;
-      const nextNotes = notes ? [order.notes, notes].filter(Boolean).join('\n') : order.notes;
-      const nextStatus = order.status === 'completed' ? 'received' : order.status;
-      const { data: updatedOrder, error: updateOrderErr } = await supabaseAdmin
-        .from('orders')
-        .update({
-          total: nextTotal,
-          gross_total: nextTotal,
-          status: nextStatus,
-          notes: nextNotes || null,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq('id', order.id)
-        .select()
-        .single();
-
-      if (updateOrderErr) throw updateOrderErr;
-      order = updatedOrder;
-    }
-
-    // Criar itens do pedido
-    const { error: itemsErr } = await supabaseAdmin
-      .from('order_items')
-      .insert(orderItems.map((oi) => ({
-        tenant_id: (umbrella as any).tenant_id,
-        ...oi,
-        order_id: order.id,
-      } as any)));
-
-    if (itemsErr) throw itemsErr;
-
-    // Decrementar estoque
-    for (const item of orderItems) {
-      const product = productMap.get(item.product_id)!;
-      if (product.stock_tracking_enabled) {
-        const newQty = Math.max(Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0) - item.quantity, 0);
-        await supabaseAdmin
-          .from('products')
-          .update({
-            beach_stock_quantity: newQty,
-            stock_quantity: newQty,
-            blocked_by_stock: newQty <= 0,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', item.product_id);
-      }
-    }
-
-    await supabaseAdmin
-      .from('umbrellas')
-      .update({ is_occupied: true, current_order_id: order.id })
-      .eq('id', umbrella_id);
-
-    // Atualizar total gasto do cliente
-    const { data: customer } = await supabaseAdmin
-      .from('customers')
-      .select('total_spent')
-      .eq('id', customer_id)
-      .single();
-
-    if (customer) {
-      await supabaseAdmin
-        .from('customers')
-        .update({
-          total_spent: Number(customer.total_spent) + total,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', customer_id);
+    if (orderErr) {
+      const message = orderErr.message || 'Erro ao criar pedido.';
+      return NextResponse.json({ error: message }, { status: orderRpcStatus(message) });
     }
 
     return NextResponse.json(order, { status: 201 });

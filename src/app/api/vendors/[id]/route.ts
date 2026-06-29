@@ -27,6 +27,37 @@ const ALLOWED_VENDOR_FIELDS = new Set([
   'max_umbrellas',
 ]);
 
+const SAFE_VENDOR_SELECT = [
+  'id',
+  'tenant_id',
+  'name',
+  'address',
+  'city',
+  'state',
+  'owner_name',
+  'owner_phone',
+  'owner_email',
+  'cpf',
+  'cnpj',
+  'document_login',
+  'beach_name',
+  'logo_url',
+  'primary_color',
+  'secondary_color',
+  'button_color',
+  'button_text_color',
+  'subscription_status',
+  'is_active',
+  'plan_type',
+  'plan_expires_at',
+  'plan_monthly_price',
+  'plan_annual_monthly_price',
+  'trial_ends_at',
+  'max_umbrellas',
+  'created_at',
+  'updated_at',
+].join(', ');
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,7 +70,7 @@ export async function GET(
 
     const { id } = await params;
     const tenantId = getTenantIdFromRequest(req);
-    const query = supabaseAdmin.from('vendors').select('*').eq('id', id);
+    const query = supabaseAdmin.from('vendors').select(SAFE_VENDOR_SELECT).eq('id', id);
     const { data, error } = await (tenantId ? enforceTenantScope(query, tenantId) : query).single();
 
     if (error) throw error;
@@ -76,7 +107,7 @@ export async function PATCH(
       .from('vendors')
       .update({ ...safeUpdate, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select();
+      .select(SAFE_VENDOR_SELECT);
     const { data, error } = await (tenantId ? enforceTenantScope(query, tenantId) : query).single();
 
     if (error) throw error;

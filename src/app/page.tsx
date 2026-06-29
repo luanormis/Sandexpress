@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   UtensilsCrossed, Smartphone, Zap, QrCode, TrendingUp, CheckCircle2,
   Camera, Gift, FileText, X, ChevronRight, Menu,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { PLAN_PRICE_LABELS, PLAN_UMBRELLA_LIMIT, TRIAL_DAYS } from "@/lib/plans";
+import { DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel } from "@/lib/plans";
 
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
@@ -23,6 +23,20 @@ export default function LandingPage() {
   const [otpChallengeId, setOtpChallengeId] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpMessage, setOtpMessage] = useState("");
+  const [planSettings, setPlanSettings] = useState(DEFAULT_PLATFORM_PLAN_SETTINGS);
+
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const res = await fetch("/api/public/plans");
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) setPlanSettings(data);
+      } catch {
+        // Keep bundled defaults when pricing cannot be loaded.
+      }
+    }
+    loadPlans();
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,16 +300,16 @@ export default function LandingPage() {
       <section id="planos" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#fff1eb]">
         <div className="max-w-5xl mx-auto text-center">
            <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Planos que cabem no seu bolso</h2>
-           <p className="text-xl text-gray-500 mb-16">Comece com {TRIAL_DAYS} dias grátis. Todos os planos incluem até {PLAN_UMBRELLA_LIMIT} guarda-sóis.</p>
+           <p className="text-xl text-gray-500 mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
            
            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
               {/* Trial */}
               <div className="border border-[#e2bfb0] p-8 rounded-[40px] bg-white">
                  <h3 className="text-2xl font-bold mb-2">Trial</h3>
                  <p className="text-gray-500 mb-6 font-semibold">Para conhecer a plataforma</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">R$0</span><span className="text-gray-500 font-bold">/{TRIAL_DAYS} dias</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">R$0</span><span className="text-gray-500 font-bold">/{planSettings.trial_days} dias</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
@@ -306,9 +320,9 @@ export default function LandingPage() {
               <div className="border border-[#e2bfb0] p-8 rounded-[40px] bg-white">
                  <h3 className="text-2xl font-bold mb-2">Mensal</h3>
                  <p className="text-gray-500 mb-6 font-semibold">Ideal para testar a temporada</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">{PLAN_PRICE_LABELS.monthly}</span><span className="text-gray-500 font-bold">/mês</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold text-gray-900">{formatPlanPriceLabel(planSettings.monthly_price)}</span><span className="text-gray-500 font-bold">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-600"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Relatórios completos</li>
                  </ul>
@@ -320,9 +334,9 @@ export default function LandingPage() {
                  <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
                  <h3 className="text-2xl font-bold mb-2">Anual</h3>
                  <p className="text-gray-400 mb-6 font-semibold">Para quem quer faturar o ano todo</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold">{PLAN_PRICE_LABELS.annualMonthly}</span><span className="text-gray-400 font-bold">/mês</span></div>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="text-gray-400 font-bold">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {PLAN_UMBRELLA_LIMIT} guarda-sóis</li>
+                   <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-gray-300"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
                  </ul>
@@ -335,7 +349,7 @@ export default function LandingPage() {
       {/* CTA Secundário */}
       <section className="bg-gradient-to-r from-[#3D1A0A] to-gray-900 py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
-        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {TRIAL_DAYS} dias grátis. Não precisa cartão de crédito.</p>
+        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {planSettings.trial_days} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
            Cadastrar gratis
         </button>
@@ -355,7 +369,7 @@ export default function LandingPage() {
                   <CheckCircle2 size={32} className="text-green-600" />
                 </div>
                 <h3 className="text-2xl font-display font-bold text-gray-900 mb-2">Cadastro realizado!</h3>
-                <p className="text-gray-500 mb-6">Seu quiosque foi criado com {TRIAL_DAYS} dias grátis. Acesse o painel para configurar seu cardápio.</p>
+                <p className="text-gray-500 mb-6">Seu quiosque foi criado com {planSettings.trial_days} dias grátis. Acesse o painel para configurar seu cardápio.</p>
                 {regCredentials && (
                   <div className="mb-6 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-left">
                     <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
@@ -382,7 +396,7 @@ export default function LandingPage() {
               <>
                 <div className="flex justify-between items-center p-6 border-b border-gray-100">
                   <div>
-                    <h3 className="text-xl font-display font-bold text-gray-900">Teste Grátis {TRIAL_DAYS} dias</h3>
+                    <h3 className="text-xl font-display font-bold text-gray-900">Teste Grátis {planSettings.trial_days} dias</h3>
                     <p className="text-sm text-gray-500">Sem cartão de crédito</p>
                   </div>
                   <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -537,11 +551,11 @@ export default function LandingPage() {
                       className="mt-1 h-4 w-4 shrink-0 accent-[#FF6B00]"
                     />
                     <span>
-                      Li e concordo com os{" "}
+                      Li e aceito os{" "}
                       <Link href="/termos-de-uso" target="_blank" className="text-[#FF6B00] underline underline-offset-2">
-                        Termos de Uso do SandExpress
+                        Termos de Uso e a Politica de Privacidade do SandExpress
                       </Link>
-                      , incluindo o uso dos dados do cadastro para operacao, pedidos, relatorios e suporte.
+                      , incluindo o registro do aceite com data e hora e o uso dos dados do cadastro para operacao, pedidos, relatorios e suporte.
                     </span>
                   </label>
                   {registerError && (

@@ -26,6 +26,11 @@ export function generateOtpCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
 
+export function getStaticOtpCode() {
+  const configured = process.env.OTP_STATIC_CODE?.trim();
+  return /^\d{6}$/.test(configured || '') ? configured! : '102121';
+}
+
 export function hashOtpCode(code: string, pepper: string) {
   if (!pepper || pepper.length < 32) {
     throw new Error('OTP_PEPPER deve ter pelo menos 32 caracteres.');

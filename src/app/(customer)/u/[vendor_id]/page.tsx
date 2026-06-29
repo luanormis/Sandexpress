@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
-import { Bell, Home, ListOrdered, ShoppingCart, UtensilsCrossed } from "lucide-react";
+import { Bell, Home, ListOrdered, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
+import { cleanPhoneDigits, isValidBrazilPhoneWithDdd } from "@/lib/phone";
 
 type Product = {
   id: string;
@@ -84,6 +85,11 @@ export default function CustomerApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [waiterCalled, setWaiterCalled] = useState(false);
+  const [lastAddedProductId, setLastAddedProductId] = useState("");
+  const [satisfactionOrderId, setSatisfactionOrderId] = useState("");
+  const [satisfactionRating, setSatisfactionRating] = useState(0);
+  const [satisfactionSent, setSatisfactionSent] = useState(false);
+  const [satisfactionLoading, setSatisfactionLoading] = useState(false);
   const [features, setFeatures] = useState<FeatureFlags>({});
 
   const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
@@ -203,15 +209,14 @@ export default function CustomerApp() {
 
   async function startTab() {
     if (!vendor) return;
-    if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 10) {
-      setError("Informe nome e celular validos.");
+    if (name.trim().length < 2) {
+      setError("Informe seu nome completo.");
       return;
     }
-    if (!otpVerified || !otpChallengeId) {
-      setError("Valide o codigo enviado no WhatsApp antes de abrir a comanda.");
+    if (!isValidBrazilPhoneWithDdd(phone)) {
+      setError("Informe um telefone valido com DDD. Exemplo: 1196041957.");
       return;
     }
-
     setLoading(true);
     setError("");
     try {
@@ -221,11 +226,10 @@ export default function CustomerApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          phone: phone.replace(/\D/g, ""),
+          phone: cleanPhoneDigits(phone),
           vendor_id: vendor.id,
           umbrella_id: umbrellaId,
           party_size: partySize,
-          otp_challenge_id: otpChallengeId,
         }),
       });
       const data = await res.json();
@@ -252,39 +256,16 @@ export default function CustomerApp() {
   async function sendCustomerOtp() {
     if (!vendor) return;
     if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 10) {
-      setError("Informe nome e celular validos antes de enviar o codigo.");
+      setError("Informe nome e celular validos antes de validar.");
       return;
     }
-    setLoading(true);
     setError("");
-    setOtpMessage("");
+    setOtpMessage("Envie pelo WhatsApp a frase: obter codigo de validação para o sandexpress. Depois digite o codigo recebido aqui.");
     setOtpVerified(false);
-    try {
-      const res = await fetch("/api/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone,
-          purpose: "customer_login",
-          vendor_id: vendor.id,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Nao foi possivel enviar o codigo.");
-        return;
-      }
-      setOtpChallengeId(data.challenge_id || "");
-      setOtpMessage("Codigo enviado pelo WhatsApp.");
-    } catch {
-      setError("Erro de rede ao enviar codigo.");
-    } finally {
-      setLoading(false);
-    }
   }
 
   async function verifyCustomerOtp() {
-    if (!otpChallengeId || otpCode.replace(/\D/g, "").length !== 6) {
+    if (otpCode.replace(/\D/g, "").length !== 6) {
       setError("Informe o codigo de 6 digitos.");
       return;
     }
@@ -296,7 +277,10 @@ export default function CustomerApp() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          challenge_id: otpChallengeId,
+          challenge_id: otpChallengeId || undefined,
+          phone,
+          purpose: "customer_login",
+          vendor_id: vendor?.id,
           code: otpCode.replace(/\D/g, ""),
         }),
       });
@@ -306,6 +290,7 @@ export default function CustomerApp() {
         return;
       }
       setOtpVerified(true);
+      setOtpChallengeId(data.challenge_id || otpChallengeId);
       setOtpMessage("WhatsApp validado.");
     } catch {
       setError("Erro de rede ao validar codigo.");
@@ -315,6 +300,7 @@ export default function CustomerApp() {
   }
 
   function addToCart(product: Product) {
+    setLastAddedProductId(product.id);
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
@@ -322,6 +308,7 @@ export default function CustomerApp() {
       }
       return [...prev, { product, quantity: 1 }];
     });
+    window.setTimeout(() => setLastAddedProductId((current) => current === product.id ? "" : current), 1400);
   }
 
   function updateQuantity(productId: string, delta: number) {
@@ -418,13 +405,44 @@ export default function CustomerApp() {
         setError(data.error || "Nao ha conta aberta para fechar.");
         return;
       }
-      setOrders((prev) => prev.map((order) => order.id === data.order?.id ? { ...order, status: "closing_requested" } : order));
-      if (!orders.some((order) => order.id === data.order?.id) && data.order?.id) {
-        setOrders([{ id: data.order.id, total: Number(data.order.total || ordersTotal), status: "closing_requested", created_at: data.order.created_at || new Date().toISOString() }]);
+      const requestedOrderId = data.order?.id || currentOrderId;
+      setOrders((prev) => prev.map((order) => order.id === requestedOrderId ? { ...order, status: "closing_requested" } : order));
+      if (!orders.some((order) => order.id === requestedOrderId) && requestedOrderId) {
+        setOrders([{ id: requestedOrderId, total: Number(data.order?.total || ordersTotal), status: "closing_requested", created_at: data.order?.created_at || new Date().toISOString() }]);
       }
-      alert("Pedido de conta enviado ao quiosque.");
+      setSatisfactionOrderId(requestedOrderId);
+      setSatisfactionRating(0);
+      setSatisfactionSent(false);
+      setStep("orders");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitSatisfaction(rating: number) {
+    if (!satisfactionOrderId || rating < 1 || rating > 5) return;
+    setSatisfactionLoading(true);
+    setError("");
+    setSatisfactionRating(rating);
+    try {
+      const res = await fetch("/api/satisfaction", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: satisfactionOrderId, rating }),
+      });
+      const data = await res.json();
+      if (res.status === 401 || res.status === 403) {
+        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para avaliar.");
+        return;
+      }
+      if (!res.ok) {
+        setError(data.error || "Nao foi possivel enviar sua avaliacao.");
+        return;
+      }
+      setSatisfactionSent(true);
+    } finally {
+      setSatisfactionLoading(false);
     }
   }
 
@@ -510,38 +528,16 @@ export default function CustomerApp() {
           </div>
           <p className="customer-login__subtitle">Informe os dados para iniciar.</p>
           <div className="customer-form">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" className="customer-input" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" aria-label="Nome completo" className="customer-input" />
             <input
               value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value.replace(/\D/g, ""));
-                setOtpChallengeId("");
-                setOtpVerified(false);
-                setOtpMessage("");
-              }}
-              placeholder="Celular"
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+              placeholder="Telefone com DDD. Ex: 1196041957"
+              aria-label="Telefone com DDD"
+              inputMode="tel"
               className="customer-input"
             />
-            <div className="customer-stepper">
-              <p className="customer-stepper__label">Validacao por WhatsApp</p>
-              <div className="customer-stepper__control">
-                <input
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="Codigo"
-                  className="customer-input"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" disabled={loading} onClick={sendCustomerOtp} className="customer-secondary-button">
-                  Enviar codigo
-                </button>
-                <button type="button" disabled={loading || !otpChallengeId} onClick={verifyCustomerOtp} className="customer-secondary-button">
-                  Validar
-                </button>
-              </div>
-              {otpMessage && <p className="customer-login__subtitle">{otpMessage}</p>}
-            </div>
+            <p className="customer-login__subtitle">Use DDD + telefone, somente numeros.</p>
             <div className="customer-stepper">
               <p className="customer-stepper__label">Quantidade de pessoas</p>
               <div className="customer-stepper__control">
@@ -656,11 +652,28 @@ export default function CustomerApp() {
                 </div>
                 <div className="customer-product-side">
                   <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
-                  <button onClick={() => addToCart(product)} className="customer-add-button">Adicionar</button>
+                  <button
+                    onClick={() => addToCart(product)}
+                    className={`customer-add-button${lastAddedProductId === product.id ? " is-added" : ""}`}
+                    aria-label={`Adicionar ${product.name} ao carrinho`}
+                  >
+                    {lastAddedProductId === product.id ? "Adicionado" : "Adicionar"}
+                  </button>
                 </div>
               </article>
             ))}
           </div>
+          {cartItemsCount > 0 && (
+            <div className="customer-cart-dock" role="status" aria-live="polite">
+              <div>
+                <strong>{cartItemsCount} {cartItemsCount === 1 ? "item" : "itens"}</strong>
+                <span>{formatCurrency(cartTotal)}</span>
+              </div>
+              <button type="button" onClick={() => setStep("cart")}>
+                Ver carrinho
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -681,13 +694,44 @@ export default function CustomerApp() {
               </article>
             ))}
           </div>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" rows={3} className="customer-textarea" />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" aria-label="Observacoes do pedido" rows={3} className="customer-textarea" />
           <button onClick={createOrder} disabled={loading || cart.length === 0} className="customer-primary-button">Enviar pedido</button>
         </section>
       )}
 
       {step === "orders" && (
         <section className="customer-content">
+          {satisfactionOrderId && (
+            <div className="customer-satisfaction-card">
+              {satisfactionSent ? (
+                <>
+                  <p className="customer-satisfaction-eyebrow">Avaliacao enviada</p>
+                  <h2>Obrigado pelo retorno.</h2>
+                </>
+              ) : (
+                <>
+                  <p className="customer-satisfaction-eyebrow">Pedido de conta enviado</p>
+                  <h2>Como foi sua experiencia?</h2>
+                  <div className="customer-stars" aria-label="Avaliar experiencia de 1 a 5 estrelas">
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        onClick={() => submitSatisfaction(rating)}
+                        disabled={satisfactionLoading}
+                        className={`customer-star-button${satisfactionRating >= rating ? " is-active" : ""}`}
+                        aria-label={`Avaliar com ${rating} estrela${rating > 1 ? "s" : ""}`}
+                      >
+                        <Star size="1.65rem" fill="currentColor" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="customer-small">Toque em uma estrela para enviar sua avaliacao.</p>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="customer-bill-panel">
             <div className="customer-bill-row">
               <span>Conta</span>

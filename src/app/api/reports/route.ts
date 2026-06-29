@@ -1,7 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { enforceTenantScope } from '@/lib/tenant-utils';
 import { fetchArchivedOrders } from '@/lib/order-archive';
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] || null;
+  return value || null;
+}
+
+function buildSatisfactionSummary(rows: any[]) {
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
+  let total = 0;
+  let sum = 0;
+
+  rows.forEach((row) => {
+    const rating = Number(row.rating) as 1 | 2 | 3 | 4 | 5;
+    if (rating >= 1 && rating <= 5) {
+      distribution[rating] += 1;
+      total += 1;
+      sum += rating;
+    }
+  });
+
+  return {
+    average_rating: total > 0 ? Math.round((sum / total) * 10) / 10 : 0,
+    total_responses: total,
+    distribution,
+    latest: rows.slice(0, 8).map((row) => ({
+      rating: Number(row.rating),
+      comment: row.comment || null,
+      created_at: row.created_at,
+      customer_name: firstRelation<{ name?: string }>(row.customers)?.name || 'Cliente',
+    })),
+  };
+}
 
 /**
  * GET /api/reports?vendor_id=xxx&period=month
@@ -10,18 +43,30 @@ import { fetchArchivedOrders } from '@/lib/order-archive';
  */
 export async function GET(req: NextRequest) {
   try {
-    const tenantId = getTenantIdFromRequest(req);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não identificado.' }, { status: 400 });
-    }
-
     const { searchParams } = new URL(req.url);
     const vendor_id = searchParams.get('vendor_id');
     const period = searchParams.get('period') || 'month';
 
     if (!vendor_id) {
-      return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
     }
+
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
+    }
+
+    const { data: vendorTenant, error: vendorTenantError } = await supabaseAdmin
+      .from('vendors')
+      .select('tenant_id')
+      .eq('id', vendor_id)
+      .single();
+
+    if (vendorTenantError || !vendorTenant?.tenant_id) {
+      return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
+    }
+
+    const tenantId = vendorTenant.tenant_id;
 
     // Calcular período
     const now = new Date();
@@ -140,6 +185,21 @@ export async function GET(req: NextRequest) {
       return acc;
     }, {} as Record<string, { count: number; gross: number; fees: number; net: number; total: number }>);
 
+    const { data: satisfactionRows, error: satisfactionError } = await enforceTenantScope(
+      supabaseAdmin
+        .from('customer_satisfaction_surveys')
+        .select('rating, comment, created_at, customers(name)')
+        .eq('vendor_id', vendor_id)
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50),
+      tenantId
+    );
+
+    if (satisfactionError && !['42P01', 'PGRST205'].includes(satisfactionError.code)) {
+      throw satisfactionError;
+    }
+
     return NextResponse.json({
       period,
       kpis: {
@@ -162,6 +222,7 @@ export async function GET(req: NextRequest) {
       top_customers,
       hourly_sales,
       payment_methods,
+      satisfaction: buildSatisfactionSummary((satisfactionRows || []) as any[]),
     });
   } catch (err) {
     console.error('Reports error:', err);

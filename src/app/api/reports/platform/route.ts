@@ -3,14 +3,6 @@ import { getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { fetchArchivedOrders } from '@/lib/order-archive';
 
-const PLAN_PRICES: Record<string, number> = {
-  monthly: 499.99,
-  '6months': 499.99,
-  annual: 299.99,
-  '12months': 299.99,
-  trial: 0,
-};
-
 type VendorRow = {
   id: string;
   name: string | null;
@@ -20,11 +12,29 @@ type VendorRow = {
   state: string | null;
   subscription_status: string | null;
   plan_type: string | null;
+  plan_monthly_price: number | null;
+  plan_annual_monthly_price: number | null;
   is_active: boolean | null;
 };
 
-function getVendorPlanAmount(vendor: { plan_type: string | null }) {
-  return PLAN_PRICES[vendor.plan_type || 'monthly'] ?? PLAN_PRICES.monthly;
+type SatisfactionVendorSummary = {
+  name: string;
+  city: string;
+  beach: string;
+  average_rating: number;
+  total_responses: number;
+};
+
+function getVendorPlanAmount(vendor: {
+  plan_type: string | null;
+  plan_monthly_price: number | null;
+  plan_annual_monthly_price: number | null;
+}) {
+  if (vendor.plan_type === 'trial') return 0;
+  if (vendor.plan_type === 'annual' || vendor.plan_type === '12months') {
+    return Number(vendor.plan_annual_monthly_price ?? 299.99);
+  }
+  return Number(vendor.plan_monthly_price ?? 499.99);
 }
 
 function includesFilter(value: string | null | undefined, filter: string) {
@@ -53,7 +63,7 @@ export async function GET(req: NextRequest) {
 
     const { data: vendors, error: vendorsError } = await supabaseAdmin
       .from('vendors')
-      .select('id, name, address, beach_name, city, state, subscription_status, plan_type, is_active');
+      .select('id, name, address, beach_name, city, state, subscription_status, plan_type, plan_monthly_price, plan_annual_monthly_price, is_active');
 
     if (vendorsError) throw vendorsError;
 
@@ -125,6 +135,51 @@ export async function GET(req: NextRequest) {
     const productHourlyAgg = new Map<string, { product: string; category: string; hour: number; quantity: number; revenue: number }>();
 
     let totalProductsSold = 0;
+
+    let satisfactionRows: any[] = [];
+    if (selectedVendorIds.size > 0) {
+      let satisfactionQuery = supabaseAdmin
+        .from('customer_satisfaction_surveys')
+        .select('vendor_id, rating, created_at')
+        .gte('created_at', from || monthStart.toISOString())
+        .in('vendor_id', Array.from(selectedVendorIds));
+
+      if (to) {
+        const endDate = new Date(to);
+        endDate.setHours(23, 59, 59, 999);
+        satisfactionQuery = satisfactionQuery.lte('created_at', endDate.toISOString());
+      }
+
+      const { data, error } = await satisfactionQuery;
+      if (error && !['42P01', 'PGRST205'].includes(error.code)) throw error;
+      satisfactionRows = (data || []) as any[];
+    }
+
+    const satisfactionVendorAgg = new Map<string, { sum: number; count: number }>();
+    satisfactionRows.forEach((row) => {
+      const rating = Number(row.rating);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+      const current = satisfactionVendorAgg.get(row.vendor_id) || { sum: 0, count: 0 };
+      current.sum += rating;
+      current.count += 1;
+      satisfactionVendorAgg.set(row.vendor_id, current);
+    });
+
+    const satisfaction_total = satisfactionRows.length;
+    const satisfaction_sum = satisfactionRows.reduce((sum, row) => sum + Number(row.rating || 0), 0);
+    const satisfaction_by_vendor: SatisfactionVendorSummary[] = Array.from(satisfactionVendorAgg.entries())
+      .map(([vendorKey, value]) => {
+        const vendor = vendorMap.get(vendorKey);
+        return {
+          name: vendor?.name || 'Quiosque',
+          city: vendor?.city || 'Sem cidade',
+          beach: vendor?.beach_name || vendor?.address || 'Sem praia/localizacao',
+          average_rating: Math.round((value.sum / value.count) * 10) / 10,
+          total_responses: value.count,
+        };
+      })
+      .sort((a, b) => b.average_rating - a.average_rating || b.total_responses - a.total_responses)
+      .slice(0, 10);
 
     filteredOrders.forEach((order: any) => {
       const vendor = vendorMap.get(order.vendor_id);
@@ -223,6 +278,9 @@ export async function GET(req: NextRequest) {
       total_visitors: countedCustomers.size,
       total_products_sold: totalProductsSold,
       avg_ticket: filteredOrders.length > 0 ? gmv / filteredOrders.length : 0,
+      satisfaction_average: satisfaction_total > 0 ? Math.round((satisfaction_sum / satisfaction_total) * 10) / 10 : 0,
+      satisfaction_total,
+      satisfaction_by_vendor,
       active_vendors,
       trial_vendors,
       overdue_vendors,

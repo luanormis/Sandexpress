@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
 
@@ -36,6 +37,11 @@ export async function GET(req: NextRequest) {
 
     if (!umbrella.active) {
       return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 403 });
+    }
+
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, umbrella.vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
     }
 
     const vendor = Array.isArray((umbrella as any).vendors) ? (umbrella as any).vendors[0] : (umbrella as any).vendors;

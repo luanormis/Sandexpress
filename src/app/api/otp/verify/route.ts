@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isRateLimited } from '@/lib/rate-limit';
-import { getOtpPepper, verifyOtpHash } from '@/lib/otp';
+import { cleanupOtpChallenges, cleanupOtpForPhone } from '@/lib/otp-cleanup';
+import { getOtpPepper, isOtpPurpose, normalizeBrazilPhoneE164, verifyOtpHash } from '@/lib/otp';
 
 type OtpChallengeRow = {
   id: string;
@@ -21,17 +22,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
     }
 
-    const { challenge_id, code } = await req.json();
-    if (!challenge_id || !code) {
-      return NextResponse.json({ error: 'challenge_id e code sao obrigatorios.' }, { status: 400 });
+    const { challenge_id, code, phone, purpose, vendor_id } = await req.json();
+    if (!code || (!challenge_id && (!phone || !isOtpPurpose(purpose)))) {
+      return NextResponse.json({ error: 'Informe o codigo e o telefone validado pelo WhatsApp.' }, { status: 400 });
+    }
+    if ((challenge_id && !/^[0-9a-f-]{36}$/i.test(String(challenge_id))) || !/^\d{6}$/.test(String(code))) {
+      return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    await cleanupOtpChallenges();
+
+    let query = supabaseAdmin
       .from('otp_challenges')
-      .select('*')
-      .eq('id', challenge_id)
-      .single();
-    const challenge = data as OtpChallengeRow | null;
+      .select('id, phone_e164, vendor_id, tenant_id, purpose, status, code_hash, attempts, expires_at')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (challenge_id) {
+      query = query.eq('id', challenge_id);
+    } else {
+      const phoneE164 = normalizeBrazilPhoneE164(String(phone));
+      query = query
+        .eq('phone_e164', phoneE164)
+        .eq('purpose', purpose)
+        .eq('status', 'pending');
+      if (vendor_id) {
+        query = query.or(`vendor_id.eq.${vendor_id},vendor_id.is.null`);
+      }
+    }
+
+    const { data: rows, error } = await query;
+    const challenge = (Array.isArray(rows) ? rows[0] : rows) as OtpChallengeRow | null;
 
     if (error || !challenge) {
       return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
@@ -41,13 +61,13 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin
         .from('otp_challenges')
         .update({ status: 'expired' })
-        .eq('id', challenge_id)
+        .eq('id', challenge.id)
         .eq('status', 'pending');
       return NextResponse.json({ error: 'Codigo expirado.' }, { status: 400 });
     }
 
     if (Number(challenge.attempts || 0) >= 5) {
-      await supabaseAdmin.from('otp_challenges').update({ status: 'blocked' }).eq('id', challenge_id);
+      await supabaseAdmin.from('otp_challenges').update({ status: 'blocked' }).eq('id', challenge.id);
       return NextResponse.json({ error: 'Codigo bloqueado por tentativas.' }, { status: 429 });
     }
 
@@ -56,18 +76,25 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin
         .from('otp_challenges')
         .update({ attempts: Number(challenge.attempts || 0) + 1 })
-        .eq('id', challenge_id);
+        .eq('id', challenge.id);
       return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
     }
 
     await supabaseAdmin
       .from('otp_challenges')
       .update({ status: 'verified', verified_at: new Date().toISOString() })
-      .eq('id', challenge_id);
+      .eq('id', challenge.id);
+
+    await cleanupOtpForPhone({
+      phoneE164: challenge.phone_e164,
+      purpose: challenge.purpose,
+      vendorId: challenge.vendor_id,
+      keepChallengeId: challenge.id,
+    });
 
     return NextResponse.json({
       ok: true,
-      challenge_id,
+      challenge_id: challenge.id,
       phone_e164: challenge.phone_e164,
       purpose: challenge.purpose,
       vendor_id: challenge.vendor_id,

@@ -22,6 +22,21 @@ export async function isRateLimited(
   const now = new Date();
   const resetAt = new Date(Date.now() + windowMs).toISOString();
   const bucketKey = `${keyPrefix}:${getClientIp(req)}`;
+  const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
+
+  const { data: limited, error: rpcError } = await supabaseAdmin.rpc('consume_rate_limit', {
+    p_key: bucketKey,
+    p_max_attempts: maxAttempts,
+    p_window_seconds: windowSeconds,
+  });
+
+  if (!rpcError && typeof limited === 'boolean') {
+    return limited;
+  }
+
+  if (rpcError && !['PGRST202', '42883'].includes(String((rpcError as any).code || ''))) {
+    console.error('Rate limit RPC error:', rpcError);
+  }
 
   const { data: existing } = await supabaseAdmin
     .from('rate_limit_buckets')

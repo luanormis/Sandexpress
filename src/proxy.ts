@@ -10,17 +10,23 @@ const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 const PUBLIC_API_PATHS = new Set([
   '/api/health',
-  '/api/qr',
   '/api/customers/login',
+  '/api/otp/send',
+  '/api/otp/verify',
   '/api/vendors/register',
   '/api/vendors/verify-email',
 ]);
 
 const SENSITIVE_PUBLIC_PATHS = new Set([
   '/api/customers/login',
+  '/api/otp/send',
+  '/api/otp/verify',
   '/api/vendors/register',
+  '/api/vendors/verify-email',
   '/api/auth/admin',
   '/api/auth/vendor',
+  '/api/auth/vendor/reset',
+  '/api/auth/vendor/change-password',
 ]);
 
 function securityHeaders(response: NextResponse) {
@@ -30,7 +36,21 @@ function securityHeaders(response: NextResponse) {
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
   response.headers.set(
     'Content-Security-Policy',
-    "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "connect-src 'self' https://*.supabase.co https://graph.facebook.com",
+      "manifest-src 'self'",
+      "worker-src 'self' blob:",
+      'upgrade-insecure-requests',
+    ].join('; ')
   );
   response.headers.set('Cache-Control', 'no-store');
   return response;
@@ -114,6 +134,26 @@ function validateRequestShape(req: NextRequest, pathname: string) {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (!pathname.startsWith('/api/')) {
+    const session = getRequestSession(req);
+    const isAdminPage = pathname.startsWith('/admin/');
+    const isVendorPage =
+      pathname === '/kiosk-config' ||
+      (pathname.startsWith('/vendor/') &&
+        pathname !== '/vendor/login' &&
+        pathname !== '/vendor/reset-password');
+
+    if (isAdminPage && session?.role !== 'admin') {
+      const loginUrl = new URL('/admin', req.url);
+      loginUrl.searchParams.set('next', pathname);
+      return securityHeaders(NextResponse.redirect(loginUrl));
+    }
+
+    if (isVendorPage && session?.role !== 'vendor' && session?.role !== 'admin') {
+      const loginUrl = new URL('/vendor/login', req.url);
+      loginUrl.searchParams.set('next', pathname);
+      return securityHeaders(NextResponse.redirect(loginUrl));
+    }
+
     return securityHeaders(NextResponse.next());
   }
 
@@ -137,5 +177,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/api/:path*', '/admin/:path*', '/kiosk-config', '/vendor/:path*'],
 };

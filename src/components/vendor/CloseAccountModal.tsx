@@ -19,6 +19,9 @@ export default function CloseAccountModal() {
   const [searchType, setSearchType] = useState<'umbrella' | 'phone'>('umbrella');
   const [searchInput, setSearchInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'split'>('full');
+  const [partialAmount, setPartialAmount] = useState('');
+  const [splitPeople, setSplitPeople] = useState(2);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [orderPreview, setOrderPreview] = useState<OrderPreview | null>(null);
@@ -81,6 +84,17 @@ export default function CloseAccountModal() {
         vendor_id: vendorId,
         payment_method: paymentMethod,
       };
+      const total = Number(orderPreview.total || 0);
+      const parsedPartial = Math.max(0, Number(partialAmount.replace(',', '.')) || 0);
+      const requestedAmount = paymentMode === 'partial'
+        ? Math.min(parsedPartial, total)
+        : paymentMode === 'split'
+          ? Number((total / Math.max(1, splitPeople)).toFixed(2))
+          : total;
+      const remaining = Math.max(0, Number((total - requestedAmount).toFixed(2)));
+      body.payment_amount = requestedAmount;
+      body.split_people = splitPeople;
+      body.split_mode = paymentMode === 'partial' ? 'custom' : paymentMode;
 
       if (searchType === 'umbrella') {
         body.umbrella_id = searchInput;
@@ -88,7 +102,12 @@ export default function CloseAccountModal() {
         body.customer_phone = searchInput;
       }
 
-      if (notes) body.notes = notes;
+      const paymentNote = paymentMode === 'split'
+        ? `Divisao solicitada no painel: ${splitPeople} pessoas - R$ ${requestedAmount.toFixed(2)} por pessoa.`
+        : paymentMode === 'partial'
+          ? `Pagamento parcial informado no painel: R$ ${requestedAmount.toFixed(2)}. Saldo restante antes do fechamento: R$ ${remaining.toFixed(2)}.`
+          : '';
+      body.notes = [notes, paymentNote].filter(Boolean).join('\n') || undefined;
 
       const response = await fetch('/api/close-account', {
         method: 'POST',
@@ -107,6 +126,8 @@ export default function CloseAccountModal() {
       setMessage(result.message || 'Conta fechada com sucesso!');
       setOrderPreview(null);
       setSearchInput('');
+      setPartialAmount('');
+      setPaymentMode('full');
 
       // Limpar após 2 segundos
       setTimeout(() => {
@@ -125,6 +146,14 @@ export default function CloseAccountModal() {
         (Date.now() - new Date(orderPreview.opened_at).getTime()) / 60000
       )
     : 0;
+  const previewTotal = Number(orderPreview?.total || 0);
+  const parsedPartial = Math.max(0, Number(partialAmount.replace(',', '.')) || 0);
+  const paymentAmount = paymentMode === 'partial'
+    ? Math.min(parsedPartial, previewTotal)
+    : paymentMode === 'split'
+      ? Number((previewTotal / Math.max(1, splitPeople)).toFixed(2))
+      : previewTotal;
+  const remainingAmount = Math.max(0, Number((previewTotal - paymentAmount).toFixed(2)));
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -265,6 +294,83 @@ export default function CloseAccountModal() {
               <option value="debit_card">Cartao de debito</option>
               <option value="credit_card">Cartao de credito</option>
             </select>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Modo de pagamento
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ['full', 'Total'],
+                ['partial', 'Parcial'],
+                ['split', 'Dividir'],
+              ].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPaymentMode(mode as 'full' | 'partial' | 'split')}
+                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
+                    paymentMode === mode
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {paymentMode === 'partial' && (
+              <input
+                type="text"
+                inputMode="decimal"
+                value={partialAmount}
+                onChange={(event) => setPartialAmount(event.target.value.replace(/[^\d,.]/g, ''))}
+                placeholder="Valor parcial"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg font-medium"
+              />
+            )}
+
+            {paymentMode === 'split' && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSplitPeople((value) => Math.max(1, value - 1))}
+                  className="h-10 w-10 rounded-lg border border-gray-300 font-bold"
+                >
+                  -
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={splitPeople}
+                  onChange={(event) => setSplitPeople(Math.max(1, Math.min(50, Number(event.target.value.replace(/\D/g, '')) || 1)))}
+                  className="h-10 w-20 rounded-lg border border-gray-300 text-center font-bold"
+                  aria-label="Quantidade de pessoas"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSplitPeople((value) => Math.min(50, value + 1))}
+                  className="h-10 w-10 rounded-lg border border-gray-300 font-bold"
+                >
+                  +
+                </button>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <div className="flex justify-between">
+                <span>{paymentMode === 'split' ? 'Valor por pessoa' : paymentMode === 'partial' ? 'Pagamento agora' : 'Pagamento'}</span>
+                <strong>R$ {paymentAmount.toFixed(2)}</strong>
+              </div>
+              {remainingAmount > 0 && (
+                <div className="mt-1 flex justify-between text-blue-700">
+                  <span>Saldo restante</span>
+                  <strong>R$ {remainingAmount.toFixed(2)}</strong>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Observações */}

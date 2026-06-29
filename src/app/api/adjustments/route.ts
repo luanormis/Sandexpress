@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { isRateLimited } from '@/lib/rate-limit';
 import { verifyVendorPassword } from '@/lib/vendor-password';
 
 export async function GET(req: NextRequest) {
@@ -12,9 +14,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
     }
 
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
+    }
+
     let query = supabaseAdmin
       .from('account_adjustments')
-      .select('*')
+      .select('id, tenant_id, vendor_id, customer_id, order_id, adjustment_type, description, amount, reason, processed_by, created_at')
       .eq('vendor_id', vendor_id)
       .order('created_at', { ascending: false });
 
@@ -34,6 +41,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (await isRateLimited(req, 'account-adjustment', 10, 10 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
+    }
+
     const {
       vendor_id,
       vendor_password,
@@ -52,6 +63,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendor_id)) {
+      return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
+    }
+
     const validTypes = ['cancellation', 'deduction', 'credit'];
     if (!validTypes.includes(adjustment_type)) {
       return NextResponse.json({ error: 'adjustment_type invalido.' }, { status: 400 });
@@ -63,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     const { data: vendor, error: vendorErr } = await supabaseAdmin
       .from('vendors')
-      .select('id, password_hash')
+      .select('id, tenant_id, password_hash')
       .eq('id', vendor_id)
       .single();
 
@@ -113,6 +129,7 @@ export async function POST(req: NextRequest) {
     const { data: adjustment, error: adjustmentErr } = await supabaseAdmin
       .from('account_adjustments')
       .insert({
+        tenant_id: vendor.tenant_id,
         vendor_id,
         customer_id,
         order_id: order_id || null,

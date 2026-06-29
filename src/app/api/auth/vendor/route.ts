@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
         vendor_id: vendor.id,
         vendor_name: vendor.name,
         owner_name: vendor.owner_name,
-        token,
         must_change_password: vendor.password_needs_reset ?? false,
       });
       setVendorCookie(response, token);
@@ -90,7 +89,6 @@ export async function POST(req: NextRequest) {
       vendor_name: linkedVendor.name,
       owner_name: user.name,
       user_role: user.role,
-      token,
       must_change_password: user.password_needs_reset ?? false,
     });
     setVendorCookie(response, token);

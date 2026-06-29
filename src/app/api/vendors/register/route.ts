@@ -7,10 +7,17 @@ import { getRequestSession } from '@/lib/auth-session';
 import { buildTenantFeatureRows } from '@/lib/features';
 import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
 import { consumeVerifiedOtp } from '@/lib/otp-challenges';
+import { isRateLimited } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/vendor-password';
+import { getPlatformPlanSettings } from '@/lib/platform-plans';
+import { seedDefaultMenuForVendor } from '@/lib/default-menu-products';
 
 function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function safeText(value: unknown, maxLength = 120) {
+  return String(value || '').trim().slice(0, maxLength);
 }
 
 /**
@@ -20,6 +27,10 @@ function hashToken(token: string) {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (await isRateLimited(req, 'vendor-register', 5, 30 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
+    }
+
     const body = await req.json();
 
     if (!body.name || !body.owner_name || !body.owner_phone || !body.owner_email || !body.city || !body.state || !body.beach_name) {
@@ -41,7 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Informe CPF ou CNPJ para o cadastro do quiosque.' }, { status: 400 });
     }
     if (body.terms_accepted !== true) {
-      return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso para concluir o cadastro.' }, { status: 400 });
+      return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso e a Politica de Privacidade para concluir o cadastro.' }, { status: 400 });
     }
     if (!isAdminCreate && !body.otp_challenge_id) {
       return NextResponse.json({ error: 'Valide o WhatsApp do responsavel antes de cadastrar o quiosque.' }, { status: 403 });
@@ -79,11 +90,14 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await hashPassword(initialPassword);
-    const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const maxUmbrellas = 50;
-    const cleanState = String(body.state).trim().toUpperCase();
-    const cleanCity = String(body.city).trim();
-    const cleanBeach = String(body.beach_name).trim();
+    const planSettings = await getPlatformPlanSettings();
+    const trialEndsAt = new Date(Date.now() + planSettings.trial_days * 24 * 60 * 60 * 1000).toISOString();
+    const maxUmbrellas = planSettings.max_umbrellas;
+    const cleanState = safeText(body.state, 40).toUpperCase();
+    const cleanCity = safeText(body.city, 80);
+    const cleanBeach = safeText(body.beach_name, 120);
+    const cleanName = safeText(body.name, 120);
+    const cleanOwnerName = safeText(body.owner_name, 120);
     if (!isAdminCreate) {
       const otpOk = await consumeVerifiedOtp({
         challengeId: String(body.otp_challenge_id),
@@ -109,7 +123,7 @@ export async function POST(req: NextRequest) {
     const beachId = beachError ? null : beach?.id || null;
 
     const tenantPayload: Record<string, unknown> = {
-      name: body.name,
+      name: cleanName,
       status: 'active',
       city: cleanCity,
       state: cleanState,
@@ -134,9 +148,9 @@ export async function POST(req: NextRequest) {
 
     const vendorPayload: Record<string, unknown> = {
         tenant_id: tenant.id,
-        name: body.name,
-        owner_name: body.owner_name,
-        owner_phone: body.owner_phone,
+        name: cleanName,
+        owner_name: cleanOwnerName,
+        owner_phone: cleanPhone,
         owner_email: String(body.owner_email).trim().toLowerCase(),
         cpf: cleanCpf || null,
         cnpj: cleanCnpj || null,
@@ -158,6 +172,8 @@ export async function POST(req: NextRequest) {
         subscription_status: 'trial',
         plan_type: 'trial',
         trial_ends_at: trialEndsAt,
+        plan_monthly_price: planSettings.monthly_price,
+        plan_annual_monthly_price: planSettings.annual_monthly_price,
         max_umbrellas: maxUmbrellas,
         is_active: true,
       };
@@ -187,6 +203,12 @@ export async function POST(req: NextRequest) {
       .insert(buildTenantFeatureRows(tenant.id));
     if (featuresError && !['42P01', 'PGRST205'].includes(featuresError.code)) throw featuresError;
 
+    try {
+      await seedDefaultMenuForVendor(tenant.id, vendor.id);
+    } catch (menuError) {
+      console.error('Default menu seed error:', menuError);
+    }
+
     const verificationUrl = `${getAppBaseUrl(req)}/api/vendors/verify-email?token=${encodeURIComponent(verificationToken)}`;
     const verificationEmail = buildVendorVerificationEmail({
       vendorName: vendor.name,
@@ -213,8 +235,20 @@ export async function POST(req: NextRequest) {
         ? 'Quiosque criado com senha definida pelo vendor.'
         : 'Quiosque criado.',
     }, { status: 201 });
-  } catch (err) {
-    console.error('Vendor register error:', err);
+  } catch (err: any) {
+    console.error('Vendor register error:', {
+      code: err?.code,
+      message: err?.message,
+      details: err?.details,
+      hint: err?.hint,
+    });
+    if (['42P01', 'PGRST205', '42703'].includes(err?.code || '')) {
+      return NextResponse.json({
+        error: 'Banco Supabase com schema desatualizado. Rode os SQLs de atualizacao no Supabase antes de cadastrar.',
+        code: err?.code,
+        missing: err?.message,
+      }, { status: 500 });
+    }
     return NextResponse.json({
       error: 'Erro ao gravar no Supabase. Confirme que o banco foi criado com infra/sql-iniciar-novo-projeto.sql e que as variaveis do Vercel apontam para esse projeto.',
     }, { status: 500 });

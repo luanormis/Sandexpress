@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAppBaseUrl, sendEmail } from '@/lib/email';
 import { buildPasswordResetEmail } from '@/lib/email-templates';
+import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function hashResetToken(token: string) {
@@ -14,6 +15,10 @@ function hashResetToken(token: string) {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (await isRateLimited(req, 'vendor-password-reset', 5, 15 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 });
+    }
+
     const { owner_email } = await req.json();
     if (!owner_email) {
       return NextResponse.json({ error: 'Informe o email cadastrado do proprietario.' }, { status: 400 });
@@ -65,7 +70,9 @@ export async function POST(req: NextRequest) {
 
     if (!emailResult.ok) {
       return NextResponse.json({
-        error: 'Nao foi possivel enviar o email de recuperacao. Configure RESEND_API_KEY e EMAIL_FROM no Vercel.',
+        error: process.env.NODE_ENV === 'production'
+          ? 'Nao foi possivel enviar a recuperacao agora.'
+          : 'Nao foi possivel enviar o email de recuperacao. Configure RESEND_API_KEY e EMAIL_FROM no Vercel.',
         ...(process.env.NODE_ENV !== 'production' ? { reset_url: resetUrl, expires_at: expiresAt } : {}),
       }, { status: 503 });
     }

@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
-  X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu, Trash2,
+  X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu, Trash2, Star, Save,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { PLAN_PRICES } from "@/lib/plans";
+import { DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
 
 // ---------- TYPES ----------
 interface Vendor {
@@ -25,6 +25,8 @@ interface Vendor {
   plan_type: string | null;
   trial_ends_at: string | null;
   plan_expires_at: string | null;
+  plan_monthly_price?: number | null;
+  plan_annual_monthly_price?: number | null;
   is_active: boolean;
   max_umbrellas: number;
   created_at: string;
@@ -37,12 +39,15 @@ interface PlatformReport {
   total_visitors: number;
   total_products_sold: number;
   avg_ticket: number;
+  satisfaction_average: number;
+  satisfaction_total: number;
   active_vendors: number;
   trial_vendors: number;
   overdue_vendors: number;
   blocked_vendors: number;
   retention_rate: number;
   top_vendors: { name: string; city: string; beach: string; revenue: number; orders: number; visitors: number }[];
+  satisfaction_by_vendor: { name: string; city: string; beach: string; average_rating: number; total_responses: number }[];
   top_products: { product_id: string; name: string; category: string; quantity: number; revenue: number; orders: number }[];
   top_categories: { category: string; quantity: number; revenue: number }[];
   top_cities: { city: string; quantity: number; revenue: number; orders: number }[];
@@ -64,6 +69,7 @@ const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "vendors", label: "Quiosques", icon: Store },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
+  { id: "plans", label: "Planos", icon: DollarSign },
   { id: "new", label: "Novo Quiosque", icon: Plus },
   { id: "danger", label: "Risco", icon: Trash2 },
 ];
@@ -83,7 +89,9 @@ function getVendorPlanLabel(vendor: Vendor) {
 
 function getVendorMonthlyAmount(vendor: Vendor) {
   if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") return 0;
-  return isAnnualPlan(vendor.plan_type) ? PLAN_PRICES.annualMonthly : PLAN_PRICES.monthly;
+  return isAnnualPlan(vendor.plan_type)
+    ? Number(vendor.plan_annual_monthly_price ?? PLAN_PRICES.annualMonthly)
+    : Number(vendor.plan_monthly_price ?? PLAN_PRICES.monthly);
 }
 
 function getRemainingAnnualInstallments(vendor: Vendor) {
@@ -126,6 +134,15 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorActionLoading, setVendorActionLoading] = useState<string | null>(null);
   const [dangerLoading, setDangerLoading] = useState<"customers" | "kiosk" | null>(null);
+  const [planSettings, setPlanSettings] = useState<PlatformPlanSettings>(DEFAULT_PLATFORM_PLAN_SETTINGS);
+  const [planForm, setPlanForm] = useState({
+    monthly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.monthly_price),
+    annual_monthly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.annual_monthly_price),
+    trial_days: String(DEFAULT_PLATFORM_PLAN_SETTINGS.trial_days),
+    max_umbrellas: String(DEFAULT_PLATFORM_PLAN_SETTINGS.max_umbrellas),
+  });
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
   const [dangerForm, setDangerForm] = useState({
     vendor_id: "",
     admin_password: "",
@@ -179,6 +196,7 @@ export default function AdminDashboard() {
         sessionStorage.setItem("admin_token", "authenticated");
         await loadVendors();
         await loadPlatformReport();
+        await loadPlanSettings();
       } else {
         setAuthError("Senha incorreta.");
       }
@@ -198,6 +216,7 @@ export default function AdminDashboard() {
       sessionStorage.setItem("admin_token", "authenticated");
       await loadVendors();
       await loadPlatformReport();
+      await loadPlanSettings();
     }
     restoreAdminSession();
   }, []);
@@ -245,6 +264,64 @@ export default function AdminDashboard() {
       setAdminDataError("Erro de rede ao carregar analytics.");
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const applyPlanSettings = (settings: PlatformPlanSettings) => {
+    setPlanSettings(settings);
+    setPlanForm({
+      monthly_price: String(settings.monthly_price),
+      annual_monthly_price: String(settings.annual_monthly_price),
+      trial_days: String(settings.trial_days),
+      max_umbrellas: String(settings.max_umbrellas),
+    });
+  };
+
+  const loadPlanSettings = async () => {
+    try {
+      const res = await fetch("/api/platform-settings/plans", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        handleAdminSessionExpired();
+        return;
+      }
+      if (!res.ok) {
+        setPlanMessage(data.error || "Nao foi possivel carregar valores dos planos.");
+        return;
+      }
+      applyPlanSettings(data);
+    } catch {
+      setPlanMessage("Erro de rede ao carregar valores dos planos.");
+    }
+  };
+
+  const savePlanSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlanSaving(true);
+    setPlanMessage("");
+    try {
+      const res = await fetch("/api/platform-settings/plans", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          monthly_price: planForm.monthly_price,
+          annual_monthly_price: planForm.annual_monthly_price,
+          trial_days: planForm.trial_days,
+          max_umbrellas: planForm.max_umbrellas,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPlanMessage(data.error || "Nao foi possivel salvar valores dos planos.");
+        return;
+      }
+      applyPlanSettings(data);
+      setPlanMessage("Valores salvos. Eles serao usados somente nos proximos quiosques cadastrados.");
+    } catch {
+      setPlanMessage("Erro de rede ao salvar valores dos planos.");
+    } finally {
+      setPlanSaving(false);
     }
   };
 
@@ -395,10 +472,12 @@ export default function AdminDashboard() {
           beach_name: regForm.beach_name || null,
           subscription_status: "trial",
           plan_type: "trial",
-          trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(),
+          trial_ends_at: new Date(Date.now() + planSettings.trial_days * 86400000).toISOString(),
           plan_expires_at: null,
+          plan_monthly_price: planSettings.monthly_price,
+          plan_annual_monthly_price: planSettings.annual_monthly_price,
           is_active: true,
-          max_umbrellas: 50,
+          max_umbrellas: planSettings.max_umbrellas,
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
@@ -846,7 +925,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">GMV</p>
                 <p className="text-3xl font-display font-bold text-blue-400">{formatCurrency(platformReport!.gmv)}</p>
@@ -866,6 +945,14 @@ export default function AdminDashboard() {
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                 <p className="text-gray-400 font-bold text-sm mb-2">Pico de Venda</p>
                 <p className="text-3xl font-display font-bold text-amber-400">{String(platformReport!.peak_hour.hour).padStart(2, "0")}h</p>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <p className="text-gray-400 font-bold text-sm mb-2">Satisfacao</p>
+                <p className="text-3xl font-display font-bold text-amber-400 flex items-center gap-2">
+                  <Star size={24} fill="currentColor" />
+                  {platformReport!.satisfaction_average || 0}
+                </p>
+                <p className="text-xs text-gray-500 font-bold">{platformReport!.satisfaction_total || 0} respostas</p>
               </div>
             </div>
 
@@ -946,6 +1033,30 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+              <h3 className="font-bold text-gray-300 mb-4">Satisfacao por quiosque</h3>
+              <div className="grid lg:grid-cols-2 gap-4">
+                {platformReport!.satisfaction_by_vendor.map((vendor, i) => (
+                  <div key={`${vendor.name}-${vendor.city}-${i}`} className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold">{i + 1}. {vendor.name}</p>
+                        <p className="text-xs text-gray-500">{vendor.city} - {vendor.beach}</p>
+                      </div>
+                      <p className="text-lg font-display font-bold text-amber-400 flex items-center gap-1">
+                        <Star size={18} fill="currentColor" />
+                        {vendor.average_rating}
+                      </p>
+                    </div>
+                    <p className="mt-3 text-xs text-gray-400">{vendor.total_responses} respostas</p>
+                  </div>
+                ))}
+                {platformReport!.satisfaction_by_vendor.length === 0 && (
+                  <p className="text-sm text-gray-500">Sem avaliacoes neste filtro.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
               <h3 className="font-bold text-gray-300 mb-4">Ranking de quiosques</h3>
               <div className="grid lg:grid-cols-2 gap-4">
                 {platformReport!.top_vendors.map((vendor, i) => (
@@ -965,6 +1076,103 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ========== PLANOS ========== */}
+        {activeTab === "plans" && (
+          <div className="max-w-3xl w-full space-y-6">
+            <div>
+              <h2 className="text-2xl font-display font-bold">Valores dos Planos</h2>
+              <p className="text-gray-400 mt-1">
+                Estes valores viram o padrao dos proximos quiosques cadastrados. Quiosques ja cadastrados mantem o valor contratado.
+              </p>
+            </div>
+
+            <form onSubmit={savePlanSettings} className="bg-gray-800 rounded-2xl border border-gray-700 p-6 space-y-5">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Plano mensal</label>
+                  <div className="flex items-center rounded-xl border border-gray-600 bg-gray-700 px-3">
+                    <span className="text-gray-400 font-bold">R$</span>
+                    <input
+                      value={planForm.monthly_price}
+                      onChange={e => setPlanForm(p => ({ ...p, monthly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
+                      inputMode="decimal"
+                      className="w-full bg-transparent p-3 text-white outline-none"
+                      placeholder="499,99"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Plano anual, valor por mes</label>
+                  <div className="flex items-center rounded-xl border border-gray-600 bg-gray-700 px-3">
+                    <span className="text-gray-400 font-bold">R$</span>
+                    <input
+                      value={planForm.annual_monthly_price}
+                      onChange={e => setPlanForm(p => ({ ...p, annual_monthly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
+                      inputMode="decimal"
+                      className="w-full bg-transparent p-3 text-white outline-none"
+                      placeholder="299,99"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Dias de teste para novos quiosques</label>
+                  <input
+                    value={planForm.trial_days}
+                    onChange={e => setPlanForm(p => ({ ...p, trial_days: e.target.value.replace(/\D/g, "") }))}
+                    inputMode="numeric"
+                    className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Limite de guarda-sois para novos quiosques</label>
+                  <input
+                    value={planForm.max_umbrellas}
+                    onChange={e => setPlanForm(p => ({ ...p, max_umbrellas: e.target.value.replace(/\D/g, "") }))}
+                    inputMode="numeric"
+                    className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                    placeholder="50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4 rounded-xl border border-gray-700 bg-gray-900/70 p-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Mensal atual</p>
+                  <p className="text-2xl font-display font-bold text-green-400">{formatPlanPriceLabel(planSettings.monthly_price)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Anual atual por mes</p>
+                  <p className="text-2xl font-display font-bold text-cyan-400">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</p>
+                </div>
+              </div>
+
+              {planMessage && (
+                <p className={cn(
+                  "rounded-xl border px-4 py-3 text-sm font-bold",
+                  planMessage.startsWith("Valores salvos")
+                    ? "border-green-500/40 bg-green-500/10 text-green-300"
+                    : "border-red-500/40 bg-red-500/10 text-red-300"
+                )}>
+                  {planMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={planSaving}
+                className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold px-5 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-60"
+              >
+                <Save size={18} />
+                {planSaving ? "Salvando..." : "Salvar valores"}
+              </button>
+            </form>
           </div>
         )}
 
@@ -1107,11 +1315,11 @@ export default function AdminDashboard() {
                       className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
                     />
                     <span>
-                      O responsavel leu e concordou com os{" "}
+                      O responsavel leu e aceitou os{" "}
                       <Link href="/termos-de-uso" target="_blank" className="text-blue-400 underline underline-offset-2">
-                        Termos de Uso do SandExpress
+                        Termos de Uso e a Politica de Privacidade do SandExpress
                       </Link>
-                      .
+                      , com registro do aceite em data e hora.
                     </span>
                   </label>
                 </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
-import { calculatePaymentBreakdown, toMoney } from '@/lib/payments';
+import { toMoney } from '@/lib/payments';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
@@ -10,17 +10,21 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-/**
- * POST /api/close-account
- * Fechar conta do cliente (após pagamento confirmado)
- * 
- * Body: {
- *   vendor_id,
- *   umbrella_id OR (customer_phone),
- *   payment_method (optional),
- *   notes (optional)
- * }
- */
+function closeAccountErrorResponse(error: any) {
+  const message = String(error?.message || error || 'Erro ao fechar conta');
+  const lower = message.toLowerCase();
+  if (lower.includes('nao pertence') || lower.includes('nao autorizado')) {
+    return NextResponse.json({ error: message }, { status: 403 });
+  }
+  if (lower.includes('nenhuma conta aberta') || lower.includes('nao encontrado')) {
+    return NextResponse.json({ error: message }, { status: 404 });
+  }
+  if (lower.includes('ja foi fechada')) {
+    return NextResponse.json({ error: message }, { status: 409 });
+  }
+  return NextResponse.json({ error: 'Erro ao fechar conta' }, { status: 500 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -40,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     if (!vendor_id || (!umbrella_id && !customer_phone)) {
       return NextResponse.json(
-        { error: 'vendor_id e (umbrella_id ou customer_phone) são obrigatórios' },
+        { error: 'vendor_id e (umbrella_id ou customer_phone) sao obrigatorios' },
         { status: 400 }
       );
     }
@@ -60,167 +64,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
-    // 1. Encontrar a ordem aberta
-    let query = supabaseAdmin
-      .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, customers(id, name, phone)')
-      .eq('vendor_id', vendor_id)
-      .in('status', OPEN_ACCOUNT_STATUSES)
-      .eq('paid', false)
-      .order('created_at', { ascending: true });
-
     if (umbrella_id) {
-      query = query.eq('umbrella_id', umbrella_id);
-    }
+      const { data: openOrder, error: openOrderError } = await supabaseAdmin
+        .from('orders')
+        .select('id, total, order_items(id)')
+        .eq('vendor_id', vendor_id)
+        .eq('umbrella_id', umbrella_id)
+        .in('status', OPEN_ACCOUNT_STATUSES)
+        .eq('paid', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const { data: orders, error: ordersErr } = await query;
-
-    if (ordersErr) throw ordersErr;
-
-    if (!orders || orders.length === 0) {
-      return NextResponse.json(
-        { error: 'Nenhuma conta aberta encontrada para este guarda-sol/cliente' },
-        { status: 404 }
-      );
-    }
-
-    // Se houver múltiplas contas abertas, filtrar por customer_phone se fornecido
-    let selectedOrder = orders[0];
-    if (customer_phone && orders.length > 1) {
-      const matchingOrder = orders.find((o: any) => {
-        const cleanPhone = (o.customers?.phone || '').replace(/\D/g, '');
-        const cleanInput = customer_phone.replace(/\D/g, '');
-        return cleanPhone === cleanInput;
-      });
-      if (matchingOrder) {
-        selectedOrder = matchingOrder;
+      if (openOrderError) throw openOrderError;
+      const itemCount = Array.isArray((openOrder as any)?.order_items) ? (openOrder as any).order_items.length : 0;
+      if (openOrder && (Number((openOrder as any).total || 0) <= 0 || itemCount === 0)) {
+        return NextResponse.json({
+          error: 'Comanda vazia nao pode ir para fechamento. Use "Liberar guarda-sol vazio".',
+        }, { status: 409 });
       }
     }
 
-    if (session.role === 'customer' && selectedOrder.customer_id !== session.customer_id) {
-      return NextResponse.json({ error: 'Conta nao pertence a este cliente.' }, { status: 403 });
-    }
-
+    let requestNotes = notes || null;
     if (request_only) {
       const paymentAmount = toMoney(payment_amount);
       const serviceFeeAmount = toMoney(service_fee_amount);
       const splitPeople = Math.max(1, Math.min(50, Number(split_people || 1)));
-      const requestedTotal = Number(selectedOrder.total || 0) + serviceFeeAmount;
-      const remainingAmount = Math.max(requestedTotal - paymentAmount, 0);
-      const closeSummary = [
+      requestNotes = [
         notes || 'Fechamento solicitado pelo cliente',
         '--- Resumo solicitado pelo cliente ---',
-        `Valor da conta: ${formatMoney(Number(selectedOrder.total || 0))}`,
         `10% do garcom: ${service_fee_enabled === false ? 'dispensado' : formatMoney(serviceFeeAmount)}`,
-        `Total com ajustes: ${formatMoney(requestedTotal)}`,
         split_mode === 'split'
-          ? `Divisao: ${splitPeople} pessoas - ${formatMoney(requestedTotal / splitPeople)} por pessoa`
+          ? `Divisao: ${splitPeople} pessoas`
           : split_mode === 'custom'
             ? `Pagamento parcial solicitado: ${formatMoney(paymentAmount)}`
-            : `Pagamento integral solicitado: ${formatMoney(requestedTotal)}`,
-        remainingAmount > 0 ? `Saldo restante apos este pagamento: ${formatMoney(remainingAmount)}` : 'Pagamento cobre o total solicitado',
+            : 'Pagamento integral solicitado',
       ].join('\n');
-      const { data: requested, error: requestErr } = await supabaseAdmin
-        .from('orders')
-        .update({
-          status: 'closing_requested',
-          close_requested_at: new Date().toISOString(),
-          notes: closeSummary,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq('id', selectedOrder.id)
-        .select()
-        .single();
+    }
 
-      if (requestErr) throw requestErr;
+    const { data: order, error: closeErr } = await supabaseAdmin.rpc('close_customer_account', {
+      p_vendor_id: vendor_id,
+      p_umbrella_id: umbrella_id || null,
+      p_customer_phone: customer_phone || null,
+      p_session_customer_id: session.role === 'customer' ? session.customer_id : null,
+      p_request_only: Boolean(request_only),
+      p_payment_method: payment_method || 'cash',
+      p_notes: requestNotes,
+    });
+
+    if (closeErr) return closeAccountErrorResponse(closeErr);
+
+    if (request_only) {
       return NextResponse.json({
         success: true,
-        order: requested,
+        order,
         message: 'Pedido de fechamento enviado ao quiosque.',
       });
     }
 
-    const { data: vendorPaymentConfig, error: vendorPaymentConfigErr } = await supabaseAdmin
-      .from('vendors')
-      .select('debit_card_fee_rate, credit_card_fee_rate, pix_fee_rate')
-      .eq('id', vendor_id)
-      .single();
-    if (vendorPaymentConfigErr) throw vendorPaymentConfigErr;
-
-    const payment = calculatePaymentBreakdown({
-      grossAmount: Number(selectedOrder.total || 0),
-      method: payment_method,
-      rates: {
-        debit_card: Number((vendorPaymentConfig as any)?.debit_card_fee_rate || 0),
-        credit_card: Number((vendorPaymentConfig as any)?.credit_card_fee_rate || 0),
-        pix: Number((vendorPaymentConfig as any)?.pix_fee_rate || 0),
-      },
-    });
-
-    // 2. Atualizar ordem para completed e pago
-    const { error: updateErr } = await supabaseAdmin
-      .from('orders')
-        .update({
-          status: 'completed',
-          paid: true,
-          payment_method: payment.payment_method,
-          gross_total: payment.gross_amount,
-          payment_fee_rate: payment.fee_rate,
-          payment_fee_amount: payment.fee_amount,
-          net_total: payment.net_amount,
-          paid_at: new Date().toISOString(),
-          notes: notes || null,
-          updated_at: new Date().toISOString(),
-        })
-      .eq('id', selectedOrder.id);
-
-    if (updateErr) throw updateErr;
-
-    if (selectedOrder.umbrella_id) {
-      const { error: umbrellaErr } = await supabaseAdmin
-        .from('umbrellas')
-        .update({
-          is_occupied: false,
-          current_order_id: null,
-        })
-        .eq('id', selectedOrder.umbrella_id)
-        .eq('vendor_id', vendor_id);
-
-      if (umbrellaErr) throw umbrellaErr;
-    }
-
-    // 3. Atualizar statistics do cliente (visit_count, last_visit_at)
-    const { error: customerErr } = await supabaseAdmin
-      .from('customers')
-      .update({
-        visit_count: (selectedOrder as any).customers?.visit_count ? (selectedOrder as any).customers.visit_count + 1 : 1,
-        last_visit_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', selectedOrder.customer_id);
-
-    if (customerErr) throw customerErr;
-
     return NextResponse.json(
       {
         success: true,
-        order: {
-          id: selectedOrder.id,
-          customer_id: selectedOrder.customer_id,
-          customer_name: (selectedOrder as any).customers?.name,
-          customer_phone: (selectedOrder as any).customers?.phone,
-          umbrella_id: selectedOrder.umbrella_id,
-          total: selectedOrder.total,
-          gross_total: payment.gross_amount,
-          payment_fee_rate: payment.fee_rate,
-          payment_fee_amount: payment.fee_amount,
-          net_total: payment.net_amount,
-          status: 'completed',
-          paid: true,
-          payment_method: payment.payment_method,
-          closed_at: new Date().toISOString(),
-        },
-        message: `Conta fechada com sucesso! Guarda-sol ${selectedOrder.umbrella_id} liberado.`,
+        order,
+        message: `Conta fechada com sucesso! Guarda-sol ${(order as any)?.umbrella_id || ''} liberado.`,
       },
       { status: 200 }
     );
@@ -230,10 +136,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * GET /api/close-account?vendor_id=xxx&umbrella_id=yyy
- * Buscar conta aberta para fechar (preview)
- */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -242,11 +144,11 @@ export async function GET(req: NextRequest) {
     const customer_phone = searchParams.get('customer_phone');
 
     if (!vendor_id) {
-      return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id obrigatorio' }, { status: 400 });
     }
 
     if (!umbrella_id && !customer_phone) {
-      return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatorio' }, { status: 400 });
     }
 
     const session = getRequestSession(req);
@@ -257,7 +159,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
-    // Buscar ordem aberta
     let query = supabaseAdmin
       .from('orders')
       .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
@@ -270,7 +171,6 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: orders, error } = await query;
-
     if (error) throw error;
 
     if (!orders || orders.length === 0) {
@@ -280,7 +180,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Se houver múltiplas, filtrar por phone
     let selectedOrder = orders[0];
     if (customer_phone && orders.length > 1) {
       const cleanPhone = customer_phone.replace(/\D/g, '');
