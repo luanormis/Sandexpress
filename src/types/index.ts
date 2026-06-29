@@ -147,9 +147,11 @@ export interface AccountAdjustment {
 // Tipos de Galeria de Imagens Padrão
 export interface ProductImage {
   id: string
-  product_category: string
+  category: string
   image_url: string
   title: string
+  name: string
+  description?: string | null
   plan_type: 'free' | 'plus' // Disponível em qual plano
   created_at?: string
 }
