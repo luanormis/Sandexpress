@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatório.' }, { status: 400 });
     }
-    const session = getRequestSession(req);
+    const session = await getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 });
     }
