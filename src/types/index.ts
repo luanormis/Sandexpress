@@ -93,6 +93,7 @@ export interface Customer {
   vendor_id: string
   name: string
   phone: string
+  party_size: number
   visit_count: number
   total_spent: number
   last_visit_at?: string | null
@@ -108,6 +109,7 @@ export interface Order {
   umbrella_id: string
   status: 'received' | 'preparing' | 'delivering' | 'completed' | 'cancelled'
   total: number
+  party_size?: number
   notes?: string | null
   paid: boolean
   payment_method?: string | null

@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "test-db-*.js",
+    "test-db-*.ts",
   ]),
   {
     rules: {
