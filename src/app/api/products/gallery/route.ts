@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getDefaultProductImages } from "@/lib/default-product-images";
 
 function galleryResponse(images: any[]) {
   const groupedByCategory = images.reduce(
@@ -47,15 +46,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Product gallery query error:", error);
-      return galleryResponse(getDefaultProductImages(category, planType));
+      return NextResponse.json({ error: 'Galeria product_images indisponivel no banco.' }, { status: 500 });
     }
 
-    const images: any[] = data?.length ? data : getDefaultProductImages(category, planType);
-    return galleryResponse(images);
+    return galleryResponse(data || []);
   } catch (error) {
     console.error("Product gallery fetch error:", error);
-    const category = request.nextUrl.searchParams.get("category");
-    const planType = request.nextUrl.searchParams.get("planType") || "free";
-    return galleryResponse(getDefaultProductImages(category, planType));
+    return NextResponse.json({ error: 'Erro ao carregar galeria de produtos.' }, { status: 500 });
   }
 }

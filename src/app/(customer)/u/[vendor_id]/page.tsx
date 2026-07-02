@@ -26,8 +26,12 @@ type CartItem = {
 
 type Order = {
   id: string;
+  account_id?: string;
+  sequence?: number;
   total: number;
+  account_total?: number;
   status: string;
+  account_status?: string;
   created_at: string;
 };
 
@@ -155,12 +159,16 @@ export default function CustomerApp() {
     if (!res.ok) return;
     const mapped = (Array.isArray(data) ? data : []).map((order) => ({
       id: order.id,
+      account_id: order.account_id,
+      sequence: order.sequence,
       total: Number(order.total || 0),
+      account_total: Number(order.account_total || order.total || 0),
       status: order.status || "received",
+      account_status: order.account_status,
       created_at: order.created_at || new Date().toISOString(),
     }));
     setOrders(mapped);
-    if (mapped[0]?.id) setCurrentOrderId(mapped[0].id);
+    if (mapped[0]?.account_id || mapped[0]?.id) setCurrentOrderId(mapped[0].account_id || mapped[0].id);
   }
 
   useEffect(() => {
@@ -819,7 +827,9 @@ export default function CustomerApp() {
             {orders.length === 0 ? <p className="customer-empty">Nenhum pedido ainda.</p> : orders.map((order) => (
               <article key={order.id} className="customer-order-row">
                 <div className="customer-order-info">
-                  <h2 className="customer-order-title">Pedido #{order.id.slice(0, 8)}</h2>
+                  <h2 className="customer-order-title">
+                    {order.sequence ? `Pedido ${order.sequence}` : `Pedido #${order.id.slice(0, 8)}`}
+                  </h2>
                   <p className="customer-order-meta">
                     {ORDER_STATUS_LABELS[order.status] || order.status}
                   </p>

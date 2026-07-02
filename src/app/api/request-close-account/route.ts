@@ -43,21 +43,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guarda-sol nao informado.' }, { status: 400 });
     }
 
-    let { data: vendor, error: vendorError } = await supabaseAdmin
+    const { data: vendor, error: vendorError } = await supabaseAdmin
       .from('vendors')
       .select('id, name, pix_enabled, pix_key, pix_account_name')
       .eq('id', session.vendor_id)
       .single();
-
-    if (vendorError && String(vendorError.message || '').includes('pix_enabled')) {
-      const fallback = await supabaseAdmin
-        .from('vendors')
-        .select('id, name')
-        .eq('id', session.vendor_id)
-        .single();
-      vendor = fallback.data as any;
-      vendorError = fallback.error;
-    }
 
     if (vendorError || !vendor) {
       return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
@@ -103,27 +93,13 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    let { error: updateError } = await enforceTenantScope(
+    const { error: updateError } = await enforceTenantScope(
       supabaseAdmin
         .from('orders')
         .update(closeRequestUpdate)
         .in('id', orderIds),
       tenantId
     );
-
-    if (updateError && /pix_payload|close_requested_at/.test(String(updateError.message || ''))) {
-      const legacyUpdate: Partial<typeof closeRequestUpdate> = { ...closeRequestUpdate };
-      delete legacyUpdate.pix_payload;
-      delete legacyUpdate.close_requested_at;
-      const fallback = await enforceTenantScope(
-        supabaseAdmin
-          .from('orders')
-          .update(legacyUpdate)
-          .in('id', orderIds),
-        tenantId
-      );
-      updateError = fallback.error;
-    }
 
     if (updateError) throw updateError;
 

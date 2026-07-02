@@ -2,20 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
-const DEFAULT_THEME = {
-  primary_color: '#ff6b00',
-  secondary_color: '#82533f',
-  button_color: '#ff6b00',
-  button_text_color: '#ffffff',
-  logo_url: '/logo-sandexpress.png',
-};
-
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
-function normalizeColor(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') return fallback;
+function normalizeColor(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  return HEX_COLOR.test(trimmed) ? trimmed.toLowerCase() : fallback;
+  return HEX_COLOR.test(trimmed) ? trimmed.toLowerCase() : null;
 }
 
 function normalizeLogoUrl(value: unknown): string | null {
@@ -76,11 +68,11 @@ export async function GET(
 
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
-      primary_color: tenant?.primary_color || vendor.primary_color || DEFAULT_THEME.primary_color,
-      secondary_color: tenant?.secondary_color || vendor.secondary_color || DEFAULT_THEME.secondary_color,
-      button_color: tenant?.button_color || (vendor as any).button_color || DEFAULT_THEME.button_color,
-      button_text_color: tenant?.button_text_color || (vendor as any).button_text_color || DEFAULT_THEME.button_text_color,
-      logo_url: tenant?.logo_url || vendor.logo_url || DEFAULT_THEME.logo_url,
+      primary_color: tenant?.primary_color || vendor.primary_color,
+      secondary_color: tenant?.secondary_color || vendor.secondary_color,
+      button_color: tenant?.button_color || (vendor as any).button_color,
+      button_text_color: tenant?.button_text_color || (vendor as any).button_text_color,
+      logo_url: tenant?.logo_url || vendor.logo_url,
       debit_card_fee_rate: Number(rates.debit_card?.fee_rate ?? vendor.debit_card_fee_rate ?? 0),
       credit_card_fee_rate: Number(rates.credit_card?.fee_rate ?? vendor.credit_card_fee_rate ?? 0),
       pix_fee_rate: Number(rates.pix?.fee_rate ?? vendor.pix_fee_rate ?? 0),
@@ -106,11 +98,14 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const primaryColor = normalizeColor(body.primary_color, DEFAULT_THEME.primary_color);
-    const secondaryColor = normalizeColor(body.secondary_color, DEFAULT_THEME.secondary_color);
-    const buttonColor = normalizeColor(body.button_color, primaryColor || DEFAULT_THEME.button_color);
-    const buttonTextColor = normalizeColor(body.button_text_color, DEFAULT_THEME.button_text_color);
-    const logoUrl = normalizeLogoUrl(body.logo_url) || DEFAULT_THEME.logo_url;
+    const primaryColor = normalizeColor(body.primary_color);
+    const secondaryColor = normalizeColor(body.secondary_color);
+    const buttonColor = normalizeColor(body.button_color);
+    const buttonTextColor = normalizeColor(body.button_text_color);
+    const logoUrl = normalizeLogoUrl(body.logo_url);
+    if (!primaryColor || !secondaryColor || !buttonColor || !buttonTextColor) {
+      return NextResponse.json({ error: 'Informe cores validas no formato #RRGGBB.' }, { status: 400 });
+    }
     const paymentFeeUpdate = {
       debit_card_fee_rate: normalizeFeeRate(body.debit_card_fee_rate),
       credit_card_fee_rate: normalizeFeeRate(body.credit_card_fee_rate),
@@ -193,7 +188,7 @@ export async function PATCH(
     ];
     const { error: ratesError } = await (supabaseAdmin.from('payment_method_rates') as any)
       .upsert(paymentRatesPayload, { onConflict: 'vendor_id,payment_method' });
-    if (ratesError && !['42P01', 'PGRST205'].includes(ratesError.code)) throw ratesError;
+    if (ratesError) throw ratesError;
 
     return NextResponse.json({
       tenant_id: vendor.tenant_id,

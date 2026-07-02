@@ -100,22 +100,42 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) throw error;
-    const mapped = (data || []).map((order: any) => ({
-      ...order,
-      umbrella: order.umbrellas?.number ?? 0,
-      customer: order.customers?.name ?? 'Cliente',
-      phone: order.customers?.phone ?? '',
-      time: order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-      requests: (order.customer_order_requests || []).sort((a: any, b: any) => Number(a.sequence || 0) - Number(b.sequence || 0)),
-      items: (order.order_items || []).map((item: any) => ({
+    const mapped = (data || []).map((order: any) => {
+      const requests = (order.customer_order_requests || [])
+        .sort((a: any, b: any) => Number(a.sequence || 0) - Number(b.sequence || 0));
+      const activeRequest = [...requests]
+        .reverse()
+        .find((request: any) => ['received', 'preparing', 'delivering'].includes(String(request.status)));
+      const accountItems = (order.order_items || []).map((item: any) => ({
         id: item.id,
         order_request_id: item.order_request_id,
         q: item.quantity,
         n: item.products?.name || 'Produto',
         subtotal: Number(item.subtotal || 0),
         cancelled: Boolean(item.cancelled),
-      })),
-    }));
+      }));
+      const activeItems = activeRequest
+        ? accountItems.filter((item: any) => item.order_request_id === activeRequest.id)
+        : accountItems.filter((item: any) => !item.cancelled);
+      const effectiveStatus = activeRequest?.status || order.status;
+
+      return {
+        ...order,
+        status: effectiveStatus,
+        account_status: order.status,
+        active_request: activeRequest || null,
+        active_request_id: activeRequest?.id || null,
+        umbrella: order.umbrellas?.number ?? 0,
+        customer: order.customers?.name ?? 'Cliente',
+        phone: order.customers?.phone ?? '',
+        time: activeRequest?.created_at
+          ? new Date(activeRequest.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+        requests,
+        account_items: accountItems,
+        items: activeItems,
+      };
+    });
     return NextResponse.json(mapped);
   } catch (err) {
     console.error('Orders GET error:', err);

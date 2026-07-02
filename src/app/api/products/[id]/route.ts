@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
-import { isMissingProductStockColumnError, normalizeProductStockForWrite, removeProductStockFields } from '@/lib/product-stock';
+import { normalizeProductStockForWrite } from '@/lib/product-stock';
 
 const ALLOWED_PRODUCT_FIELDS = new Set([
   'name',
@@ -21,26 +21,6 @@ const ALLOWED_PRODUCT_FIELDS = new Set([
   'beach_stock_quantity',
   'blocked_by_stock',
 ]);
-
-const OPTIONAL_PRODUCT_FIELDS = new Set([
-  'is_default_image',
-  'is_combo',
-  'sort_order',
-  'stock_tracking_enabled',
-  'stock_quantity',
-  'physical_stock_quantity',
-  'beach_stock_quantity',
-  'blocked_by_stock',
-  'promotional_price',
-]);
-
-function missingColumnFromError(error: any) {
-  if (!['42703', 'PGRST204'].includes(error?.code || '')) return null;
-  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
-  const quoted = message.match(/column "([^"]+)"/i) || message.match(/'([^']+)' column/i);
-  if (quoted?.[1]) return quoted[1];
-  return Array.from(OPTIONAL_PRODUCT_FIELDS).find((column) => message.includes(column)) || null;
-}
 
 function productWriteErrorResponse(error: any) {
   console.error('Product write error:', {
@@ -124,27 +104,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
 
-    let currentUpdate: Record<string, unknown> = { ...safeUpdate, updated_at: new Date().toISOString() };
-    let result: any = null;
-    for (let attempt = 0; attempt < OPTIONAL_PRODUCT_FIELDS.size + 1; attempt += 1) {
-      result = await (supabaseAdmin.from('products') as any)
-        .update(currentUpdate)
-        .eq('id', id)
-        .eq('tenant_id', productLookup.data.tenant_id)
-        .select()
-        .single();
-
-      if (!result.error) break;
-      if (isMissingProductStockColumnError(result.error)) {
-        currentUpdate = removeProductStockFields(currentUpdate);
-        continue;
-      }
-
-      const missingColumn = missingColumnFromError(result.error);
-      if (!missingColumn || !OPTIONAL_PRODUCT_FIELDS.has(missingColumn)) break;
-      const { [missingColumn]: _removed, ...nextUpdate } = currentUpdate;
-      currentUpdate = nextUpdate;
-    }
+    const result = await (supabaseAdmin.from('products') as any)
+      .update({ ...safeUpdate, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('tenant_id', productLookup.data.tenant_id)
+      .select()
+      .single();
 
     if (result?.error) throw result.error;
     return NextResponse.json(result.data);

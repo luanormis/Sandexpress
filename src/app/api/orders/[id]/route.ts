@@ -26,7 +26,7 @@ export async function PATCH(
 
     const { data: lookup, error: lookupError } = await supabaseAdmin
       .from('orders')
-      .select('id, vendor_id, tenant_id, umbrella_id, total, status, paid, order_items(id)')
+      .select('id, vendor_id, tenant_id, umbrella_id, total, status, paid, order_items(id), customer_order_requests(id, status, sequence)')
       .eq('id', id)
       .single();
 
@@ -43,6 +43,28 @@ export async function PATCH(
       return NextResponse.json({
         error: 'Comanda vazia nao pode ir para preparo, entrega ou fechamento. Use "Liberar guarda-sol vazio".',
       }, { status: 409 });
+    }
+
+    const requests = (((lookup as any).customer_order_requests || []) as any[])
+      .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0));
+    const activeRequest = [...requests]
+      .reverse()
+      .find((request) => ['received', 'preparing', 'delivering'].includes(String(request.status)));
+
+    const requestedStatus = typeof safeUpdate.status === 'string' ? String(safeUpdate.status) : null;
+    if (requestedStatus && ['preparing', 'delivering', 'completed'].includes(requestedStatus) && activeRequest) {
+      const { error: requestUpdateError } = await (supabaseAdmin.from('customer_order_requests') as any)
+        .update({ status: requestedStatus, updated_at: new Date().toISOString() })
+        .eq('id', activeRequest.id)
+        .eq('order_id', id);
+      if (requestUpdateError) throw requestUpdateError;
+
+      const hasRemainingActiveRequests = requests.some((request) => (
+        request.id !== activeRequest.id &&
+        ['received', 'preparing', 'delivering'].includes(String(request.status))
+      ));
+      const nextOrderStatus = requestedStatus === 'completed' && !hasRemainingActiveRequests ? 'completed' : requestedStatus;
+      safeUpdate.status = nextOrderStatus;
     }
 
     const { data, error } = await supabaseAdmin

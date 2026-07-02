@@ -2,54 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
-import { isMissingProductStockColumnError, normalizeProductStockForWrite, removeProductStockFields } from '@/lib/product-stock';
+import { normalizeProductStockForWrite } from '@/lib/product-stock';
 
 function normalizeMoney(value: unknown) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric >= 0 ? Number(numeric.toFixed(2)) : null;
-}
-
-const OPTIONAL_INSERT_COLUMNS = [
-  'is_default_image',
-  'is_combo',
-  'stock_tracking_enabled',
-  'stock_quantity',
-  'physical_stock_quantity',
-  'beach_stock_quantity',
-  'blocked_by_stock',
-  'sort_order',
-  'promotional_price',
-];
-
-function missingColumnFromError(error: any) {
-  if (!['42703', 'PGRST204'].includes(error?.code || '')) return null;
-  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
-  const quoted = message.match(/column "([^"]+)"/i) || message.match(/'([^']+)' column/i);
-  if (quoted?.[1]) return quoted[1];
-  return OPTIONAL_INSERT_COLUMNS.find((column) => message.includes(column)) || null;
-}
-
-async function insertProductWithSchemaFallback(payload: Record<string, unknown>) {
-  let currentPayload = { ...payload };
-  for (let attempt = 0; attempt < OPTIONAL_INSERT_COLUMNS.length + 1; attempt += 1) {
-    const result = await (supabaseAdmin.from('products') as any)
-      .insert(currentPayload)
-      .select()
-      .single();
-
-    if (!result.error) return result;
-
-    if (isMissingProductStockColumnError(result.error)) {
-      currentPayload = removeProductStockFields(currentPayload);
-      continue;
-    }
-
-    const missingColumn = missingColumnFromError(result.error);
-    if (!missingColumn || !OPTIONAL_INSERT_COLUMNS.includes(missingColumn)) return result;
-    const { [missingColumn]: _removed, ...nextPayload } = currentPayload;
-    currentPayload = nextPayload;
-  }
-  return { data: null, error: new Error('Nao foi possivel adaptar o cadastro ao schema atual.') };
 }
 
 function productErrorResponse(error: any) {
@@ -187,7 +144,10 @@ export async function POST(req: NextRequest) {
       ...stockPayload,
     };
 
-    const { data, error } = await insertProductWithSchemaFallback(insertPayload);
+    const { data, error } = await (supabaseAdmin.from('products') as any)
+      .insert(insertPayload)
+      .select()
+      .single();
 
     if (error) throw error;
     return NextResponse.json(data, { status: 201 });

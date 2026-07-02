@@ -60,8 +60,12 @@ interface Order {
   phone: string;
   total: number;
   status: string;
+  account_status?: string;
+  active_request_id?: string | null;
+  active_request?: OrderRequest | null;
   time: string;
   items: OrderItem[];
+  account_items?: OrderItem[];
   notes?: string;
   paid?: boolean;
   requests?: OrderRequest[];
@@ -84,7 +88,7 @@ function getVisibleOrderNotes(notes?: string) {
 }
 
 function isOrderEmpty(order: Pick<Order, "total" | "items">) {
-  return Number(order.total || 0) <= 0 || (order.items || []).length === 0;
+  return (order.items || []).filter((item) => !item.cancelled).length === 0;
 }
 
 interface Umbrella {
@@ -993,9 +997,16 @@ export default function VendorDashboard() {
                     Sem consumo
                   </p>
                 )}
-                <p className="mt-2 text-xs font-bold text-gray-400">Pedido #{order.id.slice(0, 8)}</p>
+                <p className="mt-2 text-xs font-bold text-gray-400">
+                  {order.active_request ? `Pedido ${order.active_request.sequence}` : `Comanda #${order.id.slice(0, 8)}`}
+                </p>
                 <p className="text-sm font-black text-gray-900 truncate">{order.customer}</p>
-                <p className="text-xs font-bold text-[#FF6B00]">{formatCurrency(order.total)}</p>
+                <p className="text-xs font-bold text-[#FF6B00]">
+                  {order.active_request ? `Pedido: ${formatCurrency(Number(order.active_request.subtotal || 0))}` : `Conta: ${formatCurrency(order.total)}`}
+                </p>
+                {order.active_request && (
+                  <p className="text-[11px] font-bold text-gray-400">Conta: {formatCurrency(order.total)}</p>
+                )}
                 <div className="mt-2 flex flex-col gap-1">
                   {emptyAccount ? (
                     <span
@@ -1598,7 +1609,7 @@ export default function VendorDashboard() {
                 <div className="space-y-4 bg-[#fff8f6] p-6">
                   <div className="rounded-xl border border-[#e2bfb0] bg-white p-4">
                     <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
-                    <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(128.5)}</p>
+                    <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(0)}</p>
                   </div>
                   <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}>
                     Abrir comanda
@@ -2148,7 +2159,9 @@ function OrderModal({
         <div className="flex justify-between items-start p-6 border-b border-gray-100">
           <div>
             <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p>
-            <h3 className="text-xl font-display font-bold text-gray-900">Pedido #{order.id.slice(0, 8)}</h3>
+            <h3 className="text-xl font-display font-bold text-gray-900">
+              {order.active_request ? `Pedido ${order.active_request.sequence}` : `Comanda #${order.id.slice(0, 8)}`}
+            </h3>
             <p className="mt-1 text-sm font-bold text-gray-500">{order.customer} · {order.phone}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -2176,7 +2189,9 @@ function OrderModal({
             </div>
           )}
           <div>
-            <h4 className="mb-2 text-sm font-black text-gray-700">Itens</h4>
+            <h4 className="mb-2 text-sm font-black text-gray-700">
+              {order.active_request ? "Itens deste pedido" : "Itens da comanda"}
+            </h4>
             <div className="space-y-2">
               {(order.items || []).length === 0 ? (
                 <p className="rounded-lg bg-gray-50 p-3 text-sm font-bold text-gray-400">Comanda aberta sem itens.</p>
@@ -2204,15 +2219,20 @@ function OrderModal({
               ))}
             </div>
           </div>
-          {order.requests && order.requests.length > 1 && (
+          {order.requests && order.requests.length > 0 && (
             <div>
               <h4 className="mb-2 text-sm font-black text-gray-700">Pedidos nesta comanda</h4>
               <div className="space-y-2">
                 {order.requests.map((request) => (
-                  <div key={request.id} className="flex items-center justify-between rounded-lg border border-orange-100 bg-orange-50 p-3 text-sm">
+                  <div key={request.id} className={cn(
+                    "flex items-center justify-between rounded-lg border p-3 text-sm",
+                    request.id === order.active_request_id ? "border-blue-200 bg-blue-50" : "border-orange-100 bg-orange-50"
+                  )}>
                     <div>
                       <p className="font-black text-gray-900">Pedido {request.sequence}</p>
-                      <p className="text-xs font-bold text-gray-500">{new Date(request.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                      <p className="text-xs font-bold text-gray-500">
+                        {new Date(request.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · {request.status}
+                      </p>
                     </div>
                     <p className="font-black text-[#FF6B00]">{formatCurrency(Number(request.subtotal || 0))}</p>
                   </div>

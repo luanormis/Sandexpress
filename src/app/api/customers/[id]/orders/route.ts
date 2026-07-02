@@ -36,14 +36,30 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select('*, order_items(quantity, subtotal, products(name))')
+      .select('id, total, status, created_at, customer_order_requests(id, sequence, subtotal, status, created_at)')
       .eq('customer_id', id)
       .eq('vendor_id', customer.vendor_id)
       .eq('paid', false)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const orderLines = (data || []).flatMap((order: any) => {
+      const requests = Array.isArray(order.customer_order_requests) ? order.customer_order_requests : [];
+      if (requests.length === 0) return [order];
+      return requests
+        .sort((a: any, b: any) => Number(b.sequence || 0) - Number(a.sequence || 0))
+        .map((request: any) => ({
+          id: request.id,
+          account_id: order.id,
+          sequence: request.sequence,
+          total: Number(request.subtotal || 0),
+          account_total: Number(order.total || 0),
+          status: request.status || order.status,
+          account_status: order.status,
+          created_at: request.created_at || order.created_at,
+        }));
+    });
+    return NextResponse.json(orderLines);
   } catch (err) {
     console.error('Customer orders error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
