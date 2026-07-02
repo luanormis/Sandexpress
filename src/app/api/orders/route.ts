@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
     let query = supabaseAdmin
       .from('orders')
       .select(
-        '*, order_items(quantity, unit_price, subtotal, product_id, cancelled, products(name)), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
+        '*, order_items(id, order_request_id, quantity, unit_price, subtotal, product_id, cancelled, products(name)), customer_order_requests(id, sequence, subtotal, status, created_at), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
       )
       .eq('vendor_id', vendor_id)
       .order('created_at', { ascending: false });
@@ -106,9 +106,14 @@ export async function GET(req: NextRequest) {
       customer: order.customers?.name ?? 'Cliente',
       phone: order.customers?.phone ?? '',
       time: order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      requests: (order.customer_order_requests || []).sort((a: any, b: any) => Number(a.sequence || 0) - Number(b.sequence || 0)),
       items: (order.order_items || []).map((item: any) => ({
+        id: item.id,
+        order_request_id: item.order_request_id,
         q: item.quantity,
         n: item.products?.name || 'Produto',
+        subtotal: Number(item.subtotal || 0),
+        cancelled: Boolean(item.cancelled),
       })),
     }));
     return NextResponse.json(mapped);

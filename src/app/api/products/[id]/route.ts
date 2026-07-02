@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { isMissingProductStockColumnError, normalizeProductStockForWrite, removeProductStockFields } from '@/lib/product-stock';
 
 const ALLOWED_PRODUCT_FIELDS = new Set([
   'name',
@@ -35,10 +36,10 @@ const OPTIONAL_PRODUCT_FIELDS = new Set([
 
 function missingColumnFromError(error: any) {
   if (!['42703', 'PGRST204'].includes(error?.code || '')) return null;
-  const message = String(error.message || '');
-  const quoted = message.match(/column "([^"]+)"/i);
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  const quoted = message.match(/column "([^"]+)"/i) || message.match(/'([^']+)' column/i);
   if (quoted?.[1]) return quoted[1];
-  return Array.from(OPTIONAL_PRODUCT_FIELDS).find((column) => message.includes(column) || message.includes(`'${column}'`)) || null;
+  return Array.from(OPTIONAL_PRODUCT_FIELDS).find((column) => message.includes(column)) || null;
 }
 
 async function loadProductForWrite(req: NextRequest, id: string) {
@@ -81,6 +82,9 @@ export async function PATCH(
     for (const field of ALLOWED_PRODUCT_FIELDS) {
       if (field in body) safeUpdate[field] = body[field];
     }
+    if ('stock_tracking_enabled' in body || 'stock_quantity' in body || 'physical_stock_quantity' in body || 'beach_stock_quantity' in body || 'blocked_by_stock' in body) {
+      Object.assign(safeUpdate, normalizeProductStockForWrite(body));
+    }
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
@@ -96,6 +100,11 @@ export async function PATCH(
         .single();
 
       if (!result.error) break;
+      if (isMissingProductStockColumnError(result.error)) {
+        currentUpdate = removeProductStockFields(currentUpdate);
+        continue;
+      }
+
       const missingColumn = missingColumnFromError(result.error);
       if (!missingColumn || !OPTIONAL_PRODUCT_FIELDS.has(missingColumn)) break;
       const { [missingColumn]: _removed, ...nextUpdate } = currentUpdate;

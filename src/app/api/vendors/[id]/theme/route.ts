@@ -35,6 +35,11 @@ function normalizeFeeRate(value: unknown) {
   return Number.isFinite(numeric) && numeric >= 0 ? Number(numeric.toFixed(2)) : 0;
 }
 
+function normalizePayoutDays(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? Math.floor(numeric) : fallback;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -61,6 +66,14 @@ export async function GET(
       .eq('id', vendor.tenant_id)
       .single();
 
+    const { data: rateRows } = await (supabaseAdmin.from('payment_method_rates') as any)
+      .select('payment_method, fee_rate, payout_delay_days')
+      .eq('vendor_id', id);
+    const rates = ((rateRows || []) as any[]).reduce((acc, row) => {
+      acc[row.payment_method] = row;
+      return acc;
+    }, {} as Record<string, any>);
+
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
       primary_color: tenant?.primary_color || vendor.primary_color || DEFAULT_THEME.primary_color,
@@ -68,9 +81,12 @@ export async function GET(
       button_color: tenant?.button_color || (vendor as any).button_color || DEFAULT_THEME.button_color,
       button_text_color: tenant?.button_text_color || (vendor as any).button_text_color || DEFAULT_THEME.button_text_color,
       logo_url: tenant?.logo_url || vendor.logo_url || DEFAULT_THEME.logo_url,
-      debit_card_fee_rate: vendor.debit_card_fee_rate || 0,
-      credit_card_fee_rate: vendor.credit_card_fee_rate || 0,
-      pix_fee_rate: vendor.pix_fee_rate || 0,
+      debit_card_fee_rate: Number(rates.debit_card?.fee_rate ?? vendor.debit_card_fee_rate ?? 0),
+      credit_card_fee_rate: Number(rates.credit_card?.fee_rate ?? vendor.credit_card_fee_rate ?? 0),
+      pix_fee_rate: Number(rates.pix?.fee_rate ?? vendor.pix_fee_rate ?? 0),
+      debit_card_payout_days: Number(rates.debit_card?.payout_delay_days ?? 1),
+      credit_card_payout_days: Number(rates.credit_card?.payout_delay_days ?? 30),
+      pix_payout_days: Number(rates.pix?.payout_delay_days ?? 0),
     });
   } catch (err) {
     console.error('Vendor theme GET error:', err);
@@ -99,6 +115,11 @@ export async function PATCH(
       debit_card_fee_rate: normalizeFeeRate(body.debit_card_fee_rate),
       credit_card_fee_rate: normalizeFeeRate(body.credit_card_fee_rate),
       pix_fee_rate: normalizeFeeRate(body.pix_fee_rate),
+    };
+    const payoutDays = {
+      debit_card_payout_days: normalizePayoutDays(body.debit_card_payout_days, 1),
+      credit_card_payout_days: normalizePayoutDays(body.credit_card_payout_days, 30),
+      pix_payout_days: normalizePayoutDays(body.pix_payout_days, 0),
     };
 
     const { data: vendor, error: vendorError } = await supabaseAdmin
@@ -132,10 +153,53 @@ export async function PATCH(
 
     if (vendorUpdateError) throw vendorUpdateError;
 
+    const paymentRatesPayload = [
+      {
+        tenant_id: vendor.tenant_id,
+        vendor_id: id,
+        payment_method: 'pix',
+        fee_rate: paymentFeeUpdate.pix_fee_rate,
+        payout_delay_days: payoutDays.pix_payout_days,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        tenant_id: vendor.tenant_id,
+        vendor_id: id,
+        payment_method: 'debit_card',
+        fee_rate: paymentFeeUpdate.debit_card_fee_rate,
+        payout_delay_days: payoutDays.debit_card_payout_days,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        tenant_id: vendor.tenant_id,
+        vendor_id: id,
+        payment_method: 'credit_card',
+        fee_rate: paymentFeeUpdate.credit_card_fee_rate,
+        payout_delay_days: payoutDays.credit_card_payout_days,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        tenant_id: vendor.tenant_id,
+        vendor_id: id,
+        payment_method: 'cash',
+        fee_rate: 0,
+        payout_delay_days: 0,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+    ];
+    const { error: ratesError } = await (supabaseAdmin.from('payment_method_rates') as any)
+      .upsert(paymentRatesPayload, { onConflict: 'vendor_id,payment_method' });
+    if (ratesError && !['42P01', 'PGRST205'].includes(ratesError.code)) throw ratesError;
+
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
       ...themeUpdate,
       ...paymentFeeUpdate,
+      ...payoutDays,
     });
   } catch (err) {
     console.error('Vendor theme PATCH error:', err);

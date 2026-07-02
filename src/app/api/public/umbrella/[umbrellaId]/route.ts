@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, getTenantFeatureMap } from '@/lib/features';
+import { isProductVisibleToCustomer } from '@/lib/public-product-visibility';
 
 /**
  * GET /api/public/umbrella/[umbrellaId]?vendor_id=xxx
@@ -68,7 +69,7 @@ export async function GET(
 
     const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
-      .select('id, name, category, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_quantity, blocked_by_stock')
+      .select('id, name, category, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock')
       .eq('tenant_id', umbrella.tenant_id)
       .eq('vendor_id', umbrella.vendor_id)
       .eq('active', true)
@@ -76,10 +77,7 @@ export async function GET(
 
     if (productsError) throw productsError;
 
-    const visible = ((products || []) as any[]).filter((product) => {
-      if (product.blocked_by_stock && (product.stock_quantity ?? 0) <= 0) return false;
-      return true;
-    });
+    const visible = ((products || []) as any[]).filter(isProductVisibleToCustomer);
 
     return NextResponse.json({
       umbrella: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
+import { isMissingProductStockColumnError, normalizeProductStockForWrite, removeProductStockFields } from '@/lib/product-stock';
 
 function normalizeMoney(value: unknown) {
   const numeric = Number(value);
@@ -22,10 +23,10 @@ const OPTIONAL_INSERT_COLUMNS = [
 
 function missingColumnFromError(error: any) {
   if (!['42703', 'PGRST204'].includes(error?.code || '')) return null;
-  const message = String(error.message || '');
-  const quoted = message.match(/column "([^"]+)"/i);
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  const quoted = message.match(/column "([^"]+)"/i) || message.match(/'([^']+)' column/i);
   if (quoted?.[1]) return quoted[1];
-  return OPTIONAL_INSERT_COLUMNS.find((column) => message.includes(column) || message.includes(`'${column}'`)) || null;
+  return OPTIONAL_INSERT_COLUMNS.find((column) => message.includes(column)) || null;
 }
 
 async function insertProductWithSchemaFallback(payload: Record<string, unknown>) {
@@ -37,6 +38,11 @@ async function insertProductWithSchemaFallback(payload: Record<string, unknown>)
       .single();
 
     if (!result.error) return result;
+
+    if (isMissingProductStockColumnError(result.error)) {
+      currentPayload = removeProductStockFields(currentPayload);
+      continue;
+    }
 
     const missingColumn = missingColumnFromError(result.error);
     if (!missingColumn || !OPTIONAL_INSERT_COLUMNS.includes(missingColumn)) return result;
@@ -143,6 +149,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor sem tenant configurado. Execute a migracao de producao.' }, { status: 400 });
     }
 
+    const stockPayload = normalizeProductStockForWrite(body);
     const insertPayload = {
       tenant_id: vendor.tenant_id,
       vendor_id: body.vendor_id,
@@ -156,11 +163,7 @@ export async function POST(req: NextRequest) {
       active: body.active !== false,
       is_combo: Boolean(body.is_combo),
       sort_order: Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : 0,
-      stock_tracking_enabled: Boolean(body.stock_tracking_enabled),
-      stock_quantity: Number.isFinite(Number(body.stock_quantity)) ? Math.max(0, Number(body.stock_quantity)) : null,
-      physical_stock_quantity: Number.isFinite(Number(body.physical_stock_quantity)) ? Math.max(0, Number(body.physical_stock_quantity)) : 0,
-      beach_stock_quantity: Number.isFinite(Number(body.beach_stock_quantity)) ? Math.max(0, Number(body.beach_stock_quantity)) : 0,
-      blocked_by_stock: Boolean(body.blocked_by_stock),
+      ...stockPayload,
     };
 
     const { data, error } = await insertProductWithSchemaFallback(insertPayload);

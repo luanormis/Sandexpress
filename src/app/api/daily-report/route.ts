@@ -18,12 +18,12 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   const { data: orders, error: ordersErr } = await supabaseAdmin
     .from('orders')
-    .select('id, umbrella_id, customer_id, total, gross_total, payment_fee_amount, net_total, status, paid, payment_method, created_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
+    .select('id, umbrella_id, customer_id, total, gross_total, payment_fee_amount, net_total, status, paid, payment_method, created_at, paid_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
     .eq('vendor_id', vendorId)
-    .eq('status', 'completed')
-    .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay)
-    .order('created_at', { ascending: true });
+    .eq('paid', true)
+    .gte('paid_at', startOfDay)
+    .lte('paid_at', endOfDay)
+    .order('paid_at', { ascending: true });
 
   if (ordersErr) throw ordersErr;
 
@@ -33,7 +33,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     endDate: endOfDay,
   });
 
-  const completedOrders = [...(orders || []), ...archivedOrders.filter((order: any) => order.status === 'completed')];
+  const completedOrders = [...(orders || []), ...archivedOrders.filter((order: any) => Boolean(order.paid))];
   const totalRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
   const totalGrossRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.gross_total || order.total || 0), 0);
   const totalPaymentFees = completedOrders.reduce((sum: number, order: any) => sum + Number(order.payment_fee_amount || 0), 0);
@@ -98,7 +98,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
 
   const hourlyMap: Record<string, { orders: number; revenue: number }> = {};
   completedOrders.forEach((order: any) => {
-    const hour = new Date(order.created_at).getHours().toString().padStart(2, '0');
+    const hour = new Date(order.paid_at || order.created_at).getHours().toString().padStart(2, '0');
     const hourKey = `${hour}:00`;
     if (!hourlyMap[hourKey]) hourlyMap[hourKey] = { orders: 0, revenue: 0 };
     hourlyMap[hourKey].orders += 1;
@@ -122,6 +122,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     payment_method: order.payment_method || 'cash',
     items_count: (order.order_items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0),
     created_at: order.created_at,
+    paid_at: order.paid_at || order.created_at,
   }));
 
   return {

@@ -1,32 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isSupabaseUrlConfigured } from '@/lib/supabase-env';
 import { buildReadinessReport, getBlockingReadinessIssues } from '@/lib/readiness';
-
-const REQUIRED_TABLES = [
-  { table: 'tenants', column: 'id' },
-  { table: 'beaches', column: 'id' },
-  { table: 'vendors', column: 'id' },
-  { table: 'vendors', column: 'plan_monthly_price' },
-  { table: 'vendors', column: 'plan_annual_monthly_price' },
-  { table: 'vendor_users', column: 'id' },
-  { table: 'customers', column: 'id' },
-  { table: 'umbrellas', column: 'id' },
-  { table: 'products', column: 'id' },
-  { table: 'product_images', column: 'id' },
-  { table: 'orders', column: 'id' },
-  { table: 'order_items', column: 'id' },
-  { table: 'daily_closings', column: 'id' },
-  { table: 'terms_acceptances', column: 'id' },
-  { table: 'account_adjustments', column: 'id' },
-  { table: 'customer_satisfaction_surveys', column: 'id' },
-  { table: 'vendor_plans', column: 'id' },
-  { table: 'tenant_features', column: 'id' },
-  { table: 'rate_limit_buckets', column: 'key' },
-  { table: 'otp_challenges', column: 'id' },
-  { table: 'analytics_events', column: 'id' },
-  { table: 'platform_settings', column: 'key' },
-  { table: 'platform_settings', column: 'value' },
-];
+import { REQUIRED_SCHEMA_CHECKS } from '@/lib/readiness-schema';
 
 /**
  * GET /api/health
@@ -57,7 +32,7 @@ export async function GET() {
   try {
     const { supabaseAdmin } = await import('@/lib/supabase-admin');
     const checks = await Promise.all(
-      REQUIRED_TABLES.map(async ({ table, column }) => {
+      REQUIRED_SCHEMA_CHECKS.map(async ({ table, column }) => {
         const { error } = await supabaseAdmin.from(table).select(column).limit(1);
         return {
           table,

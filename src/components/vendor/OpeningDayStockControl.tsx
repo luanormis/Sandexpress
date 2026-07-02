@@ -138,9 +138,9 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">Abertura do dia</h1>
+        <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">Controle de estoque</h1>
         <p className="mt-1 text-sm font-semibold text-gray-500">
-          Informe a quantidade inicial de cada item antes de iniciar as vendas.
+          Informe o estoque fisico, abra a quantidade da praia e feche o dia devolvendo as sobras.
         </p>
       </div>
 

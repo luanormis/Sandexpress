@@ -5,9 +5,10 @@ import {
   ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, Clock, Trash2, Pencil, X, Upload,
   Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
-  Palette, Menu,
+  Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { getProductStockStatus } from "@/lib/product-stock";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
@@ -29,10 +30,28 @@ interface Product {
   active: boolean;
   is_combo: boolean;
   stock_tracking_enabled?: boolean;
+  stock_quantity?: number | null;
+  physical_stock_quantity?: number | null;
+  beach_stock_quantity?: number | null;
+  blocked_by_stock?: boolean | null;
   sort_order: number;
 }
 
-interface OrderItem { q: number; n: string; }
+interface OrderItem {
+  id?: string;
+  order_request_id?: string | null;
+  q: number;
+  n: string;
+  subtotal?: number;
+  cancelled?: boolean;
+}
+interface OrderRequest {
+  id: string;
+  sequence: number;
+  subtotal: number;
+  status: string;
+  created_at: string;
+}
 interface Order {
   id: string;
   umbrella_id: string;
@@ -45,6 +64,7 @@ interface Order {
   items: OrderItem[];
   notes?: string;
   paid?: boolean;
+  requests?: OrderRequest[];
 }
 
 function hasWaiterCall(order?: Pick<Order, "notes"> | null) {
@@ -83,7 +103,15 @@ interface Umbrella {
 }
 
 interface ReportData {
-  kpis: { total_revenue: number; total_orders: number; avg_ticket: number; unique_customers: number };
+  kpis: {
+    total_revenue: number;
+    total_gross_revenue?: number;
+    total_payment_fees?: number;
+    total_net_revenue?: number;
+    total_orders: number;
+    avg_ticket: number;
+    unique_customers: number;
+  };
   daily_summary: {
     available_products: number;
     active_umbrellas: number;
@@ -94,6 +122,20 @@ interface ReportData {
   top_products: { name: string; quantity: number; revenue: number }[];
   top_customers: { name: string; phone: string; visits: number; total_spent: number }[];
   hourly_sales: { hour: string; orders: number }[];
+  payment_methods?: Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
+  receivables?: Array<{
+    id: string;
+    order_id: string;
+    payment_method: string;
+    gross_amount: number;
+    fee_rate: number;
+    fee_amount: number;
+    net_amount: number;
+    paid_at: string;
+    expected_payment_date: string;
+    status: string;
+  }>;
+  receivables_by_date?: Record<string, { gross: number; fees: number; net: number; count: number }>;
   satisfaction?: {
     average_rating: number;
     total_responses: number;
@@ -130,10 +172,13 @@ interface KioskTheme {
   debit_card_fee_rate?: number;
   credit_card_fee_rate?: number;
   pix_fee_rate?: number;
+  debit_card_payout_days?: number;
+  credit_card_payout_days?: number;
+  pix_payout_days?: number;
   tenant_id?: string;
 }
 
-const CATEGORIES = ["Bebidas", "Alcoólicos", "Não Alcoólicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
+const CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
@@ -144,6 +189,9 @@ const DEFAULT_THEME: KioskTheme = {
   debit_card_fee_rate: 0,
   credit_card_fee_rate: 0,
   pix_fee_rate: 0,
+  debit_card_payout_days: 1,
+  credit_card_payout_days: 30,
+  pix_payout_days: 0,
 };
 
 const BRAND_PALETTE = [
@@ -157,9 +205,23 @@ const BRAND_PALETTE = [
   { name: "Azul mar", value: "#0f6b78" },
 ];
 
+const PAYMENT_METHOD_OPTIONS = [
+  { id: "cash", label: "Dinheiro", Icon: Banknote },
+  { id: "pix", label: "Pix", Icon: Smartphone },
+  { id: "debit_card", label: "Debito", Icon: CreditCard },
+  { id: "credit_card", label: "Credito", Icon: CreditCard },
+] as const;
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "Dinheiro",
+  pix: "Pix",
+  debit_card: "Cartao debito",
+  credit_card: "Cartao credito",
+};
+
 const TABS = [
   { id: "orders", label: "Pedidos", icon: ShoppingBag },
-  { id: "opening", label: "Abertura", icon: CalendarCheck },
+  { id: "stock", label: "Estoque", icon: PackageCheck },
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
@@ -180,6 +242,7 @@ export default function VendorDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [newOrderCount, setNewOrderCount] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [payingOrder, setPayingOrder] = useState<Order | null>(null);
 
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>([]);
@@ -368,6 +431,9 @@ export default function VendorDashboard() {
           debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
           credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
           pix_fee_rate: Number(data.pix_fee_rate || 0),
+          debit_card_payout_days: Number(data.debit_card_payout_days ?? 1),
+          credit_card_payout_days: Number(data.credit_card_payout_days ?? 30),
+          pix_payout_days: Number(data.pix_payout_days ?? 0),
         });
       }
     } catch (err) {
@@ -416,6 +482,9 @@ export default function VendorDashboard() {
         debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
         credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
         pix_fee_rate: Number(data.pix_fee_rate || 0),
+        debit_card_payout_days: Number(data.debit_card_payout_days ?? 1),
+        credit_card_payout_days: Number(data.credit_card_payout_days ?? 30),
+        pix_payout_days: Number(data.pix_payout_days ?? 0),
       });
       setThemeMessage("Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
     } catch {
@@ -739,17 +808,13 @@ export default function VendorDashboard() {
   };
 
   const markAccountPaid = async (order: Order) => {
+    setPayingOrder(order);
+  };
+
+  const confirmAccountPaid = async (order: Order, paymentMethod: string) => {
     if (!vendorId) return;
-    const method = prompt('Forma de pagamento: dinheiro, pix, debito ou credito', 'dinheiro');
-    if (!method) return;
-    const normalizedMethod = method.toLowerCase().includes('pix')
-      ? 'pix'
-      : method.toLowerCase().includes('deb')
-        ? 'debit_card'
-        : method.toLowerCase().includes('cred')
-          ? 'credit_card'
-          : 'cash';
-    const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella}?`);
+    const label = PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod;
+    const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella} em ${label}?`);
     if (!confirmed) return;
 
     try {
@@ -759,7 +824,7 @@ export default function VendorDashboard() {
         body: JSON.stringify({
           vendor_id: vendorId,
           umbrella_id: order.umbrella_id,
-          payment_method: normalizedMethod,
+          payment_method: paymentMethod,
           notes: order.notes || 'Conta paga no Kanban',
         }),
       });
@@ -771,9 +836,46 @@ export default function VendorDashboard() {
       setOrders(prev => prev.filter(o => o.id !== order.id));
       setUmbrellas(prev => prev.map(u => u.id === order.umbrella_id ? { ...u, is_occupied: false, current_order_id: null } : u));
       setSelectedOrder(null);
+      setPayingOrder(null);
     } catch (err) {
       console.error('Pay account error:', err);
       alert('Erro de rede ao confirmar pagamento.');
+    }
+  };
+
+  const cancelOrderItem = async (order: Order, item: OrderItem) => {
+    if (!item.id || item.cancelled) return;
+    const reason = prompt(`Motivo do cancelamento de "${item.n}"`, 'Cancelado pela gestao do quiosque');
+    if (!reason) return;
+
+    try {
+      const res = await fetch(`/api/order-items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Nao foi possivel cancelar o item.');
+        return;
+      }
+
+      setOrders(prev => prev.map(current => {
+        if (current.id !== order.id) return current;
+        return {
+          ...current,
+          total: Number(data.total || 0),
+          items: current.items.map(currentItem => currentItem.id === item.id ? { ...currentItem, cancelled: true } : currentItem),
+        };
+      }));
+      setSelectedOrder(prev => prev?.id === order.id ? {
+        ...prev,
+        total: Number(data.total || 0),
+        items: prev.items.map(currentItem => currentItem.id === item.id ? { ...currentItem, cancelled: true } : currentItem),
+      } : prev);
+    } catch (err) {
+      console.error('Cancel order item error:', err);
+      alert('Erro de rede ao cancelar item.');
     }
   };
 
@@ -1100,7 +1202,7 @@ export default function VendorDashboard() {
           )}
 
           {/* ========== ABA 2: CARDÁPIO ========== */}
-          {activeTab === "opening" && (
+          {activeTab === "stock" && (
             <OpeningDayStockControl vendorId={vendorId || undefined} />
           )}
 
@@ -1146,12 +1248,15 @@ export default function VendorDashboard() {
                         <th className="p-3">Categoria</th>
                         <th className="p-3">Preço</th>
                         <th className="p-3">Promo</th>
+                        <th className="p-3">Estoque</th>
                         <th className="p-3">Status</th>
                         <th className="p-3 rounded-tr-lg">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProducts.map(p => (
+                      {filteredProducts.map(p => {
+                        const stockStatus = getProductStockStatus(p);
+                        return (
                         <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                           <td className="p-3">
                             <div className="flex items-center gap-3">
@@ -1176,6 +1281,19 @@ export default function VendorDashboard() {
                           <td className="p-3 font-bold text-gray-900">{formatCurrency(p.price)}</td>
                           <td className="p-3 text-[#FF6B00] font-bold">{p.promotional_price ? formatCurrency(p.promotional_price) : "—"}</td>
                           <td className="p-3">
+                            <div className="flex flex-col gap-1">
+                              <span className={cn(
+                                "w-fit rounded-full px-2.5 py-1 text-xs font-black",
+                                stockStatus.tone === "ok" && "bg-green-100 text-green-700",
+                                stockStatus.tone === "blocked" && "bg-red-100 text-red-700",
+                                stockStatus.tone === "neutral" && "bg-gray-100 text-gray-500"
+                              )}>
+                                {stockStatus.label}
+                              </span>
+                              <span className="text-xs font-bold text-gray-400">Praia: {stockStatus.quantityLabel}</span>
+                            </div>
+                          </td>
+                          <td className="p-3">
                             <button
                               onClick={() => toggleProduct(p.id)}
                               className={cn("flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full transition-colors", p.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400")}
@@ -1194,7 +1312,8 @@ export default function VendorDashboard() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1417,24 +1536,35 @@ export default function VendorDashboard() {
 
                 <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <h4 className="text-sm font-black text-gray-900">Taxas de recebimento</h4>
-                  <p className="mt-1 text-xs font-semibold text-gray-500">Percentual descontado para calcular o valor liquido no fechamento da conta.</p>
+                  <p className="mt-1 text-xs font-semibold text-gray-500">Percentual descontado e prazo para calcular o valor liquido e a data prevista de recebimento.</p>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     {[
-                      ['pix_fee_rate', 'PIX'],
-                      ['debit_card_fee_rate', 'Debito'],
-                      ['credit_card_fee_rate', 'Credito'],
-                    ].map(([field, label]) => (
-                      <label key={field} className="space-y-1">
-                        <span className="text-xs font-black uppercase text-gray-600">{label} (%)</span>
+                      ['pix_fee_rate', 'pix_payout_days', 'PIX'],
+                      ['debit_card_fee_rate', 'debit_card_payout_days', 'Debito'],
+                      ['credit_card_fee_rate', 'credit_card_payout_days', 'Credito'],
+                    ].map(([feeField, daysField, label]) => (
+                      <div key={feeField} className="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
+                        <span className="text-xs font-black uppercase text-gray-600">{label}</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
-                          value={Number(themeForm[field as keyof KioskTheme] || 0)}
-                          onChange={(event) => setThemeForm(prev => ({ ...prev, [field]: Number(event.target.value) || 0 }))}
+                          value={Number(themeForm[feeField as keyof KioskTheme] || 0)}
+                          onChange={(event) => setThemeForm(prev => ({ ...prev, [feeField]: Number(event.target.value) || 0 }))}
                           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
+                          aria-label={`${label} percentual de taxa`}
                         />
-                      </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={Number(themeForm[daysField as keyof KioskTheme] || 0)}
+                          onChange={(event) => setThemeForm(prev => ({ ...prev, [daysField]: Math.max(0, Math.floor(Number(event.target.value) || 0)) }))}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
+                          aria-label={`${label} dias para pagamento`}
+                        />
+                        <p className="text-[11px] font-bold text-gray-400">Taxa (%) e dias para cair</p>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1587,6 +1717,68 @@ export default function VendorDashboard() {
                         {reportData.satisfaction?.average_rating || 0}
                       </p>
                       <p className="text-xs text-gray-400 font-bold">{reportData.satisfaction?.total_responses || 0} respostas</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CreditCard size={18} className="text-[#FF6B00]" /> Meios de recebimento</h4>
+                      <div className="space-y-3">
+                        {Object.entries(reportData.payment_methods || {}).length === 0 ? (
+                          <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhuma conta paga no periodo.</p>
+                        ) : Object.entries(reportData.payment_methods || {}).map(([method, data]) => (
+                          <div key={method} className="rounded-xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-black text-gray-900">{PAYMENT_METHOD_LABELS[method] || method}</p>
+                              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-500">{data.count} conta{data.count === 1 ? "" : "s"}</span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Bruto</p>
+                                <p className="font-black text-gray-900">{formatCurrency(data.gross)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Taxas</p>
+                                <p className="font-black text-red-600">{formatCurrency(data.fees)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Liquido</p>
+                                <p className="font-black text-green-700">{formatCurrency(data.net)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CalendarCheck size={18} className="text-[#FF6B00]" /> Recebiveis por data</h4>
+                      <div className="space-y-3">
+                        {Object.entries(reportData.receivables_by_date || {}).length === 0 ? (
+                          <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhum recebivel no periodo.</p>
+                        ) : Object.entries(reportData.receivables_by_date || {}).map(([date, data]) => (
+                          <div key={date} className="rounded-xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-black text-gray-900">{date === "sem_data" ? "Sem data" : new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR")}</p>
+                              <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-xs font-black text-[#FF6B00]">{data.count} venda{data.count === 1 ? "" : "s"}</span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Bruto</p>
+                                <p className="font-black text-gray-900">{formatCurrency(data.gross)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Taxas</p>
+                                <p className="font-black text-red-600">{formatCurrency(data.fees)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-400">Cai na conta</p>
+                                <p className="font-black text-green-700">{formatCurrency(data.net)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -1895,6 +2087,15 @@ export default function VendorDashboard() {
           onPaid={markAccountPaid}
           onReleaseEmpty={releaseEmptyUmbrella}
           onWaiterDone={acknowledgeWaiterCall}
+          onCancelItem={cancelOrderItem}
+        />
+      )}
+
+      {payingOrder && (
+        <PaymentMethodModal
+          order={payingOrder}
+          onClose={() => setPayingOrder(null)}
+          onConfirm={confirmAccountPaid}
         />
       )}
 
@@ -1919,6 +2120,7 @@ function OrderModal({
   onPaid,
   onReleaseEmpty,
   onWaiterDone,
+  onCancelItem,
 }: {
   order: Order;
   onClose: () => void;
@@ -1926,6 +2128,7 @@ function OrderModal({
   onPaid: (order: Order) => Promise<void>;
   onReleaseEmpty: (order: Order) => Promise<void>;
   onWaiterDone: (order: Order) => Promise<void>;
+  onCancelItem: (order: Order, item: OrderItem) => Promise<void>;
 }) {
   const serviceRequest = getServiceRequest(order);
   const emptyAccount = isOrderEmpty(order);
@@ -1978,13 +2181,45 @@ function OrderModal({
               {(order.items || []).length === 0 ? (
                 <p className="rounded-lg bg-gray-50 p-3 text-sm font-bold text-gray-400">Comanda aberta sem itens.</p>
               ) : (order.items || []).map((item, index) => (
-                <div key={`${item.n}-${index}`} className="flex justify-between rounded-lg border border-gray-100 p-3 text-sm">
+                <div key={`${item.id || item.n}-${index}`} className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 text-sm",
+                  item.cancelled && "bg-gray-50 text-gray-400 line-through"
+                )}>
                   <span className="font-bold text-gray-900">{item.n}</span>
-                  <span className="font-black text-[#FF6B00]">{item.q}x</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-[#FF6B00]">{item.q}x</span>
+                    {item.subtotal !== undefined && (
+                      <span className="text-xs font-black text-gray-400">{formatCurrency(item.subtotal)}</span>
+                    )}
+                    {!item.cancelled && item.id && !order.paid && (
+                      <button
+                        onClick={() => onCancelItem(order, item)}
+                        className="rounded-lg border border-red-100 px-2 py-1 text-xs font-black text-red-600 hover:bg-red-50"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+          {order.requests && order.requests.length > 1 && (
+            <div>
+              <h4 className="mb-2 text-sm font-black text-gray-700">Pedidos nesta comanda</h4>
+              <div className="space-y-2">
+                {order.requests.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between rounded-lg border border-orange-100 bg-orange-50 p-3 text-sm">
+                    <div>
+                      <p className="font-black text-gray-900">Pedido {request.sequence}</p>
+                      <p className="text-xs font-bold text-gray-500">{new Date(request.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                    </div>
+                    <p className="font-black text-[#FF6B00]">{formatCurrency(Number(request.subtotal || 0))}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {getVisibleOrderNotes(order.notes) && (
             <div className="whitespace-pre-line rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">
               {getVisibleOrderNotes(order.notes)}
@@ -2014,13 +2249,66 @@ function OrderModal({
   );
 }
 
+function PaymentMethodModal({
+  order,
+  onClose,
+  onConfirm,
+}: {
+  order: Order;
+  onClose: () => void;
+  onConfirm: (order: Order, paymentMethod: string) => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleConfirm = async (paymentMethod: string) => {
+    setSubmitting(true);
+    try {
+      await onConfirm(order, paymentMethod);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-3 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p>
+            <h3 className="text-xl font-display font-bold text-gray-900">Conta paga</h3>
+            <p className="mt-1 text-sm font-bold text-gray-500">{order.customer} - {formatCurrency(order.total)}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          {PAYMENT_METHOD_OPTIONS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              disabled={submitting}
+              onClick={() => handleConfirm(id)}
+              className="min-h-24 rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 text-left transition hover:border-[#FF6B00] hover:bg-[#FFF2E5] disabled:opacity-50"
+            >
+              <Icon className="mb-3 text-[#FF6B00]" size={24} />
+              <span className="block font-black text-gray-900">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // =========================================================
 // PRODUCT MODAL COMPONENT
 // =========================================================
 function ProductModal({ product, vendorId, onSave, onClose }: { product: Product | null; vendorId: string | null; onSave: (p: Product) => Promise<void> | void; onClose: () => void }) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
-    description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false, sort_order: 99,
+    description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false,
+    stock_quantity: null, physical_stock_quantity: 0, beach_stock_quantity: 0, blocked_by_stock: false,
+    sort_order: 99,
   });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string }>>([]);
@@ -2193,12 +2481,57 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
               <input
                 type="checkbox"
                 checked={Boolean(form.stock_tracking_enabled)}
-                onChange={e => setForm(prev => ({ ...prev, stock_tracking_enabled: e.target.checked }))}
+                onChange={e => {
+                  const enabled = e.target.checked;
+                  setForm(prev => ({
+                    ...prev,
+                    stock_tracking_enabled: enabled,
+                    stock_quantity: enabled ? prev.stock_quantity : null,
+                    physical_stock_quantity: enabled ? prev.physical_stock_quantity : 0,
+                    beach_stock_quantity: enabled ? prev.beach_stock_quantity : 0,
+                    blocked_by_stock: enabled ? prev.blocked_by_stock : false,
+                  }));
+                }}
                 className="w-5 h-5 accent-[#FF6B00]"
               />
               <span className="text-sm font-bold text-gray-700">Contabilizar estoque</span>
             </label>
           </div>
+
+          {form.stock_tracking_enabled && (
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-orange-100 bg-orange-50 p-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Estoque fisico</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.physical_stock_quantity || ""}
+                  onChange={e => setForm(prev => ({ ...prev, physical_stock_quantity: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                  className="w-full border-2 border-orange-100 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                  placeholder="Ex: 80"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Estoque praia</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.beach_stock_quantity || ""}
+                  onChange={e => {
+                    const nextStock = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setForm(prev => ({
+                      ...prev,
+                      beach_stock_quantity: nextStock,
+                      stock_quantity: nextStock,
+                      blocked_by_stock: nextStock <= 0,
+                    }));
+                  }}
+                  className="w-full border-2 border-orange-100 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                  placeholder="Ex: 24"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-6 border-t border-gray-100 flex gap-3">

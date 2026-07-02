@@ -148,6 +148,9 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS is_combo BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 99,
+  ADD COLUMN IF NOT EXISTS stock_tracking_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS physical_stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (physical_stock_quantity >= 0),
+  ADD COLUMN IF NOT EXISTS beach_stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (beach_stock_quantity >= 0),
   ADD COLUMN IF NOT EXISTS stock_quantity INTEGER,
   ADD COLUMN IF NOT EXISTS blocked_by_stock BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
@@ -302,6 +305,21 @@ CREATE TABLE IF NOT EXISTS beaches (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE beaches
+  ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS state TEXT,
+  ADD COLUMN IF NOT EXISTS region TEXT,
+  ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,8),
+  ADD COLUMN IF NOT EXISTS longitude DECIMAL(11,8),
+  ADD COLUMN IF NOT EXISTS total_visits INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_sales NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS avg_ticket NUMERIC(10,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS peak_hours JSONB,
+  ADD COLUMN IF NOT EXISTS popular_products JSONB,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_customers_vendor ON customers(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_umbrellas_vendor ON umbrellas(vendor_id);
@@ -316,7 +334,19 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_otps_lookup ON customer_otps(vendor_id, phone, used, expires_at);
 CREATE INDEX IF NOT EXISTS idx_vendor_plans_vendor ON vendor_plans(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_adjustments_vendor ON account_adjustments(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_beaches_tenant ON beaches(tenant_id);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'beaches'
+      AND column_name = 'tenant_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_beaches_tenant ON beaches(tenant_id);
+  END IF;
+END $$;
 
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;

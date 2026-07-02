@@ -1,5 +1,5 @@
 import { DEFAULT_PRODUCT_IMAGES } from '@/lib/default-product-images';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isMissingProductStockColumnError, removeProductStockFields } from '@/lib/product-stock';
 
 type DefaultMenuProduct = {
   name: string;
@@ -25,6 +25,19 @@ function imageUrlFor(key: string) {
   return DEFAULT_PRODUCT_IMAGES.find((image) => image.id === key)?.image_url || null;
 }
 
+function buildCompatibleDefaultMenuRows(tenantId: string, vendorId: string) {
+  return DEFAULT_MENU.map((item) => ({
+    tenant_id: tenantId,
+    vendor_id: vendorId,
+    name: item.name,
+    category: item.category,
+    description: item.description,
+    price: item.price,
+    image_url: imageUrlFor(item.imageKey),
+    active: true,
+  }));
+}
+
 export function buildDefaultMenuRows(tenantId: string, vendorId: string) {
   return DEFAULT_MENU.map((item) => ({
     tenant_id: tenantId,
@@ -47,20 +60,8 @@ export function buildDefaultMenuRows(tenantId: string, vendorId: string) {
   }));
 }
 
-function buildCompatibleDefaultMenuRows(tenantId: string, vendorId: string) {
-  return DEFAULT_MENU.map((item) => ({
-    tenant_id: tenantId,
-    vendor_id: vendorId,
-    name: item.name,
-    category: item.category,
-    description: item.description,
-    price: item.price,
-    image_url: imageUrlFor(item.imageKey),
-    active: true,
-  }));
-}
-
 export async function seedDefaultMenuForVendor(tenantId: string, vendorId: string) {
+  const { supabaseAdmin } = await import('@/lib/supabase-admin');
   const { count, error: countError } = await supabaseAdmin
     .from('products')
     .select('id', { count: 'exact', head: true })
@@ -69,8 +70,16 @@ export async function seedDefaultMenuForVendor(tenantId: string, vendorId: strin
   if (countError) throw countError;
   if (Number(count || 0) > 0) return { inserted: 0 };
 
-  const rows = buildCompatibleDefaultMenuRows(tenantId, vendorId);
-  const { error } = await supabaseAdmin.from('products').insert(rows as any);
+  const rows = buildDefaultMenuRows(tenantId, vendorId);
+  let { error } = await supabaseAdmin.from('products').insert(rows as any);
+  if (error && ['42703', 'PGRST204'].includes(error.code || '')) {
+    console.warn('Default menu seed retrying with compatible product fields because the database schema is older:', error.message);
+    const retryRows = isMissingProductStockColumnError(error)
+      ? rows.map((row) => removeProductStockFields(row))
+      : buildCompatibleDefaultMenuRows(tenantId, vendorId);
+    const retry = await supabaseAdmin.from('products').insert(retryRows as any);
+    error = retry.error;
+  }
   if (error) throw error;
   return { inserted: rows.length };
 }

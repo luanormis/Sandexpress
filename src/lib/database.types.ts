@@ -199,6 +199,9 @@ export interface Database {
           active: boolean | null
           is_combo: boolean | null
           sort_order: number | null
+          stock_tracking_enabled: boolean | null
+          physical_stock_quantity: number | null
+          beach_stock_quantity: number | null
           stock_quantity: number | null
           blocked_by_stock: boolean | null
           created_at: string | null
@@ -219,6 +222,9 @@ export interface Database {
           active?: boolean | null
           is_combo?: boolean | null
           sort_order?: number | null
+          stock_tracking_enabled?: boolean | null
+          physical_stock_quantity?: number | null
+          beach_stock_quantity?: number | null
           stock_quantity?: number | null
           blocked_by_stock?: boolean | null
           created_at?: string | null
@@ -237,6 +243,9 @@ export interface Database {
           active?: boolean | null
           is_combo?: boolean | null
           sort_order?: number | null
+          stock_tracking_enabled?: boolean | null
+          physical_stock_quantity?: number | null
+          beach_stock_quantity?: number | null
           stock_quantity?: number | null
           blocked_by_stock?: boolean | null
           updated_at?: string | null

@@ -11,7 +11,7 @@ export type DefaultProductImage = {
 export const DEFAULT_PRODUCT_IMAGES: DefaultProductImage[] = [
   {
     id: 'default-beer-long-neck',
-    category: 'Alcoólicos',
+    category: 'Alcoolicos',
     title: 'Cerveja long neck',
     name: 'Cerveja long neck gelada',
     image_url: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&w=900&q=80',
@@ -20,7 +20,7 @@ export const DEFAULT_PRODUCT_IMAGES: DefaultProductImage[] = [
   },
   {
     id: 'default-beer-can',
-    category: 'Alcoólicos',
+    category: 'Alcoolicos',
     title: 'Cerveja lata',
     name: 'Cerveja lata gelada',
     image_url: 'https://images.unsplash.com/photo-1618885472179-5e474019f2a9?auto=format&fit=crop&w=900&q=80',
@@ -29,7 +29,7 @@ export const DEFAULT_PRODUCT_IMAGES: DefaultProductImage[] = [
   },
   {
     id: 'default-tropical-drink',
-    category: 'Alcoólicos',
+    category: 'Alcoolicos',
     title: 'Drink tropical',
     name: 'Drink tropical colorido',
     image_url: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=900&q=80',
@@ -47,7 +47,7 @@ export const DEFAULT_PRODUCT_IMAGES: DefaultProductImage[] = [
   },
   {
     id: 'default-juice',
-    category: 'Não Alcoólicos',
+    category: 'Nao Alcoolicos',
     title: 'Suco natural',
     name: 'Suco natural de frutas',
     image_url: 'https://images.unsplash.com/photo-1622597467836-f3285f2131b8?auto=format&fit=crop&w=900&q=80',
@@ -83,9 +83,21 @@ export const DEFAULT_PRODUCT_IMAGES: DefaultProductImage[] = [
   },
 ];
 
+export function categoryKey(category?: string | null) {
+  const key = String(category || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+  if (key.includes('noalco') || key.includes('naoalco')) return 'naoalcoolicos';
+  if (key.includes('alco')) return 'alcoolicos';
+  return key;
+}
+
 export function getDefaultProductImages(category?: string | null, planType = 'free') {
   return DEFAULT_PRODUCT_IMAGES.filter((image) => {
-    if (category && image.category !== category) return false;
+    if (category && categoryKey(image.category) !== categoryKey(category)) return false;
     if (planType === 'free' && image.plan_type !== 'free') return false;
     return true;
   });

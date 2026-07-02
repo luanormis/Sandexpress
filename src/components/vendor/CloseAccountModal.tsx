@@ -286,11 +286,8 @@ export default function CloseAccountModal() {
               onChange={(e) => setPaymentMethod(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg font-medium"
             >
-              <option value="cash">💵 Dinheiro</option>
-              <option value="card">💳 Cartão</option>
-              <option value="transfer">🏦 Transferência</option>
-              <option value="pix">📲 PIX</option>
-              <option value="other">📝 Outro</option>
+              <option value="cash">Dinheiro</option>
+              <option value="pix">Pix</option>
               <option value="debit_card">Cartao de debito</option>
               <option value="credit_card">Cartao de credito</option>
             </select>

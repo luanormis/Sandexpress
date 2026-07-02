@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Product, ProductImage } from "@/types";
 import { Upload } from "lucide-react";
 
@@ -21,23 +20,25 @@ export function ProductImageManager({
   const [selectedImage, setSelectedImage] = useState(product.image_url || "");
 
   useEffect(() => {
-    fetchDefaultImages();
-  }, [product.category]);
+    let cancelled = false;
 
-  const fetchDefaultImages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("product_images")
-        .select("*")
-        .eq("category", product.category)
-        .eq("plan_type", "free");
-
-      if (error) throw error;
-      setDefaultImages(data as ProductImage[]);
-    } catch (err) {
-      console.error("Erro ao carregar imagens padrão:", err);
+    async function fetchDefaultImages() {
+      try {
+        const response = await fetch(`/api/products/gallery?category=${encodeURIComponent(product.category)}&planType=free`);
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "Erro ao carregar imagens padrao.");
+        if (!cancelled) setDefaultImages((data?.data?.images || []) as ProductImage[]);
+      } catch (err) {
+        console.error("Erro ao carregar imagens padrao:", err);
+        if (!cancelled) setDefaultImages([]);
+      }
     }
-  };
+
+    fetchDefaultImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [product.category]);
 
   const handleSelectDefault = (imageUrl: string) => {
     setSelectedImage(imageUrl);
@@ -49,13 +50,14 @@ export function ProductImageManager({
     if (!file) return;
 
     if (!isPlusUser) {
-      alert("Upload de imagens personalizadas está disponível apenas no plano Plus");
+      alert("Upload de imagens personalizadas esta disponivel apenas no plano Plus");
       return;
     }
 
     setLoading(true);
 
     try {
+      const { supabase } = await import("@/lib/supabase");
       const fileName = `products/${product.vendor_id}/${Date.now()}-${file.name}`;
       const { data, error } = await supabase.storage
         .from("product-images")
@@ -91,13 +93,13 @@ export function ProductImageManager({
         </div>
       )}
 
-      {/* Imagens Padrão */}
       <div>
-        <p className="text-sm font-medium text-gray-600 mb-2">Imagens Padrão (Grátis)</p>
+        <p className="text-sm font-medium text-gray-600 mb-2">Imagens Padrao (Gratis)</p>
         <div className="grid grid-cols-3 gap-2">
           {defaultImages.map((img) => (
             <button
               key={img.id}
+              type="button"
               onClick={() => handleSelectDefault(img.image_url)}
               className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${
                 selectedImage === img.image_url
@@ -112,7 +114,7 @@ export function ProductImageManager({
               />
               {selectedImage === img.image_url && (
                 <div className="absolute inset-0 bg-[#FF6B00]/20 flex items-center justify-center">
-                  <span className="text-white font-bold">✓</span>
+                  <span className="text-white font-bold">OK</span>
                 </div>
               )}
             </button>
@@ -120,7 +122,6 @@ export function ProductImageManager({
         </div>
       </div>
 
-      {/* Upload Customizado */}
       {isPlusUser && (
         <div>
           <p className="text-sm font-medium text-gray-600 mb-2">
@@ -147,7 +148,7 @@ export function ProductImageManager({
       {!isPlusUser && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-sm text-blue-700">
-            💡 Atualize para o Plano Plus para enviar imagens personalizadas
+            Atualize para o Plano Plus para enviar imagens personalizadas.
           </p>
         </div>
       )}
