@@ -74,6 +74,27 @@ function productErrorResponse(error: any) {
     }, { status: 500 });
   }
 
+  if (error?.code === '42501') {
+    return NextResponse.json({
+      error: 'Permissao insuficiente na tabela products. Rode infra/sql-atualizacao-controle-estoque-produtos.sql no Supabase para liberar os GRANTs da Data API.',
+      code: error.code,
+    }, { status: 500 });
+  }
+
+  if (error?.code === '23503') {
+    return NextResponse.json({
+      error: 'Produto sem vendor/tenant valido. Faca login novamente no painel do quiosque e tente salvar outra vez.',
+      code: error.code,
+    }, { status: 400 });
+  }
+
+  if (error?.code === '23502') {
+    return NextResponse.json({
+      error: `Campo obrigatorio ausente em products: ${error.message}. Rode o SQL de preparacao do banco.`,
+      code: error.code,
+    }, { status: 500 });
+  }
+
   return NextResponse.json({ error: error?.message || 'Erro interno ao salvar produto.' }, { status: 500 });
 }
 

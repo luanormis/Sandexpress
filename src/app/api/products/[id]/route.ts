@@ -42,6 +42,38 @@ function missingColumnFromError(error: any) {
   return Array.from(OPTIONAL_PRODUCT_FIELDS).find((column) => message.includes(column)) || null;
 }
 
+function productWriteErrorResponse(error: any) {
+  console.error('Product write error:', {
+    code: error?.code,
+    message: error?.message,
+    details: error?.details,
+    hint: error?.hint,
+  });
+
+  if (['42P01', 'PGRST205'].includes(error?.code || '')) {
+    return NextResponse.json({
+      error: 'Tabela products nao encontrada. Rode infra/sql-atualizacao-controle-estoque-produtos.sql no Supabase.',
+      code: error?.code,
+    }, { status: 500 });
+  }
+
+  if (['42703', 'PGRST204'].includes(error?.code || '')) {
+    return NextResponse.json({
+      error: `Schema de products desatualizado: ${error.message}. Rode infra/sql-atualizacao-controle-estoque-produtos.sql no Supabase.`,
+      code: error?.code,
+    }, { status: 500 });
+  }
+
+  if (error?.code === '42501') {
+    return NextResponse.json({
+      error: 'Permissao insuficiente na tabela products. Rode infra/sql-atualizacao-controle-estoque-produtos.sql no Supabase para liberar edicao e exclusao.',
+      code: error.code,
+    }, { status: 500 });
+  }
+
+  return NextResponse.json({ error: error?.message || 'Erro interno ao salvar produto.' }, { status: 500 });
+}
+
 async function loadProductForWrite(req: NextRequest, id: string) {
   const tenantId = getTenantIdFromRequest(req);
   let query = supabaseAdmin
@@ -72,6 +104,9 @@ export async function PATCH(
     const body = await req.json();
 
     const productLookup = await loadProductForWrite(req, id);
+    if (productLookup.error && ['42P01', 'PGRST205', '42703', 'PGRST204', '42501'].includes(productLookup.error.code || '')) {
+      return productWriteErrorResponse(productLookup.error);
+    }
     if (productLookup.error || !productLookup.data) {
       return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
@@ -114,8 +149,7 @@ export async function PATCH(
     if (result?.error) throw result.error;
     return NextResponse.json(result.data);
   } catch (err) {
-    console.error('Product PATCH error:', err);
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    return productWriteErrorResponse(err);
   }
 }
 
@@ -128,6 +162,9 @@ export async function DELETE(
     const { id } = await params;
 
     const productLookup = await loadProductForWrite(req, id);
+    if (productLookup.error && ['42P01', 'PGRST205', '42703', 'PGRST204', '42501'].includes(productLookup.error.code || '')) {
+      return productWriteErrorResponse(productLookup.error);
+    }
     if (productLookup.error || !productLookup.data) {
       return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
@@ -143,7 +180,6 @@ export async function DELETE(
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Product DELETE error:', err);
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    return productWriteErrorResponse(err);
   }
 }
