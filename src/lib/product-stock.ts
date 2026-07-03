@@ -71,7 +71,7 @@ export function normalizeProductStockForWrite(product: ProductStockInput): Produ
     stock_quantity: beachStock,
     physical_stock_quantity: toDisplayQuantity(product.physical_stock_quantity),
     beach_stock_quantity: beachStock,
-    blocked_by_stock: Boolean(product.blocked_by_stock) || beachStock <= 0,
+    blocked_by_stock: beachStock <= 0,
   };
 }
 

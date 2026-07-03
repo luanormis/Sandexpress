@@ -1,22 +1,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, Check, Loader, Minus, Plus, Save } from 'lucide-react';
+import { AlertCircle, Check, Loader, Minus, Pencil, Plus, Save, Trash2, Utensils } from 'lucide-react';
 
 interface Product {
   id: string;
   name: string;
   category: string;
   price: number;
-  stock_tracking_enabled: boolean;
-  physical_stock_quantity: number;
-  beach_stock_quantity: number;
-  stock_quantity: number | null;
-  blocked_by_stock: boolean;
+  promotional_price?: number | null;
+  description?: string | null;
+  image_url?: string | null;
+  is_combo?: boolean;
+  sort_order?: number;
+  stock_tracking_enabled?: boolean | null;
+  physical_stock_quantity?: number | null;
+  beach_stock_quantity?: number | null;
+  stock_quantity?: number | null;
+  blocked_by_stock?: boolean | null;
   active: boolean;
 }
 
-export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { vendorId?: string }) {
+type OpeningDayStockControlProps = {
+  vendorId?: string;
+  products?: Product[];
+  onProductsLoaded?: (products: Product[]) => void;
+  onAddProduct?: () => void;
+  onEditProduct?: (product: Product) => void;
+  onDeleteProduct?: (productId: string) => void;
+};
+
+export default function OpeningDayStockControl({
+  vendorId: vendorIdProp,
+  products: externalProducts,
+  onProductsLoaded,
+  onAddProduct,
+  onEditProduct,
+  onDeleteProduct,
+}: OpeningDayStockControlProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockUpdates, setStockUpdates] = useState<Record<string, number>>({});
   const [physicalUpdates, setPhysicalUpdates] = useState<Record<string, number>>({});
@@ -42,6 +63,7 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
       }
       const data = await response.json();
       setProducts(data);
+      onProductsLoaded?.(data);
       const initial: Record<string, number> = {};
       const physicalInitial: Record<string, number> = {};
       data.forEach((product: Product) => {
@@ -60,6 +82,20 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
   useEffect(() => {
     loadProducts();
   }, [vendorId]);
+
+  useEffect(() => {
+    if (externalProducts) {
+      setProducts(externalProducts);
+      const initial: Record<string, number> = {};
+      const physicalInitial: Record<string, number> = {};
+      externalProducts.forEach((product: Product) => {
+        initial[product.id] = product.beach_stock_quantity || product.stock_quantity || 0;
+        physicalInitial[product.id] = product.physical_stock_quantity || 0;
+      });
+      setStockUpdates(initial);
+      setPhysicalUpdates(physicalInitial);
+    }
+  }, [externalProducts]);
 
   const setStock = (productId: string, value: string) => {
     const next = Math.max(0, parseInt(value, 10) || 0);
@@ -138,10 +174,34 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">Controle de estoque</h1>
-        <p className="mt-1 text-sm font-semibold text-gray-500">
-          Informe o estoque fisico, abra a quantidade da praia e feche o dia devolvendo as sobras.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">Controle de estoque</h1>
+            <p className="mt-1 text-sm font-semibold text-gray-500">
+              Cada quiosque controla seu estoque central e o estoque levado para a praia.
+            </p>
+          </div>
+          {onAddProduct && (
+            <button
+              type="button"
+              onClick={onAddProduct}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-4 py-3 font-black text-white shadow-sm transition hover:bg-[#E56000] active:scale-95"
+            >
+              <Plus size={18} />
+              Adicionar produto
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <p className="text-xs font-black uppercase text-blue-700">Estoque central</p>
+            <p className="mt-1 text-sm font-bold text-blue-900">Quantidade fisica guardada no quiosque.</p>
+          </div>
+          <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
+            <p className="text-xs font-black uppercase text-orange-700">Estoque praia</p>
+            <p className="mt-1 text-sm font-bold text-orange-900">Quantidade disponivel para venda no cardapio do cliente.</p>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -160,7 +220,7 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
 
       {Object.keys(grouped).length === 0 && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm font-bold text-gray-500">
-          Nenhum produto ativo encontrado para abertura.
+          Nenhum produto cadastrado para este quiosque.
         </div>
       )}
 
@@ -180,15 +240,26 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
                   className="flex flex-col gap-3 rounded-xl bg-gray-50 p-3 transition hover:bg-gray-100 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-black text-gray-900">{product.name}</p>
-                    <p className="text-sm font-semibold text-gray-500">R$ {product.price.toFixed(2)}</p>
-                    <p className="text-xs font-bold text-gray-500">
-                      Fisico: {product.physical_stock_quantity || 0} un. | Praia: {product.beach_stock_quantity ?? product.stock_quantity ?? 0} un.
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-gray-300">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Utensils size={18} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-900">{product.name}</p>
+                        <p className="text-sm font-semibold text-gray-500">R$ {product.price.toFixed(2)}</p>
+                        <p className="text-xs font-bold text-gray-500">
+                          Central: {product.physical_stock_quantity || 0} un. | Praia: {product.beach_stock_quantity ?? product.stock_quantity ?? 0} un.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <span className="text-xs font-black uppercase text-gray-500">Fisico</span>
+                    <span className="text-xs font-black uppercase text-blue-700">Central</span>
                     <input
                       type="number"
                       min="0"
@@ -198,7 +269,7 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
                       className="h-10 w-20 rounded-lg border border-gray-300 px-3 text-center font-black outline-none focus:border-[#FF6B00] disabled:bg-gray-100"
                       aria-label={`Estoque fisico de ${product.name}`}
                     />
-                    <span className="text-xs font-black uppercase text-gray-500">Praia</span>
+                    <span className="text-xs font-black uppercase text-orange-700">Praia</span>
                     <button
                       type="button"
                       onClick={() => stepStock(product.id, -1)}
@@ -234,6 +305,26 @@ export default function OpeningDayStockControl({ vendorId: vendorIdProp }: { ven
                       <span className="rounded-lg bg-red-100 px-2 py-1 text-xs font-black text-red-700">Sem estoque</span>
                     ) : (
                       <span className="rounded-lg bg-green-100 px-2 py-1 text-xs font-black text-green-700">OK</span>
+                    )}
+                    {onEditProduct && (
+                      <button
+                        type="button"
+                        onClick={() => onEditProduct(product)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 hover:text-gray-900"
+                        aria-label={`Alterar produto ${product.name}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
+                    {onDeleteProduct && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteProduct(product.id)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-100 bg-white text-red-400 hover:bg-red-50 hover:text-red-600"
+                        aria-label={`Deletar produto ${product.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     )}
                   </div>
                 </div>

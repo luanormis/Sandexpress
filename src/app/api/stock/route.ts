@@ -152,9 +152,8 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('products')
-      .select('id, name, category, price, stock_tracking_enabled, physical_stock_quantity, beach_stock_quantity, stock_quantity, blocked_by_stock, active')
+      .select('id, name, category, price, promotional_price, description, image_url, is_combo, sort_order, stock_tracking_enabled, physical_stock_quantity, beach_stock_quantity, stock_quantity, blocked_by_stock, active')
       .eq('vendor_id', vendor_id)
-      .eq('active', true)
       .order('sort_order');
 
     if (error) throw error;

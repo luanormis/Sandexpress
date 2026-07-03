@@ -87,4 +87,19 @@ describe('product stock write normalization', () => {
       blocked_by_stock: false,
     });
   });
+
+  it('unblocks products when active beach stock is restored', () => {
+    expect(normalizeProductStockForWrite({
+      stock_tracking_enabled: true,
+      physical_stock_quantity: 30,
+      beach_stock_quantity: 5,
+      blocked_by_stock: true,
+    })).toEqual({
+      stock_tracking_enabled: true,
+      stock_quantity: 5,
+      physical_stock_quantity: 30,
+      beach_stock_quantity: 5,
+      blocked_by_stock: false,
+    });
+  });
 });

@@ -8,7 +8,6 @@ import {
   Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { getProductStockStatus } from "@/lib/product-stock";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
@@ -253,6 +252,7 @@ export default function VendorDashboard() {
   const [productFilter, setProductFilter] = useState("Todos");
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productModalMode, setProductModalMode] = useState<"stock" | "menu">("stock");
 
   // --- Umbrellas State ---
   const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
@@ -1214,7 +1214,44 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 2: CARDÁPIO ========== */}
           {activeTab === "stock" && (
-            <OpeningDayStockControl vendorId={vendorId || undefined} />
+            <OpeningDayStockControl
+              vendorId={vendorId || undefined}
+              products={products}
+              onProductsLoaded={(loaded) => setProducts(loaded.map((product) => ({
+                ...product,
+                promotional_price: product.promotional_price ?? null,
+                description: product.description || "",
+                image_url: product.image_url || "",
+                is_combo: Boolean(product.is_combo),
+                stock_tracking_enabled: Boolean(product.stock_tracking_enabled),
+                physical_stock_quantity: product.physical_stock_quantity ?? 0,
+                beach_stock_quantity: product.beach_stock_quantity ?? 0,
+                blocked_by_stock: product.blocked_by_stock ?? false,
+                sort_order: product.sort_order ?? 0,
+              })))}
+              onAddProduct={() => {
+                setEditingProduct(null);
+                setProductModalMode("stock");
+                setShowProductModal(true);
+              }}
+              onEditProduct={(product) => {
+                setEditingProduct({
+                  ...product,
+                  promotional_price: product.promotional_price ?? null,
+                  description: product.description || "",
+                  image_url: product.image_url || "",
+                  is_combo: Boolean(product.is_combo),
+                  stock_tracking_enabled: Boolean(product.stock_tracking_enabled),
+                  physical_stock_quantity: product.physical_stock_quantity ?? 0,
+                  beach_stock_quantity: product.beach_stock_quantity ?? 0,
+                  blocked_by_stock: product.blocked_by_stock ?? false,
+                  sort_order: product.sort_order ?? 0,
+                });
+                setProductModalMode("stock");
+                setShowProductModal(true);
+              }}
+              onDeleteProduct={deleteProduct}
+            />
           )}
 
 
@@ -1223,15 +1260,12 @@ export default function VendorDashboard() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                   <div>
-                    <h3 className="font-bold text-lg">Seus Produtos</h3>
+                    <h3 className="font-bold text-lg">Cardapio do cliente</h3>
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
                   </div>
-                  <button
-                    onClick={() => { setEditingProduct(null); setShowProductModal(true); }}
-                    className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 hover:bg-[#E56000] active:scale-95 transition-all"
-                  >
-                    <Plus size={20} /> Adicionar Item
-                  </button>
+                  <p className="rounded-xl bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700">
+                    Cadastro e estoque ficam na aba Estoque
+                  </p>
                 </div>
 
                 {/* Category filter */}
@@ -1252,22 +1286,18 @@ export default function VendorDashboard() {
 
                 {/* Products table */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-[760px] w-full text-left">
+                  <table className="min-w-[720px] w-full text-left">
                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                       <tr>
                         <th className="p-3 rounded-tl-lg">Produto</th>
-                        <th className="p-3">Categoria</th>
                         <th className="p-3">Preço</th>
-                        <th className="p-3">Promo</th>
-                        <th className="p-3">Estoque</th>
+                        <th className="p-3">Promocao/Combo</th>
                         <th className="p-3">Status</th>
                         <th className="p-3 rounded-tr-lg">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProducts.map(p => {
-                        const stockStatus = getProductStockStatus(p);
-                        return (
+                      {filteredProducts.map(p => (
                         <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                           <td className="p-3">
                             <div className="flex items-center gap-3">
@@ -1280,28 +1310,19 @@ export default function VendorDashboard() {
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900">{p.name}</p>
-                                <p className="text-xs text-gray-400 truncate max-w-[200px]">{p.description}</p>
+                                <p className="text-xs text-gray-400 truncate max-w-[200px]">{p.is_combo ? "Combo" : p.category}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3">
-                            <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">
-                              {p.is_combo ? "🎁 " : ""}{p.category}
-                            </span>
-                          </td>
                           <td className="p-3 font-bold text-gray-900">{formatCurrency(p.price)}</td>
-                          <td className="p-3 text-[#FF6B00] font-bold">{p.promotional_price ? formatCurrency(p.promotional_price) : "—"}</td>
                           <td className="p-3">
                             <div className="flex flex-col gap-1">
-                              <span className={cn(
-                                "w-fit rounded-full px-2.5 py-1 text-xs font-black",
-                                stockStatus.tone === "ok" && "bg-green-100 text-green-700",
-                                stockStatus.tone === "blocked" && "bg-red-100 text-red-700",
-                                stockStatus.tone === "neutral" && "bg-gray-100 text-gray-500"
-                              )}>
-                                {stockStatus.label}
+                              <span className={cn("w-fit rounded-full px-2.5 py-1 text-xs font-black", p.promotional_price ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500")}>
+                                {p.promotional_price ? formatCurrency(p.promotional_price) : "Sem promocao"}
                               </span>
-                              <span className="text-xs font-bold text-gray-400">Praia: {stockStatus.quantityLabel}</span>
+                              {p.is_combo && (
+                                <span className="w-fit rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-700">Combo</span>
+                              )}
                             </div>
                           </td>
                           <td className="p-3">
@@ -1314,17 +1335,21 @@ export default function VendorDashboard() {
                           </td>
                           <td className="p-3">
                             <div className="flex gap-1">
-                              <button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors">
+                              <button
+                                onClick={() => {
+                                  setEditingProduct(p);
+                                  setProductModalMode("menu");
+                                  setShowProductModal(true);
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors"
+                                title="Alterar preco, promocao e combo"
+                              >
                                 <Pencil size={16} />
-                              </button>
-                              <button onClick={() => deleteProduct(p.id)} className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors">
-                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
                         </tr>
-                        );
-                      })}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -2085,8 +2110,9 @@ export default function VendorDashboard() {
         <ProductModal
           product={editingProduct}
           vendorId={vendorId}
+          mode={productModalMode}
           onSave={saveProduct}
-          onClose={() => { setShowProductModal(false); setEditingProduct(null); }}
+          onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductModalMode("stock"); }}
         />
       )}
 
@@ -2323,7 +2349,19 @@ function PaymentMethodModal({
 // =========================================================
 // PRODUCT MODAL COMPONENT
 // =========================================================
-function ProductModal({ product, vendorId, onSave, onClose }: { product: Product | null; vendorId: string | null; onSave: (p: Product) => Promise<void> | void; onClose: () => void }) {
+function ProductModal({
+  product,
+  vendorId,
+  mode = "stock",
+  onSave,
+  onClose,
+}: {
+  product: Product | null;
+  vendorId: string | null;
+  mode?: "stock" | "menu";
+  onSave: (p: Product) => Promise<void> | void;
+  onClose: () => void;
+}) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
     description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false,
@@ -2332,8 +2370,10 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
   });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string }>>([]);
+  const isMenuMode = mode === "menu";
 
   useEffect(() => {
+    if (isMenuMode) return;
     let cancelled = false;
     async function loadDefaultImages() {
       try {
@@ -2350,7 +2390,7 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
     return () => {
       cancelled = true;
     };
-  }, [form.category]);
+  }, [form.category, isMenuMode]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2376,11 +2416,20 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h3 className="text-xl font-display font-bold">{product ? "Editar Produto" : "Novo Produto"}</h3>
+          <h3 className="text-xl font-display font-bold">{isMenuMode ? "Alterar cardapio" : product ? "Editar Produto" : "Novo Produto"}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
 
         <div className="p-6 space-y-4">
+          {isMenuMode && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-black uppercase text-gray-500">Produto</p>
+              <p className="mt-1 font-black text-gray-900">{form.name}</p>
+              <p className="text-sm font-bold text-gray-500">{form.category}</p>
+            </div>
+          )}
+          {!isMenuMode && (
+            <>
           {/* Image upload */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Foto do Produto</label>
@@ -2444,6 +2493,9 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
             />
           </div>
 
+            </>
+          )}
+
           {/* Price row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -2466,19 +2518,20 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
             </div>
           </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
-            <select
-              value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
-            >
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
+          {!isMenuMode && (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
+              <select
+                value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
+                className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+              >
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* Toggles */}
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -2497,28 +2550,30 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
               />
               <span className="text-sm font-bold text-gray-700">Disponível no cardápio</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(form.stock_tracking_enabled)}
-                onChange={e => {
-                  const enabled = e.target.checked;
-                  setForm(prev => ({
-                    ...prev,
-                    stock_tracking_enabled: enabled,
-                    stock_quantity: enabled ? prev.stock_quantity : null,
-                    physical_stock_quantity: enabled ? prev.physical_stock_quantity : 0,
-                    beach_stock_quantity: enabled ? prev.beach_stock_quantity : 0,
-                    blocked_by_stock: enabled ? prev.blocked_by_stock : false,
-                  }));
-                }}
-                className="w-5 h-5 accent-[#FF6B00]"
-              />
-              <span className="text-sm font-bold text-gray-700">Contabilizar estoque</span>
-            </label>
+            {!isMenuMode && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.stock_tracking_enabled)}
+                  onChange={e => {
+                    const enabled = e.target.checked;
+                    setForm(prev => ({
+                      ...prev,
+                      stock_tracking_enabled: enabled,
+                      stock_quantity: enabled ? prev.stock_quantity : null,
+                      physical_stock_quantity: enabled ? prev.physical_stock_quantity : 0,
+                      beach_stock_quantity: enabled ? prev.beach_stock_quantity : 0,
+                      blocked_by_stock: enabled ? prev.blocked_by_stock : false,
+                    }));
+                  }}
+                  className="w-5 h-5 accent-[#FF6B00]"
+                />
+                <span className="text-sm font-bold text-gray-700">Contabilizar estoque</span>
+              </label>
+            )}
           </div>
 
-          {form.stock_tracking_enabled && (
+          {!isMenuMode && form.stock_tracking_enabled && (
             <div className="grid grid-cols-1 gap-4 rounded-xl border border-orange-100 bg-orange-50 p-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Estoque fisico</label>
@@ -2562,7 +2617,7 @@ function ProductModal({ product, vendorId, onSave, onClose }: { product: Product
             onClick={() => { if (form.name && form.price) onSave(form); }}
             className="flex-1 py-3 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] active:scale-95 transition-all"
           >
-            {product ? "Salvar Alterações" : "Adicionar Produto"}
+            {isMenuMode ? "Salvar cardapio" : product ? "Salvar alteracoes" : "Adicionar Produto"}
           </button>
         </div>
       </div>
