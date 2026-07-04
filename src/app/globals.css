@@ -223,23 +223,19 @@ input[type="number"] {
   justify-content: center;
   overflow: hidden;
   border-radius: 999rem;
-  background: #ffffff;
+  background: transparent;
   color: var(--customer-primary);
-  box-shadow: 0 1.25rem 3rem rgba(31, 41, 51, 0.18);
+  box-shadow: none;
 }
 
 .customer-logo--small {
   width: clamp(3.5rem, 15vw, 4.5rem);
-  border-radius: 1.25rem;
-  border: 0.0625rem solid var(--customer-border);
-  box-shadow: none;
 }
 
 .customer-logo img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: clamp(0.45rem, 2vw, 0.8rem);
 }
 
 .customer-brand-label {
@@ -509,16 +505,14 @@ input[type="number"] {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 0.0625rem solid var(--customer-border);
   border-radius: 1rem;
-  background: #ffffff;
+  background: transparent;
 }
 
 .customer-avatar img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 0.35rem;
 }
 
 .customer-name {

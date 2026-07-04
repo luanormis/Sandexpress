@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { Bell, Home, ListOrdered, Minus, Plus, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
-import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
 import { isValidBrazilPhoneWithDdd, normalizeBrazilPhoneWithDdd } from "@/lib/phone";
@@ -544,7 +543,6 @@ export default function CustomerApp() {
           <button onClick={() => setStep("login")} className="customer-action">
             Comecar pedido
           </button>
-          <InstallShortcutButton context="customer" className="customer-action" />
         </section>
         {sandExpressMark}
       </main>
