@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
+import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithoutConsumption } from "@/lib/vendor-order-state";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
 const SERVICE_REQUEST_MARKERS = [
@@ -79,15 +80,11 @@ function getServiceRequest(order?: Pick<Order, "notes"> | null) {
 }
 
 function getVisibleOrderNotes(notes?: string) {
-  return (notes || "")
-    .split("\n")
-    .filter(line => !SERVICE_REQUEST_MARKERS.some(request => line.includes(request.marker)))
-    .join("\n")
-    .trim();
+  return getVisibleVendorOrderNotes(notes, SERVICE_REQUEST_MARKERS.map((request) => request.marker));
 }
 
-function isOrderEmpty(order: Pick<Order, "total" | "items">) {
-  return (order.items || []).filter((item) => !item.cancelled).length === 0;
+function isOrderEmpty(order: Pick<Order, "total" | "items" | "account_items">) {
+  return isAccountWithoutConsumption(order);
 }
 
 function getFirstCustomerName(name?: string | null) {
@@ -1106,7 +1103,7 @@ export default function VendorDashboard() {
                     {serviceRequest.shortLabel}
                   </span>
                 )}
-                {!serviceRequest && emptyAccount && (
+                {!serviceRequest && emptyAccount && !firstCustomerName && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-white/90 px-1 py-0.5 text-[9px] font-black uppercase text-gray-500">
                     Vazio
                   </span>
@@ -2174,6 +2171,7 @@ function OrderModal({
 }) {
   const serviceRequest = getServiceRequest(order);
   const emptyAccount = isOrderEmpty(order);
+  const visibleItems = getVisibleConsumptionItems(order, Boolean(order.active_request));
   const next = emptyAccount ? null : order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
@@ -2224,9 +2222,9 @@ function OrderModal({
               {order.active_request ? "Itens deste pedido" : "Itens da comanda"}
             </h4>
             <div className="space-y-2">
-              {(order.items || []).length === 0 ? (
+              {visibleItems.length === 0 ? (
                 <p className="rounded-lg bg-gray-50 p-3 text-sm font-bold text-gray-400">Comanda aberta sem itens.</p>
-              ) : (order.items || []).map((item, index) => (
+              ) : visibleItems.map((item, index) => (
                 <div key={`${item.id || item.n}-${index}`} className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 text-sm",
                   item.cancelled && "bg-gray-50 text-gray-400 line-through"
