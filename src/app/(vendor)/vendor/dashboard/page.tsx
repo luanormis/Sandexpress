@@ -1076,6 +1076,7 @@ export default function VendorDashboard() {
             const emptyAccount = order ? isOrderEmpty(order) : false;
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
             const firstCustomerName = getFirstCustomerName(order?.customer);
+            const accountTotal = order ? formatCurrency(Number(order.total || 0)) : '';
             return (
               <button
                 key={umbrella.id}
@@ -1095,6 +1096,11 @@ export default function VendorDashboard() {
                   {firstCustomerName && (
                     <span className="mt-0.5 max-w-full truncate text-[10px] font-black opacity-80">
                       {firstCustomerName}
+                    </span>
+                  )}
+                  {firstCustomerName && accountTotal && (
+                    <span className="mt-0.5 max-w-full truncate text-[9px] font-black opacity-90">
+                      {accountTotal}
                     </span>
                   )}
                 </span>
