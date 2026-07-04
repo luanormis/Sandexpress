@@ -2,8 +2,16 @@ export function cleanPhoneDigits(input: unknown) {
   return String(input || '').replace(/\D/g, '');
 }
 
-export function isValidBrazilPhoneWithDdd(input: unknown) {
+export function stripBrazilCountryCode(input: unknown) {
   const digits = cleanPhoneDigits(input);
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+export function isValidBrazilPhoneWithDdd(input: unknown) {
+  const digits = stripBrazilCountryCode(input);
   if (!/^\d{10,11}$/.test(digits)) return false;
 
   const ddd = Number(digits.slice(0, 2));
@@ -16,7 +24,7 @@ export function isValidBrazilPhoneWithDdd(input: unknown) {
 }
 
 export function normalizeBrazilPhoneWithDdd(input: unknown) {
-  const digits = cleanPhoneDigits(input);
+  const digits = stripBrazilCountryCode(input);
   if (!isValidBrazilPhoneWithDdd(digits)) {
     throw new Error('Informe um telefone valido com DDD. Exemplo: 1196041957.');
   }

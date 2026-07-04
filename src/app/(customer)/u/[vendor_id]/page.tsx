@@ -3,11 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
-import { Bell, Home, ListOrdered, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
+import { Bell, Home, ListOrdered, Minus, Plus, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
-import { cleanPhoneDigits, isValidBrazilPhoneWithDdd } from "@/lib/phone";
+import { isValidBrazilPhoneWithDdd, normalizeBrazilPhoneWithDdd } from "@/lib/phone";
+import {
+  CUSTOMER_MENU_CATEGORIES,
+  CustomerMenuCategory,
+  filterCustomerMenuProducts,
+  getCustomerMenuThumbnail,
+} from "@/lib/customer-menu";
 
 type Product = {
   id: string;
@@ -85,9 +91,10 @@ export default function CustomerApp() {
   const [splitMode, setSplitMode] = useState<"full" | "partial" | "split">("full");
   const [splitPeople, setSplitPeople] = useState(2);
   const [partialAmount, setPartialAmount] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Todos");
+  const [activeCategory, setActiveCategory] = useState<CustomerMenuCategory>("Bebidas");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [welcomeMessage, setWelcomeMessage] = useState("");
   const [waiterCalled, setWaiterCalled] = useState(false);
   const [lastAddedProductId, setLastAddedProductId] = useState("");
   const [satisfactionOrderId, setSatisfactionOrderId] = useState("");
@@ -96,7 +103,7 @@ export default function CustomerApp() {
   const [satisfactionLoading, setSatisfactionLoading] = useState(false);
   const [features, setFeatures] = useState<FeatureFlags>({});
 
-  const categories = useMemo(() => ["Todos", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
+  const visibleProducts = useMemo(() => filterCustomerMenuProducts(products, activeCategory), [activeCategory, products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const ordersTotal = orders
@@ -225,8 +232,10 @@ export default function CustomerApp() {
       setError("Informe um telefone valido com DDD. Exemplo: 1196041957.");
       return;
     }
+    const normalizedPhone = normalizeBrazilPhoneWithDdd(phone);
     setLoading(true);
     setError("");
+    setWelcomeMessage("");
     try {
       const res = await fetch("/api/customers/login", {
         method: "POST",
@@ -234,7 +243,7 @@ export default function CustomerApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          phone: cleanPhoneDigits(phone),
+          phone: normalizedPhone,
           vendor_id: vendor.id,
           umbrella_id: umbrellaId,
           party_size: partySize,
@@ -248,10 +257,11 @@ export default function CustomerApp() {
       setCustomerId(data.id || data.customer_id);
       setCurrentOrderId(data.current_order_id || "");
       setCustomerName(data.name || name);
+      setWelcomeMessage(data.message || "");
       sessionStorage.setItem(`sandexpress_user_${umbrellaId}`, JSON.stringify({
         customer_id: data.id || data.customer_id,
         name: data.name || name,
-        phone: data.phone || phone,
+        phone: data.phone || normalizedPhone,
         party_size: data.party_size || partySize,
       }));
       await loadCustomerOrders(data.id || data.customer_id, vendor.id);
@@ -323,6 +333,10 @@ export default function CustomerApp() {
     setCart((prev) => prev
       .map((item) => item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item)
       .filter((item) => item.quantity > 0));
+  }
+
+  function getCartQuantity(productId: string) {
+    return cart.find((item) => item.product.id === productId)?.quantity || 0;
   }
 
   async function createOrder() {
@@ -539,8 +553,8 @@ export default function CustomerApp() {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" aria-label="Nome completo" className="customer-input" />
             <input
               value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
-              placeholder="Telefone com DDD. Ex: 1196041957"
+              onChange={(e) => setPhone(e.target.value.replace(/[^\d+()\-\s]/g, "").slice(0, 20))}
+              placeholder="Telefone com DDD. Ex: +55 11 9604-1957"
               aria-label="Telefone com DDD"
               inputMode="tel"
               className="customer-input"
@@ -621,6 +635,7 @@ export default function CustomerApp() {
           )}
         </div>
         {waiterCalled && <p className="customer-feedback">Solicitacao enviada ao quiosque.</p>}
+        {welcomeMessage && <p className="customer-feedback">{welcomeMessage}</p>}
         {error && <p className="customer-error">{error}</p>}
         <div className="customer-total-card">
           <p className="customer-kicker">Total da conta</p>
@@ -636,7 +651,7 @@ export default function CustomerApp() {
       {step === "menu" && (
         <section className="customer-content">
           <div className="customer-category-rail">
-            {categories.map((category) => (
+            {CUSTOMER_MENU_CATEGORIES.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
@@ -647,29 +662,46 @@ export default function CustomerApp() {
             ))}
           </div>
           <div className="customer-list">
-            {products.filter((p) => activeCategory === "Todos" || p.category === activeCategory).map((product) => (
-              <article key={product.id} className="customer-product-row">
-                {product.image_url && (
-                  <div className="customer-product-media">
-                    <img src={product.image_url} alt={product.name} />
+            {visibleProducts.length === 0 ? (
+              <p className="customer-empty">Nenhum produto nesta categoria.</p>
+            ) : visibleProducts.map((product) => {
+              const quantity = getCartQuantity(product.id);
+              return (
+                <article key={product.id} className={`customer-product-row${lastAddedProductId === product.id ? " is-added" : ""}`}>
+                  {product.image_url && (
+                    <div className="customer-product-media">
+                      <img src={getCustomerMenuThumbnail(product.image_url)} alt={product.name} loading="lazy" decoding="async" />
+                    </div>
+                  )}
+                  <div className="customer-product-info">
+                    <h2 className="customer-product-name">{product.name}</h2>
+                    <p className="customer-product-description">{product.description || product.category}</p>
+                    <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
                   </div>
-                )}
-                <div className="customer-product-info">
-                  <h2 className="customer-product-name">{product.name}</h2>
-                  {product.description && <p className="customer-product-description">{product.description}</p>}
-                </div>
-                <div className="customer-product-side">
-                  <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
-                  <button
-                    onClick={() => addToCart(product)}
-                    className={`customer-add-button${lastAddedProductId === product.id ? " is-added" : ""}`}
-                    aria-label={`Adicionar ${product.name} ao carrinho`}
-                  >
-                    {lastAddedProductId === product.id ? "Adicionado" : "Adicionar"}
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="customer-product-side">
+                    {quantity > 0 ? (
+                      <div className="customer-qty customer-qty--compact">
+                        <button onClick={() => updateQuantity(product.id, -1)} className="customer-qty-button" aria-label={`Remover ${product.name}`}>
+                          <Minus size="1rem" />
+                        </button>
+                        <span>{quantity}</span>
+                        <button onClick={() => addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}>
+                          <Plus size="1rem" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="customer-add-button"
+                        aria-label={`Adicionar ${product.name} ao carrinho`}
+                      >
+                        <Plus size="1.15rem" />
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
           {cartItemsCount > 0 && (
             <div className="customer-cart-dock" role="status" aria-live="polite">

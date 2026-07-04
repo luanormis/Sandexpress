@@ -5,6 +5,8 @@ describe('phone helpers', () => {
     expect(isValidBrazilPhoneWithDdd('1196041957')).toBe(true);
     expect(isValidBrazilPhoneWithDdd('(11) 99604-1957')).toBe(true);
     expect(normalizeBrazilPhoneWithDdd('(11) 9604-1957')).toBe('1196041957');
+    expect(normalizeBrazilPhoneWithDdd('+55 (11) 99604-1957')).toBe('11996041957');
+    expect(normalizeBrazilPhoneWithDdd('55 11 9604-1957')).toBe('1196041957');
   });
 
   it('rejects phones without DDD or fake repeated digits', () => {

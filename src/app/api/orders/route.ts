@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
+import { mapOrderForKanban } from '@/lib/order-kanban';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
 const MAX_ORDER_ITEMS = 50;
@@ -101,39 +102,15 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) throw error;
     const mapped = (data || []).map((order: any) => {
-      const requests = (order.customer_order_requests || [])
-        .sort((a: any, b: any) => Number(a.sequence || 0) - Number(b.sequence || 0));
-      const activeRequest = [...requests]
-        .reverse()
-        .find((request: any) => ['received', 'preparing', 'delivering'].includes(String(request.status)));
-      const accountItems = (order.order_items || []).map((item: any) => ({
-        id: item.id,
-        order_request_id: item.order_request_id,
-        q: item.quantity,
-        n: item.products?.name || 'Produto',
-        subtotal: Number(item.subtotal || 0),
-        cancelled: Boolean(item.cancelled),
-      }));
-      const activeItems = activeRequest
-        ? accountItems.filter((item: any) => item.order_request_id === activeRequest.id)
-        : accountItems.filter((item: any) => !item.cancelled);
-      const effectiveStatus = activeRequest?.status || order.status;
-
+      const mappedOrder = mapOrderForKanban(order);
       return {
-        ...order,
-        status: effectiveStatus,
-        account_status: order.status,
-        active_request: activeRequest || null,
-        active_request_id: activeRequest?.id || null,
+        ...mappedOrder,
         umbrella: order.umbrellas?.number ?? 0,
         customer: order.customers?.name ?? 'Cliente',
         phone: order.customers?.phone ?? '',
-        time: activeRequest?.created_at
-          ? new Date(activeRequest.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        time: mappedOrder.active_request?.created_at
+          ? new Date(mappedOrder.active_request.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           : order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-        requests,
-        account_items: accountItems,
-        items: activeItems,
       };
     });
     return NextResponse.json(mapped);

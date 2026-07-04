@@ -4,8 +4,7 @@ import { isRateLimited } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { normalizeBrazilPhoneWithDdd } from '@/lib/phone';
-
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'closing_requested'];
+import { OPEN_ACCOUNT_STATUSES } from '@/lib/order-account';
 
 async function ensureOpenAccount({
   tenantId,
@@ -149,7 +148,7 @@ export async function POST(req: NextRequest) {
         .eq('vendor_id', vendor_id)
         .eq('umbrella_id', umbrella_id)
         .eq('paid', false)
-        .in('status', ['received', 'preparing', 'delivering', 'closing_requested'])
+        .in('status', OPEN_ACCOUNT_STATUSES)
         .order('created_at', { ascending: true })
         .limit(1);
 
@@ -187,7 +186,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: account.error }, { status: 409 });
       }
       const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id }, 12 * 60 * 60);
-      const response = NextResponse.json({ ...updated, current_order_id: account?.orderId || null });
+      const response = NextResponse.json({
+        ...updated,
+        current_order_id: account?.orderId || null,
+        returning_customer: true,
+        message: `Bem-vindo(a) de volta, ${updated.name || name}!`,
+      });
       response.cookies.set({
         name: 'customer_session',
         value: token,
@@ -223,7 +227,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: account.error }, { status: 409 });
     }
     const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id }, 12 * 60 * 60);
-    const response = NextResponse.json({ ...newCustomer, current_order_id: account?.orderId || null }, { status: 201 });
+    const response = NextResponse.json({
+      ...newCustomer,
+      current_order_id: account?.orderId || null,
+      returning_customer: false,
+    }, { status: 201 });
     response.cookies.set({
       name: 'customer_session',
       value: token,

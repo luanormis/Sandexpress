@@ -1177,7 +1177,7 @@ export default function VendorDashboard() {
           {activeTab === "orders" && (
             <div className="space-y-4">
               {renderBeachMap()}
-              <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-3">
                 {renderCompactKanbanColumn(
                   "Mesa aberta",
                   (order) => !order.paid && order.status !== "closing_requested" && Number(order.total || 0) <= 0,
@@ -1192,13 +1192,6 @@ export default function VendorDashboard() {
                   "completed",
                   "bg-blue-500",
                   { pulse: true }
-                )}
-                {renderCompactKanbanColumn(
-                  "Entregue",
-                  (order) => !order.paid && order.status === "completed",
-                  "Fechar conta",
-                  "closing_requested",
-                  "bg-green-500"
                 )}
                 {renderCompactKanbanColumn(
                   "Fechar conta",
