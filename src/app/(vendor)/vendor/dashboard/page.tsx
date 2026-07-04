@@ -14,8 +14,6 @@ import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithou
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
 const SERVICE_REQUEST_MARKERS = [
   { marker: "[WAITER_CALL]", label: "Solicitando atendente", shortLabel: "Atendente", tone: "waiter" },
-  { marker: "[CLEANING_REQUEST]", label: "Solicitando limpeza", shortLabel: "Limpeza", tone: "waiter" },
-  { marker: "[UMBRELLA_TRANSFER]", label: "Solicitando troca de guarda-sol", shortLabel: "Troca", tone: "waiter" },
 ];
 
 // ---------- TYPES ----------
@@ -1725,7 +1723,7 @@ export default function VendorDashboard() {
                   <div>
                     <h3 className="text-lg font-black text-gray-900">Formas de pagamento</h3>
                     <p className="text-sm font-semibold text-gray-500">
-                      Cadastre meios aceitos, taxas, prazo de recebimento e deixe preparado para ativar API de pagamento.
+                      Cadastre meios aceitos, taxas e prazo de recebimento deste quiosque.
                     </p>
                   </div>
                   <button
@@ -1742,10 +1740,9 @@ export default function VendorDashboard() {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
-                {PAYMENT_SETTINGS.map(({ id, label, Icon, feeField, typeField, fixedField, daysField, activeField, apiField }) => {
+                {PAYMENT_SETTINGS.map(({ id, label, Icon, feeField, typeField, fixedField, daysField, activeField }) => {
                   const feeType = (themeForm[typeField as keyof KioskTheme] === "fixed" ? "fixed" : "percent") as PaymentFeeType;
                   const active = themeForm[activeField as keyof KioskTheme] !== false;
-                  const apiEnabled = themeForm[apiField as keyof KioskTheme] === true;
                   return (
                     <section key={id} className={cn("rounded-2xl border bg-white p-5 shadow-sm", active ? "border-gray-100" : "border-gray-200 opacity-75")}>
                       <div className="flex items-start justify-between gap-4">
@@ -1816,20 +1813,6 @@ export default function VendorDashboard() {
                         </label>
                       </div>
 
-                      <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
-                        <label className="flex items-center justify-between gap-3 text-sm font-black text-gray-700">
-                          <span>Preparar para API de pagamento</span>
-                          <input
-                            type="checkbox"
-                            checked={apiEnabled}
-                            onChange={(event) => setThemeForm(prev => ({ ...prev, [apiField]: event.target.checked }))}
-                            className="h-4 w-4 accent-[#FF6B00]"
-                          />
-                        </label>
-                        <p className="mt-2 text-xs font-semibold text-gray-400">
-                          Reserva a configuracao deste meio para integracao futura sem alterar o fluxo atual de caixa.
-                        </p>
-                      </div>
                     </section>
                   );
                 })}

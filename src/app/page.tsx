@@ -169,7 +169,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
-              <Image src="/logo-sandexpress.png" alt="SandExpress" width={76} height={43} priority className="drop-shadow-sm" />
+              <Image src="/logo-sandexpress.png" alt="SandExpress" width={104} height={59} priority className="h-12 w-auto object-contain sm:h-14" />
               <span className="font-display font-bold text-xl sm:text-2xl text-[#261812]">SandExpress</span>
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-br from-[#ff6b00] via-[#ffb693] to-[#fff8f6]" />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sand.png')] opacity-10 mix-blend-overlay"></div>
         <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
-          <Image src="/logo-sandexpress.png" alt="" width={128} height={72} priority className="mx-auto mb-6 drop-shadow-xl" />
+          <Image src="/logo-sandexpress.png" alt="" width={220} height={124} priority className="mx-auto mb-6 h-28 w-auto object-contain sm:h-36" />
           <span className="bg-white/45 text-[#572000] px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
             Seu quiosque vendendo mais, sem esforço.

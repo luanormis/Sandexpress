@@ -484,7 +484,7 @@ export default function CustomerApp() {
     }
   }
 
-  async function requestService(requestType: "waiter_call" | "cleaning_request" | "umbrella_transfer") {
+  async function requestService(requestType: "waiter_call") {
     if (!vendor || !customerId) {
       setError("Abra a comanda antes de solicitar atendimento.");
       return;
@@ -637,18 +637,6 @@ export default function CustomerApp() {
               </button>
             )}
           </div>
-        </div>
-        <div className="customer-service-actions" aria-label="Solicitacoes do guarda-sol">
-          {featureEnabled("cleaning_request") && (
-            <button type="button" onClick={() => requestService("cleaning_request")}>
-              Limpeza
-            </button>
-          )}
-          {featureEnabled("umbrella_transfer") && (
-            <button type="button" onClick={() => requestService("umbrella_transfer")}>
-              Trocar guarda-sol
-            </button>
-          )}
         </div>
         {waiterCalled && <p className="customer-feedback">Solicitacao enviada ao quiosque.</p>}
         {welcomeMessage && <p className="customer-feedback">{welcomeMessage}</p>}
