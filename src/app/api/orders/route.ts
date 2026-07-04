@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { mapOrderForKanban } from '@/lib/order-kanban';
+import { isCanonicalUuid } from '@/lib/uuid';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
 const MAX_ORDER_ITEMS = 50;
 const MAX_ITEM_QUANTITY = 50;
 
@@ -22,7 +22,7 @@ function normalizeOrderItems(items: unknown): IncomingOrderItem[] | null {
     const raw = item as { product_id?: unknown; quantity?: unknown };
     const productId = String(raw.product_id || '').trim();
     const quantity = Number(raw.quantity);
-    if (!UUID_RE.test(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ITEM_QUANTITY) {
+    if (!isCanonicalUuid(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ITEM_QUANTITY) {
       return null;
     }
     merged.set(productId, (merged.get(productId) || 0) + quantity);
@@ -127,9 +127,9 @@ export async function POST(req: NextRequest) {
     const safeNotes = normalizeNotes(notes);
 
     if (
-      !UUID_RE.test(String(vendor_id || '')) ||
-      !UUID_RE.test(String(customer_id || '')) ||
-      !UUID_RE.test(String(umbrella_id || '')) ||
+      !isCanonicalUuid(vendor_id) ||
+      !isCanonicalUuid(customer_id) ||
+      !isCanonicalUuid(umbrella_id) ||
       !normalizedItems
     ) {
       return NextResponse.json({ error: 'Dados de pedido incompletos.' }, { status: 400 });
