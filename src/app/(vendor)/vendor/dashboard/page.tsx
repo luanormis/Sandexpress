@@ -90,6 +90,10 @@ function isOrderEmpty(order: Pick<Order, "total" | "items">) {
   return (order.items || []).filter((item) => !item.cancelled).length === 0;
 }
 
+function getFirstCustomerName(name?: string | null) {
+  return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
 interface Umbrella {
   id: string;
   vendor_id: string;
@@ -1074,6 +1078,7 @@ export default function VendorDashboard() {
             const serviceRequest = getServiceRequest(order);
             const emptyAccount = order ? isOrderEmpty(order) : false;
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
+            const firstCustomerName = getFirstCustomerName(order?.customer);
             return (
               <button
                 key={umbrella.id}
@@ -1088,7 +1093,14 @@ export default function VendorDashboard() {
                 )}
                 title={serviceRequest ? `${serviceRequest.label} - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
               >
-                {umbrella.number}
+                <span className="flex h-full min-w-0 flex-col items-center justify-center px-1 leading-tight">
+                  <span>{umbrella.number}</span>
+                  {firstCustomerName && (
+                    <span className="mt-0.5 max-w-full truncate text-[10px] font-black opacity-80">
+                      {firstCustomerName}
+                    </span>
+                  )}
+                </span>
                 {serviceRequest && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-white/95 px-1 py-0.5 text-[9px] font-black uppercase text-red-600">
                     {serviceRequest.shortLabel}
