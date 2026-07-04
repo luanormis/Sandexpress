@@ -153,6 +153,31 @@ export default function CustomerApp() {
     setStep("login");
   }
 
+  function endCustomerSession(message = "Conta enviada ao quiosque. Para abrir outra comanda, faca login novamente.") {
+    sessionStorage.removeItem(`sandexpress_user_${umbrellaId}`);
+    setCustomerId("");
+    setCurrentOrderId("");
+    setCustomerName("");
+    setName("");
+    setPhone("");
+    setOtpCode("");
+    setOtpChallengeId("");
+    setOtpVerified(false);
+    setOtpMessage("");
+    setOrders([]);
+    setCart([]);
+    setNotes("");
+    setPartialAmount("");
+    setSplitMode("full");
+    setSatisfactionOrderId("");
+    setSatisfactionRating(0);
+    setSatisfactionSent(false);
+    setWaiterCalled(false);
+    setWelcomeMessage(message);
+    setError("");
+    setStep("login");
+  }
+
   async function loadCustomerOrders(nextCustomerId: string, nextVendorId: string) {
     if (!nextCustomerId || !nextVendorId) return;
     const res = await fetch(`/api/customers/${encodeURIComponent(nextCustomerId)}/orders?vendor_id=${encodeURIComponent(nextVendorId)}`, {
@@ -427,15 +452,7 @@ export default function CustomerApp() {
         setError(data.error || "Nao ha conta aberta para fechar.");
         return;
       }
-      const requestedOrderId = data.order?.id || currentOrderId;
-      setOrders((prev) => prev.map((order) => order.id === requestedOrderId ? { ...order, status: "closing_requested" } : order));
-      if (!orders.some((order) => order.id === requestedOrderId) && requestedOrderId) {
-        setOrders([{ id: requestedOrderId, total: Number(data.order?.total || ordersTotal), status: "closing_requested", created_at: data.order?.created_at || new Date().toISOString() }]);
-      }
-      setSatisfactionOrderId(requestedOrderId);
-      setSatisfactionRating(0);
-      setSatisfactionSent(false);
-      setStep("orders");
+      endCustomerSession(data.message || "Conta enviada ao quiosque. Para abrir outra comanda, faca login novamente.");
     } finally {
       setLoading(false);
     }
@@ -549,6 +566,7 @@ export default function CustomerApp() {
             </div>
           </div>
           <p className="customer-login__subtitle">Informe os dados para iniciar.</p>
+          {welcomeMessage && <p className="customer-feedback">{welcomeMessage}</p>}
           <div className="customer-form">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" aria-label="Nome completo" className="customer-input" />
             <input

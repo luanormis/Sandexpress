@@ -173,14 +173,34 @@ interface KioskTheme {
   button_color: string;
   button_text_color: string;
   logo_url: string;
+  cash_fee_rate?: number;
+  cash_fee_type?: PaymentFeeType;
+  cash_fixed_fee_amount?: number;
+  cash_payout_days?: number;
+  cash_active?: boolean;
+  cash_api_enabled?: boolean;
   debit_card_fee_rate?: number;
+  debit_card_fee_type?: PaymentFeeType;
+  debit_card_fixed_fee_amount?: number;
   credit_card_fee_rate?: number;
+  credit_card_fee_type?: PaymentFeeType;
+  credit_card_fixed_fee_amount?: number;
   pix_fee_rate?: number;
+  pix_fee_type?: PaymentFeeType;
+  pix_fixed_fee_amount?: number;
   debit_card_payout_days?: number;
+  debit_card_active?: boolean;
+  debit_card_api_enabled?: boolean;
   credit_card_payout_days?: number;
+  credit_card_active?: boolean;
+  credit_card_api_enabled?: boolean;
   pix_payout_days?: number;
+  pix_active?: boolean;
+  pix_api_enabled?: boolean;
   tenant_id?: string;
 }
+
+type PaymentFeeType = "percent" | "fixed";
 
 const CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
 
@@ -190,12 +210,30 @@ const DEFAULT_THEME: KioskTheme = {
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
   logo_url: "/logo-sandexpress.png",
+  cash_fee_rate: 0,
+  cash_fee_type: "percent",
+  cash_fixed_fee_amount: 0,
+  cash_payout_days: 0,
+  cash_active: true,
+  cash_api_enabled: false,
   debit_card_fee_rate: 0,
+  debit_card_fee_type: "percent",
+  debit_card_fixed_fee_amount: 0,
   credit_card_fee_rate: 0,
+  credit_card_fee_type: "percent",
+  credit_card_fixed_fee_amount: 0,
   pix_fee_rate: 0,
+  pix_fee_type: "percent",
+  pix_fixed_fee_amount: 0,
   debit_card_payout_days: 1,
+  debit_card_active: true,
+  debit_card_api_enabled: false,
   credit_card_payout_days: 30,
+  credit_card_active: true,
+  credit_card_api_enabled: false,
   pix_payout_days: 0,
+  pix_active: true,
+  pix_api_enabled: false,
 };
 
 const BRAND_PALETTE = [
@@ -216,6 +254,88 @@ const PAYMENT_METHOD_OPTIONS = [
   { id: "credit_card", label: "Credito", Icon: CreditCard },
 ] as const;
 
+const PAYMENT_SETTINGS = [
+  {
+    id: "cash",
+    label: "Dinheiro",
+    Icon: Banknote,
+    feeField: "cash_fee_rate",
+    typeField: "cash_fee_type",
+    fixedField: "cash_fixed_fee_amount",
+    daysField: "cash_payout_days",
+    activeField: "cash_active",
+    apiField: "cash_api_enabled",
+  },
+  {
+    id: "pix",
+    label: "Pix",
+    Icon: Smartphone,
+    feeField: "pix_fee_rate",
+    typeField: "pix_fee_type",
+    fixedField: "pix_fixed_fee_amount",
+    daysField: "pix_payout_days",
+    activeField: "pix_active",
+    apiField: "pix_api_enabled",
+  },
+  {
+    id: "debit_card",
+    label: "Cartao debito",
+    Icon: CreditCard,
+    feeField: "debit_card_fee_rate",
+    typeField: "debit_card_fee_type",
+    fixedField: "debit_card_fixed_fee_amount",
+    daysField: "debit_card_payout_days",
+    activeField: "debit_card_active",
+    apiField: "debit_card_api_enabled",
+  },
+  {
+    id: "credit_card",
+    label: "Cartao credito",
+    Icon: CreditCard,
+    feeField: "credit_card_fee_rate",
+    typeField: "credit_card_fee_type",
+    fixedField: "credit_card_fixed_fee_amount",
+    daysField: "credit_card_payout_days",
+    activeField: "credit_card_active",
+    apiField: "credit_card_api_enabled",
+  },
+] as const;
+
+function buildThemeForm(data: Partial<KioskTheme> & Record<string, unknown>): KioskTheme {
+  return {
+    tenant_id: data.tenant_id as string | undefined,
+    primary_color: String(data.primary_color || DEFAULT_THEME.primary_color),
+    secondary_color: String(data.secondary_color || DEFAULT_THEME.secondary_color),
+    button_color: String(data.button_color || data.primary_color || DEFAULT_THEME.button_color),
+    button_text_color: String(data.button_text_color || DEFAULT_THEME.button_text_color),
+    logo_url: String(data.logo_url || DEFAULT_THEME.logo_url),
+    cash_fee_rate: Number(data.cash_fee_rate || 0),
+    cash_fee_type: data.cash_fee_type === "fixed" ? "fixed" : "percent",
+    cash_fixed_fee_amount: Number(data.cash_fixed_fee_amount || 0),
+    cash_payout_days: Number(data.cash_payout_days ?? 0),
+    cash_active: data.cash_active !== false,
+    cash_api_enabled: data.cash_api_enabled === true,
+    debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
+    debit_card_fee_type: data.debit_card_fee_type === "fixed" ? "fixed" : "percent",
+    debit_card_fixed_fee_amount: Number(data.debit_card_fixed_fee_amount || 0),
+    credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
+    credit_card_fee_type: data.credit_card_fee_type === "fixed" ? "fixed" : "percent",
+    credit_card_fixed_fee_amount: Number(data.credit_card_fixed_fee_amount || 0),
+    pix_fee_rate: Number(data.pix_fee_rate || 0),
+    pix_fee_type: data.pix_fee_type === "fixed" ? "fixed" : "percent",
+    pix_fixed_fee_amount: Number(data.pix_fixed_fee_amount || 0),
+    debit_card_payout_days: Number(data.debit_card_payout_days ?? 1),
+    debit_card_active: data.debit_card_active !== false,
+    debit_card_api_enabled: data.debit_card_api_enabled === true,
+    credit_card_payout_days: Number(data.credit_card_payout_days ?? 30),
+    credit_card_active: data.credit_card_active !== false,
+    credit_card_api_enabled: data.credit_card_api_enabled === true,
+    pix_payout_days: Number(data.pix_payout_days ?? 0),
+    pix_active: data.pix_active !== false,
+    pix_api_enabled: data.pix_api_enabled === true,
+  };
+}
+
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "Dinheiro",
   pix: "Pix",
@@ -228,6 +348,7 @@ const TABS = [
   { id: "stock", label: "Estoque", icon: PackageCheck },
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
+  { id: "payments", label: "Pagamentos", icon: CreditCard },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "theme", label: "Personalizacao", icon: Palette },
   { id: "customers", label: "Clientes", icon: Users },
@@ -426,20 +547,7 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/vendors/${vid}/theme`);
       if (res.ok) {
         const data = await res.json();
-        setThemeForm({
-          tenant_id: data.tenant_id,
-          primary_color: data.primary_color || DEFAULT_THEME.primary_color,
-          secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
-          button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
-          button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
-          logo_url: data.logo_url || DEFAULT_THEME.logo_url,
-          debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
-          credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
-          pix_fee_rate: Number(data.pix_fee_rate || 0),
-          debit_card_payout_days: Number(data.debit_card_payout_days ?? 1),
-          credit_card_payout_days: Number(data.credit_card_payout_days ?? 30),
-          pix_payout_days: Number(data.pix_payout_days ?? 0),
-        });
+        setThemeForm(buildThemeForm(data));
       }
     } catch (err) {
       console.error('Failed to load theme:', err);
@@ -477,21 +585,10 @@ export default function VendorDashboard() {
         setThemeMessage(data.error || "Nao foi possivel salvar a personalizacao.");
         return;
       }
-      setThemeForm({
-        tenant_id: data.tenant_id,
-        primary_color: data.primary_color || DEFAULT_THEME.primary_color,
-        secondary_color: data.secondary_color || DEFAULT_THEME.secondary_color,
-        button_color: data.button_color || data.primary_color || DEFAULT_THEME.button_color,
-        button_text_color: data.button_text_color || DEFAULT_THEME.button_text_color,
-        logo_url: data.logo_url || DEFAULT_THEME.logo_url,
-        debit_card_fee_rate: Number(data.debit_card_fee_rate || 0),
-        credit_card_fee_rate: Number(data.credit_card_fee_rate || 0),
-        pix_fee_rate: Number(data.pix_fee_rate || 0),
-        debit_card_payout_days: Number(data.debit_card_payout_days ?? 1),
-        credit_card_payout_days: Number(data.credit_card_payout_days ?? 30),
-        pix_payout_days: Number(data.pix_payout_days ?? 0),
-      });
-      setThemeMessage("Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
+      setThemeForm(buildThemeForm(data));
+      setThemeMessage(activeTab === "payments"
+        ? "Formas de pagamento salvas para este quiosque."
+        : "Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
     } catch {
       setThemeMessage("Erro de rede ao salvar personalizacao.");
     } finally {
@@ -1578,41 +1675,6 @@ export default function VendorDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <h4 className="text-sm font-black text-gray-900">Taxas de recebimento</h4>
-                  <p className="mt-1 text-xs font-semibold text-gray-500">Percentual descontado e prazo para calcular o valor liquido e a data prevista de recebimento.</p>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    {[
-                      ['pix_fee_rate', 'pix_payout_days', 'PIX'],
-                      ['debit_card_fee_rate', 'debit_card_payout_days', 'Debito'],
-                      ['credit_card_fee_rate', 'credit_card_payout_days', 'Credito'],
-                    ].map(([feeField, daysField, label]) => (
-                      <div key={feeField} className="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
-                        <span className="text-xs font-black uppercase text-gray-600">{label}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={Number(themeForm[feeField as keyof KioskTheme] || 0)}
-                          onChange={(event) => setThemeForm(prev => ({ ...prev, [feeField]: Number(event.target.value) || 0 }))}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
-                          aria-label={`${label} percentual de taxa`}
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={Number(themeForm[daysField as keyof KioskTheme] || 0)}
-                          onChange={(event) => setThemeForm(prev => ({ ...prev, [daysField]: Math.max(0, Math.floor(Number(event.target.value) || 0)) }))}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-[#ff6b00]"
-                          aria-label={`${label} dias para pagamento`}
-                        />
-                        <p className="text-[11px] font-bold text-gray-400">Taxa (%) e dias para cair</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 {themeMessage && (
                   <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>
                 )}
@@ -1653,6 +1715,126 @@ export default function VendorDashboard() {
                 </div>
               </aside>
             </div>
+          )}
+
+          {/* ========== ABA: PAGAMENTOS ========== */}
+          {activeTab === "payments" && (
+            <form onSubmit={saveTheme} className="space-y-6">
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900">Formas de pagamento</h3>
+                    <p className="text-sm font-semibold text-gray-500">
+                      Cadastre meios aceitos, taxas, prazo de recebimento e deixe preparado para ativar API de pagamento.
+                    </p>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={themeSaving}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#E56000] disabled:opacity-60"
+                  >
+                    <CreditCard size={18} /> {themeSaving ? "Salvando..." : "Salvar pagamentos"}
+                  </button>
+                </div>
+                {themeMessage && (
+                  <p className="mt-4 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>
+                )}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                {PAYMENT_SETTINGS.map(({ id, label, Icon, feeField, typeField, fixedField, daysField, activeField, apiField }) => {
+                  const feeType = (themeForm[typeField as keyof KioskTheme] === "fixed" ? "fixed" : "percent") as PaymentFeeType;
+                  const active = themeForm[activeField as keyof KioskTheme] !== false;
+                  const apiEnabled = themeForm[apiField as keyof KioskTheme] === true;
+                  return (
+                    <section key={id} className={cn("rounded-2xl border bg-white p-5 shadow-sm", active ? "border-gray-100" : "border-gray-200 opacity-75")}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF2E5] text-[#FF6B00]">
+                            <Icon size={22} />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-gray-900">{label}</h4>
+                            <p className="text-xs font-bold text-gray-400">{active ? "Disponivel no fechamento" : "Oculto no fechamento"}</p>
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm font-black text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={(event) => setThemeForm(prev => ({ ...prev, [activeField]: event.target.checked }))}
+                            className="h-4 w-4 accent-[#FF6B00]"
+                          />
+                          Ativo
+                        </label>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 md:grid-cols-[160px_1fr_1fr]">
+                        <div>
+                          <p className="mb-2 text-xs font-black uppercase text-gray-500">Tipo da taxa</p>
+                          <div className="grid grid-cols-2 rounded-xl border border-gray-200 bg-gray-50 p-1">
+                            {[
+                              ["percent", "%"],
+                              ["fixed", "R$"],
+                            ].map(([value, text]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setThemeForm(prev => ({ ...prev, [typeField]: value as PaymentFeeType }))}
+                                className={cn("rounded-lg px-3 py-2 text-sm font-black", feeType === value ? "bg-white text-[#FF6B00] shadow-sm" : "text-gray-500")}
+                              >
+                                {text}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <label className="space-y-2">
+                          <span className="text-xs font-black uppercase text-gray-500">{feeType === "fixed" ? "Valor fixo" : "Percentual"}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={Number(themeForm[(feeType === "fixed" ? fixedField : feeField) as keyof KioskTheme] || 0)}
+                            onChange={(event) => setThemeForm(prev => ({ ...prev, [feeType === "fixed" ? fixedField : feeField]: Number(event.target.value) || 0 }))}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-black outline-none focus:border-[#ff6b00]"
+                            aria-label={`${label} ${feeType === "fixed" ? "valor fixo" : "percentual"}`}
+                          />
+                        </label>
+
+                        <label className="space-y-2">
+                          <span className="text-xs font-black uppercase text-gray-500">Dias para cair</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={Number(themeForm[daysField as keyof KioskTheme] || 0)}
+                            onChange={(event) => setThemeForm(prev => ({ ...prev, [daysField]: Math.max(0, Math.floor(Number(event.target.value) || 0)) }))}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-black outline-none focus:border-[#ff6b00]"
+                            aria-label={`${label} dias para recebimento`}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
+                        <label className="flex items-center justify-between gap-3 text-sm font-black text-gray-700">
+                          <span>Preparar para API de pagamento</span>
+                          <input
+                            type="checkbox"
+                            checked={apiEnabled}
+                            onChange={(event) => setThemeForm(prev => ({ ...prev, [apiField]: event.target.checked }))}
+                            className="h-4 w-4 accent-[#FF6B00]"
+                          />
+                        </label>
+                        <p className="mt-2 text-xs font-semibold text-gray-400">
+                          Reserva a configuracao deste meio para integracao futura sem alterar o fluxo atual de caixa.
+                        </p>
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </form>
           )}
 
           {activeTab === "reports" && (
@@ -1764,7 +1946,7 @@ export default function VendorDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="grid gap-6">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CreditCard size={18} className="text-[#FF6B00]" /> Meios de recebimento</h4>
                       <div className="space-y-3">
@@ -1787,36 +1969,6 @@ export default function VendorDashboard() {
                               </div>
                               <div>
                                 <p className="text-xs font-bold text-gray-400">Liquido</p>
-                                <p className="font-black text-green-700">{formatCurrency(data.net)}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CalendarCheck size={18} className="text-[#FF6B00]" /> Recebiveis por data</h4>
-                      <div className="space-y-3">
-                        {Object.entries(reportData.receivables_by_date || {}).length === 0 ? (
-                          <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhum recebivel no periodo.</p>
-                        ) : Object.entries(reportData.receivables_by_date || {}).map(([date, data]) => (
-                          <div key={date} className="rounded-xl border border-gray-100 p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="font-black text-gray-900">{date === "sem_data" ? "Sem data" : new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR")}</p>
-                              <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-xs font-black text-[#FF6B00]">{data.count} venda{data.count === 1 ? "" : "s"}</span>
-                            </div>
-                            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                              <div>
-                                <p className="text-xs font-bold text-gray-400">Bruto</p>
-                                <p className="font-black text-gray-900">{formatCurrency(data.gross)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-gray-400">Taxas</p>
-                                <p className="font-black text-red-600">{formatCurrency(data.fees)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-gray-400">Cai na conta</p>
                                 <p className="font-black text-green-700">{formatCurrency(data.net)}</p>
                               </div>
                             </div>
@@ -1919,6 +2071,36 @@ export default function VendorDashboard() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CalendarCheck size={18} className="text-[#FF6B00]" /> Recebiveis por data</h4>
+                    <div className="space-y-3">
+                      {Object.entries(reportData.receivables_by_date || {}).length === 0 ? (
+                        <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhum recebivel no periodo.</p>
+                      ) : Object.entries(reportData.receivables_by_date || {}).map(([date, data]) => (
+                        <div key={date} className="rounded-xl border border-gray-100 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-black text-gray-900">{date === "sem_data" ? "Sem data" : new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR")}</p>
+                            <span className="rounded-full bg-[#FFF2E5] px-3 py-1 text-xs font-black text-[#FF6B00]">{data.count} venda{data.count === 1 ? "" : "s"}</span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                            <div>
+                              <p className="text-xs font-bold text-gray-400">Bruto</p>
+                              <p className="font-black text-gray-900">{formatCurrency(data.gross)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-400">Taxas</p>
+                              <p className="font-black text-red-600">{formatCurrency(data.fees)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-400">Cai na conta</p>
+                              <p className="font-black text-green-700">{formatCurrency(data.net)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </>
@@ -2139,6 +2321,7 @@ export default function VendorDashboard() {
       {payingOrder && (
         <PaymentMethodModal
           order={payingOrder}
+          settings={themeForm}
           onClose={() => setPayingOrder(null)}
           onConfirm={confirmAccountPaid}
         />
@@ -2306,14 +2489,17 @@ function OrderModal({
 
 function PaymentMethodModal({
   order,
+  settings,
   onClose,
   onConfirm,
 }: {
   order: Order;
+  settings: KioskTheme;
   onClose: () => void;
   onConfirm: (order: Order, paymentMethod: string) => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const activePaymentOptions = PAYMENT_METHOD_OPTIONS.filter(({ id }) => settings[`${id}_active` as keyof KioskTheme] !== false);
 
   const handleConfirm = async (paymentMethod: string) => {
     setSubmitting(true);
@@ -2337,7 +2523,7 @@ function PaymentMethodModal({
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
-          {PAYMENT_METHOD_OPTIONS.map(({ id, label, Icon }) => (
+          {activePaymentOptions.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"

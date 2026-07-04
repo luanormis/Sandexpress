@@ -28,6 +28,13 @@ describe('sql-atualizacao-comandas-incrementais-recebiveis', () => {
     expect(sql).toContain('CURRENT_DATE + payout_delay_days');
   });
 
+  it('supports fixed payment fees and future API enablement per payment method', () => {
+    expect(sql).toContain("fee_type TEXT NOT NULL DEFAULT 'percent'");
+    expect(sql).toContain('fixed_fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0');
+    expect(sql).toContain('api_enabled BOOLEAN NOT NULL DEFAULT FALSE');
+    expect(sql).toContain("WHEN fee_type = 'fixed' THEN LEAST(gross_amount, ROUND(fixed_fee_amount, 2))");
+  });
+
   it('uses explicit grants for Supabase Data API compatibility', () => {
     expect(sql).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON customer_order_requests TO service_role');
     expect(sql).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON payment_method_rates TO service_role');

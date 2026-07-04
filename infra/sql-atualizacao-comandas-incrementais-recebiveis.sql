@@ -24,12 +24,20 @@ CREATE TABLE IF NOT EXISTS payment_method_rates (
   vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   payment_method TEXT NOT NULL CHECK (payment_method IN ('cash','pix','debit_card','credit_card')),
   fee_rate NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (fee_rate >= 0),
+  fee_type TEXT NOT NULL DEFAULT 'percent' CHECK (fee_type IN ('percent','fixed')),
+  fixed_fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (fixed_fee_amount >= 0),
   payout_delay_days INTEGER NOT NULL DEFAULT 0 CHECK (payout_delay_days >= 0),
+  api_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(vendor_id, payment_method)
 );
+
+ALTER TABLE payment_method_rates
+  ADD COLUMN IF NOT EXISTS fee_type TEXT NOT NULL DEFAULT 'percent' CHECK (fee_type IN ('percent','fixed')),
+  ADD COLUMN IF NOT EXISTS fixed_fee_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (fixed_fee_amount >= 0),
+  ADD COLUMN IF NOT EXISTS api_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS payment_receivables (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -323,7 +331,9 @@ DECLARE
   vendor_row vendors%ROWTYPE;
   rate_row payment_method_rates%ROWTYPE;
   normalized_method TEXT;
+  fee_type TEXT := 'percent';
   fee_rate NUMERIC(5,2) := 0;
+  fixed_fee_amount NUMERIC(10,2) := 0;
   payout_delay_days INTEGER := 0;
   fee_amount NUMERIC(10,2) := 0;
   gross_amount NUMERIC(10,2) := 0;
@@ -405,9 +415,13 @@ BEGIN
     LIMIT 1;
 
     IF FOUND THEN
-      fee_rate := GREATEST(COALESCE(rate_row.fee_rate, 0), 0);
+      fee_type := CASE WHEN COALESCE(rate_row.fee_type, 'percent') = 'fixed' THEN 'fixed' ELSE 'percent' END;
+      fee_rate := CASE WHEN fee_type = 'percent' THEN GREATEST(COALESCE(rate_row.fee_rate, 0), 0) ELSE 0 END;
+      fixed_fee_amount := CASE WHEN fee_type = 'fixed' THEN GREATEST(COALESCE(rate_row.fixed_fee_amount, 0), 0) ELSE 0 END;
       payout_delay_days := GREATEST(COALESCE(rate_row.payout_delay_days, 0), 0);
     ELSE
+      fee_type := 'percent';
+      fixed_fee_amount := 0;
       fee_rate := CASE normalized_method
         WHEN 'debit_card' THEN GREATEST(COALESCE(vendor_row.debit_card_fee_rate, 0), 0)
         WHEN 'credit_card' THEN GREATEST(COALESCE(vendor_row.credit_card_fee_rate, 0), 0)
@@ -422,7 +436,10 @@ BEGIN
     END IF;
 
     gross_amount := ROUND(GREATEST(COALESCE(order_row.total, 0), 0), 2);
-    fee_amount := ROUND(gross_amount * (fee_rate / 100), 2);
+    fee_amount := CASE
+      WHEN fee_type = 'fixed' THEN LEAST(gross_amount, ROUND(fixed_fee_amount, 2))
+      ELSE ROUND(gross_amount * (fee_rate / 100), 2)
+    END;
     net_amount := ROUND(GREATEST(gross_amount - fee_amount, 0), 2);
     expected_date := (CURRENT_DATE + payout_delay_days);
 

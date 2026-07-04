@@ -9,6 +9,7 @@ describe('payment helpers', () => {
     })).toEqual({
       payment_method: 'credit_card',
       gross_amount: 100,
+      fee_type: 'percent',
       fee_rate: 3.5,
       fee_amount: 3.5,
       net_amount: 96.5,
@@ -24,6 +25,34 @@ describe('payment helpers', () => {
       payment_method: 'cash',
       fee_amount: 0,
       net_amount: 80,
+    });
+  });
+
+  it('calculates fixed payment fees in currency', () => {
+    expect(calculatePaymentBreakdown({
+      grossAmount: 100,
+      method: 'pix',
+      fees: { pix: { type: 'fixed', amount: 2.5 } },
+    })).toEqual({
+      payment_method: 'pix',
+      gross_amount: 100,
+      fee_type: 'fixed',
+      fee_rate: 0,
+      fee_amount: 2.5,
+      net_amount: 97.5,
+    });
+  });
+
+  it('caps fixed payment fees at the gross amount', () => {
+    expect(calculatePaymentBreakdown({
+      grossAmount: 8,
+      method: 'debit_card',
+      fees: { debit_card: { type: 'fixed', amount: 10 } },
+    })).toMatchObject({
+      payment_method: 'debit_card',
+      fee_type: 'fixed',
+      fee_amount: 8,
+      net_amount: 0,
     });
   });
 

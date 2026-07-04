@@ -3,11 +3,19 @@ export const PAYMENT_METHODS = ['cash', 'pix', 'debit_card', 'credit_card'] as c
 export type PaymentMethod = typeof PAYMENT_METHODS[number];
 
 type PaymentRates = Partial<Record<PaymentMethod, number>>;
+export type PaymentFeeType = 'percent' | 'fixed';
+export type PaymentFeeConfig = {
+  type?: PaymentFeeType;
+  rate?: number;
+  amount?: number;
+};
+type PaymentFees = Partial<Record<PaymentMethod, PaymentFeeConfig>>;
 
 type PaymentBreakdownInput = {
   grossAmount: number;
   method: unknown;
   rates?: PaymentRates | null;
+  fees?: PaymentFees | null;
 };
 
 const LEGACY_PAYMENT_METHODS: Record<string, PaymentMethod> = {
@@ -34,13 +42,21 @@ export function normalizePaymentMethod(method: unknown): PaymentMethod {
 export function calculatePaymentBreakdown(input: PaymentBreakdownInput) {
   const paymentMethod = normalizePaymentMethod(input.method);
   const grossAmount = toMoney(input.grossAmount);
-  const feeRate = Math.max(0, Number(input.rates?.[paymentMethod] || 0));
-  const feeAmount = toMoney(grossAmount * (feeRate / 100));
+  const feeConfig = input.fees?.[paymentMethod];
+  const feeType: PaymentFeeType = feeConfig?.type === 'fixed' ? 'fixed' : 'percent';
+  const feeRate = feeType === 'percent'
+    ? Math.max(0, Number(feeConfig?.rate ?? input.rates?.[paymentMethod] ?? 0))
+    : 0;
+  const calculatedFeeAmount = feeType === 'fixed'
+    ? Number(feeConfig?.amount || 0)
+    : grossAmount * (feeRate / 100);
+  const feeAmount = Math.min(grossAmount, toMoney(calculatedFeeAmount));
   const netAmount = toMoney(grossAmount - feeAmount);
 
   return {
     payment_method: paymentMethod,
     gross_amount: grossAmount,
+    fee_type: feeType,
     fee_rate: feeRate,
     fee_amount: feeAmount,
     net_amount: netAmount,
