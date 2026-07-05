@@ -235,14 +235,16 @@ const DEFAULT_THEME: KioskTheme = {
 };
 
 const BRAND_PALETTE = [
-  { name: "Laranja SandExpress", value: "#ff6b00" },
-  { name: "Laranja forte", value: "#a04100" },
-  { name: "Marrom praia", value: "#82533f" },
-  { name: "Cacau", value: "#3d1a0a" },
-  { name: "Areia", value: "#f8ddd2" },
+  { name: "Laranja vibrante", value: "#ff6b00" },
+  { name: "Marrom primario", value: "#a04100" },
+  { name: "Marrom cliente", value: "#572000" },
+  { name: "Marrom estrutural", value: "#82533f" },
+  { name: "Cafe escuro", value: "#3d1a0a" },
+  { name: "Areia baixa", value: "#fff1eb" },
+  { name: "Areia media", value: "#ffeae1" },
+  { name: "Areia alta", value: "#f8ddd2" },
+  { name: "Contorno", value: "#8e7164" },
   { name: "Creme", value: "#fff8f6" },
-  { name: "Verde livre", value: "#15803d" },
-  { name: "Azul mar", value: "#0f6b78" },
 ];
 
 const PAYMENT_METHOD_OPTIONS = [
