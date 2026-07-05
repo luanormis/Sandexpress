@@ -204,7 +204,7 @@ const CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petis
 
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
-  secondary_color: "#82533f",
+  secondary_color: "#3d1a0a",
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
   logo_url: "/sandexpress-logo-fluid.png",
@@ -235,16 +235,14 @@ const DEFAULT_THEME: KioskTheme = {
 };
 
 const BRAND_PALETTE = [
-  { name: "Laranja vibrante", value: "#ff6b00" },
-  { name: "Marrom primario", value: "#a04100" },
-  { name: "Marrom cliente", value: "#572000" },
-  { name: "Marrom estrutural", value: "#82533f" },
-  { name: "Cafe escuro", value: "#3d1a0a" },
-  { name: "Areia baixa", value: "#fff1eb" },
-  { name: "Areia media", value: "#ffeae1" },
-  { name: "Areia alta", value: "#f8ddd2" },
-  { name: "Contorno", value: "#8e7164" },
-  { name: "Creme", value: "#fff8f6" },
+  { name: "Primary / Laranja", value: "#ff6b00" },
+  { name: "Secondary / Marrom", value: "#3d1a0a" },
+  { name: "Surface / Creme", value: "#efd5ca" },
+  { name: "Background", value: "#fff8f6" },
+  { name: "Surface variant", value: "#f4ded5" },
+  { name: "Primary container", value: "#ffdbcb" },
+  { name: "On surface", value: "#231916" },
+  { name: "Outline", value: "#85736c" },
 ];
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -868,7 +866,7 @@ export default function VendorDashboard() {
               .kpi strong { display: block; margin-top: 6px; font-size: 20px; }
               table { width: 100%; border-collapse: collapse; background: #fff; }
               th, td { border: 1px solid #ead7cc; padding: 8px; text-align: left; font-size: 12px; }
-              th { background: #ffefe6; color: #572000; font-size: 11px; text-transform: uppercase; }
+              th { background: #ffdbcb; color: #3d1a0a; font-size: 11px; text-transform: uppercase; }
               footer { margin-top: 28px; color: #8a746a; font-size: 11px; text-align: center; }
               @media print { body { background: #fff; padding: 18px; } .kpis { break-inside: avoid; } }
             </style>
@@ -1828,13 +1826,13 @@ export default function VendorDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-dashed border-[#e2bfb0] bg-[#fff8f6] p-4">
+                <div className="mt-5 rounded-2xl border border-dashed border-[#85736C] bg-[#fff8f6] p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e2bfb0] bg-white shadow-sm">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#85736C] bg-white shadow-sm">
                       {themeForm.logo_url ? (
                         <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-3" />
                       ) : (
-                        <Upload className="text-[#82533f]" size={30} />
+                        <Upload className="text-[#3D1A0A]" size={30} />
                       )}
                     </div>
                     <label className="min-w-0 flex-1 space-y-2">
@@ -1862,7 +1860,7 @@ export default function VendorDashboard() {
                 </div>
 
                 {themeMessage && (
-                  <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>
+                  <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#3D1A0A]">{themeMessage}</p>
                 )}
 
                 <button
@@ -1888,7 +1886,7 @@ export default function VendorDashboard() {
                   <p className="text-sm font-semibold text-white/80">Login, cardapio e botoes do QR.</p>
                 </div>
                 <div className="space-y-4 bg-[#fff8f6] p-6">
-                  <div className="rounded-xl border border-[#e2bfb0] bg-white p-4">
+                  <div className="rounded-xl border border-[#85736C] bg-white p-4">
                     <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
                     <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(0)}</p>
                   </div>
@@ -1923,7 +1921,7 @@ export default function VendorDashboard() {
                   </button>
                 </div>
                 {themeMessage && (
-                  <p className="mt-4 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{themeMessage}</p>
+                  <p className="mt-4 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#3D1A0A]">{themeMessage}</p>
                 )}
               </div>
 
@@ -2422,7 +2420,7 @@ export default function VendorDashboard() {
                     className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                   />
                 </div>
-                {teamMessage && <p className="rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#572000]">{teamMessage}</p>}
+                {teamMessage && <p className="rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#3D1A0A]">{teamMessage}</p>}
                 <button type="submit" className="w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
                   Criar usuario
                 </button>
@@ -2437,7 +2435,7 @@ export default function VendorDashboard() {
                         <p className="font-bold text-gray-900">{user.name}</p>
                         <p className="text-sm text-gray-500">Login: {user.login} {user.email ? `- ${user.email}` : ""}</p>
                       </div>
-                      <span className="rounded-full bg-[#ffeae1] px-3 py-1 text-xs font-black text-[#a04100]">
+                      <span className="rounded-full bg-[#EFD5CA] px-3 py-1 text-xs font-black text-[#3D1A0A]">
                         {user.role === 'manager' ? 'Gerente' : user.role === 'owner' ? 'Proprietario' : 'Vendedor'}
                       </span>
                     </div>
@@ -2949,20 +2947,20 @@ function ProductModal({
           </div>
 
           {!isMenuMode && form.stock_tracking_enabled && (
-            <div className="grid grid-cols-1 gap-4 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#e2bfb0] bg-white p-3">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-[#85736C] bg-[#fff8f6] p-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#85736C] bg-white p-3">
                 <label className="block text-sm font-black text-[#3d1a0a] mb-1">Estoque central</label>
                 <input
                   type="number"
                   min="0"
                   value={form.physical_stock_quantity || ""}
                   onChange={e => setForm(prev => ({ ...prev, physical_stock_quantity: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                  className="w-full border-2 border-[#e2bfb0] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-[#fff8f6] font-black text-[#3d1a0a]"
+                  className="w-full border-2 border-[#85736C] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-[#fff8f6] font-black text-[#3d1a0a]"
                   placeholder="Ex: 80"
                 />
               </div>
-              <div className="rounded-xl border border-[#ffb693] bg-[#fff1eb] p-3">
-                <label className="block text-sm font-black text-[#a04100] mb-1">Estoque praia</label>
+              <div className="rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-3">
+                <label className="block text-sm font-black text-[#FF6B00] mb-1">Estoque praia</label>
                 <input
                   type="number"
                   min="0"
@@ -2976,7 +2974,7 @@ function ProductModal({
                       blocked_by_stock: nextStock <= 0,
                     }));
                   }}
-                  className="w-full border-2 border-[#ffb693] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white font-black text-[#572000]"
+                  className="w-full border-2 border-[#FFDBCB] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white font-black text-[#3D1A0A]"
                   placeholder="Ex: 24"
                 />
               </div>

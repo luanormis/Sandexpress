@@ -99,16 +99,16 @@ export default function DailyReportComponent() {
           <meta charset="UTF-8">
           <title>Relatório do Dia - ${selectedDate}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; color: #261812; background: #fff8f6; }
-            h1 { color: #261812; border-bottom: 3px solid #ff6b00; padding-bottom: 10px; }
-            h2 { color: #a04100; margin-top: 30px; border-bottom: 1px solid #e2bfb0; padding-bottom: 5px; }
+            body { font-family: Arial, sans-serif; margin: 20px; color: #231916; background: #fff8f6; }
+            h1 { color: #231916; border-bottom: 3px solid #ff6b00; padding-bottom: 10px; }
+            h2 { color: #3d1a0a; margin-top: 30px; border-bottom: 1px solid #85736c; padding-bottom: 5px; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #ffffff; }
-            th, td { padding: 10px; text-align: left; border: 1px solid #e2bfb0; }
-            th { background-color: #a04100; color: white; }
-            tr:nth-child(even) { background-color: #fff1eb; }
+            th, td { padding: 10px; text-align: left; border: 1px solid #efd5ca; }
+            th { background-color: #3d1a0a; color: white; }
+            tr:nth-child(even) { background-color: #f4ded5; }
             .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
-            .summary-box { background-color: #ffeae1; padding: 15px; border-radius: 12px; border: 1px solid #e2bfb0; }
-            .summary-box h3 { margin: 0 0 10px 0; color: #a04100; }
+            .summary-box { background-color: #efd5ca; padding: 15px; border-radius: 12px; border: 1px solid #85736c; }
+            .summary-box h3 { margin: 0 0 10px 0; color: #3d1a0a; }
             .summary-box p { margin: 5px 0; font-size: 18px; font-weight: bold; }
           </style>
         </head>

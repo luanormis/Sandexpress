@@ -2,45 +2,48 @@
 
 :root {
   --background: #fff8f6;
-  --foreground: #261812;
+  --foreground: #231916;
   --surface-dim: #efd5ca;
   --surface-bright: #fff8f6;
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #fff1eb;
+  --surface-container-low: #fff8f6;
   --surface: #fff8f6;
-  --surface-container: #ffeae1;
-  --surface-container-high: #fee3d8;
-  --surface-container-highest: #f8ddd2;
-  --on-surface: #261812;
-  --on-surface-variant: #5a4136;
-  --inverse-surface: #3d2d26;
+  --surface-variant: #f4ded5;
+  --surface-container: #efd5ca;
+  --surface-container-high: #f4ded5;
+  --surface-container-highest: #ffdbcb;
+  --on-surface: #231916;
+  --on-surface-variant: #53433e;
+  --inverse-surface: #3d1a0a;
   --inverse-on-surface: #ffede6;
-  --outline: #8e7164;
-  --outline-variant: #e2bfb0;
-  --surface-tint: #a04100;
-  --brand-primary: #a04100;
-  --brand-primary-strong: #a04100;
+  --outline: #85736c;
+  --outline-variant: #efd5ca;
+  --surface-tint: #ff6b00;
+  --brand-primary: #ff6b00;
+  --brand-primary-strong: #ff6b00;
   --brand-primary-container: #ff6b00;
-  --brand-primary-hover: #c85200;
+  --brand-primary-hover: #d85a00;
   --on-primary: #ffffff;
-  --on-primary-container: #572000;
-  --brand-secondary: #82533f;
-  --brand-secondary-container: #fdbea5;
-  --on-secondary-container: #794b37;
-  --brand-tertiary: #605e5a;
-  --brand-tertiary-container: #9c9894;
+  --primary-container: #ffdbcb;
+  --on-primary-container: #341100;
+  --brand-secondary: #3d1a0a;
+  --brand-secondary-container: #efd5ca;
+  --on-secondary-container: #3d1a0a;
+  --brand-tertiary: #53433e;
+  --brand-tertiary-container: #f4ded5;
   --brand-dark: #3d1a0a;
-  --brand-cream: #fff8f6;
-  --brand-sand: #f8ddd2;
-  --brand-outline: #8e7164;
-  --brand-outline-soft: #e2bfb0;
+  --brand-cream: #efd5ca;
+  --brand-sand: #efd5ca;
+  --brand-outline: #85736c;
+  --brand-outline-soft: #efd5ca;
   --brand-orange: #ff6b00;
-  --brand-orange-soft: #ffb693;
+  --brand-orange-soft: #ffdbcb;
   --brand-error: #ba1a1a;
   --brand-error-soft: #ffdad6;
-  --brand-success: #605e5a;
-  --brand-success-soft: #e6e2dd;
+  --brand-success: #3d1a0a;
+  --brand-success-soft: #efd5ca;
   --shadow-brand: 0 1.25rem 2.5rem rgba(61, 26, 10, 0.08);
+  --brand-accent: #efd5ca;
 }
 
 @theme inline {
@@ -256,14 +259,14 @@ input[type="number"] {
 
 .customer-app {
   --customer-primary: #ff6b00;
-  --customer-secondary: #82533f;
+  --customer-secondary: #3d1a0a;
   --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #f6f4f1;
+  --customer-bg: #fff8f6;
   --customer-surface: #ffffff;
-  --customer-border: #eaded4;
-  --customer-text: #1f2933;
-  --customer-muted: #70645d;
+  --customer-border: #efd5ca;
+  --customer-text: #231916;
+  --customer-muted: #53433e;
   min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
@@ -1161,30 +1164,30 @@ input[type="number"] {
 
 /* SandExpress reference rebuild: solar concierge + beach-tech operations */
 .customer-app {
-  --customer-primary: #a04100;
-  --customer-secondary: #572000;
-  --customer-button: #a04100;
+  --customer-primary: #ff6b00;
+  --customer-secondary: #3d1a0a;
+  --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #fff1eb;
+  --customer-bg: #fff8f6;
   --customer-surface: #ffffff;
-  --customer-border: rgba(130, 83, 63, 0.34);
-  --customer-text: #201512;
-  --customer-muted: #5b3a2d;
+  --customer-border: rgba(133, 115, 108, 0.36);
+  --customer-text: #231916;
+  --customer-muted: #53433e;
   background:
     radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.16), transparent 34rem),
-    linear-gradient(180deg, #fff8f6 0%, #ffeae1 100%);
+    linear-gradient(180deg, #fff8f6 0%, #efd5ca 100%);
 }
 
 .customer-welcome {
   background:
     radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.26), transparent 16rem),
-    linear-gradient(145deg, #a04100 0%, #572000 100%);
+    linear-gradient(145deg, #ff6b00 0%, #3d1a0a 100%);
 }
 
 .customer-login {
   background:
     radial-gradient(circle at 80% 0%, rgba(255, 106, 0, 0.12), transparent 22rem),
-    linear-gradient(180deg, #fff8f6 0%, #fff1eb 100%);
+    linear-gradient(180deg, #fff8f6 0%, #efd5ca 100%);
 }
 
 .customer-topbar {
@@ -1286,7 +1289,7 @@ input[type="number"] {
   flex: 0 0 4rem;
   overflow: hidden;
   border-radius: 0.7rem;
-  background: linear-gradient(135deg, #fff2eb, #ffffff);
+  background: linear-gradient(135deg, #efd5ca, #ffffff);
 }
 
 .customer-product-media img {
@@ -1303,7 +1306,7 @@ input[type="number"] {
   border-radius: 0.7rem;
   background:
     radial-gradient(circle at 35% 34%, rgba(255, 106, 0, 0.24), transparent 22%),
-    linear-gradient(135deg, #fff1eb, #ffffff);
+    linear-gradient(135deg, #efd5ca, #ffffff);
 }
 
 .customer-product-row:first-child .customer-product-media,
@@ -1444,7 +1447,7 @@ input[type="number"] {
   background:
     radial-gradient(circle at 70% 0%, rgba(255, 106, 0, 0.08), transparent 28rem),
     linear-gradient(180deg, #fff8f6 0%, #fff3ef 100%) !important;
-  color: #261812 !important;
+  color: #231916 !important;
 }
 
 .vendor-ops-shell aside,
@@ -1454,7 +1457,7 @@ input[type="number"] {
   border: 0 !important;
   border-radius: 2.5rem !important;
   background: rgba(255, 255, 255, 0.82) !important;
-  color: #261812 !important;
+  color: #231916 !important;
   box-shadow: 0 1.5rem 4rem rgba(61, 26, 10, 0.08) !important;
   backdrop-filter: blur(1rem);
 }
@@ -1462,7 +1465,7 @@ input[type="number"] {
 .vendor-ops-shell main,
 .admin-ops-shell main {
   background: transparent !important;
-  color: #261812 !important;
+  color: #231916 !important;
 }
 
 .vendor-ops-shell h1,
@@ -1471,7 +1474,7 @@ input[type="number"] {
 .admin-ops-shell h1,
 .admin-ops-shell h2,
 .admin-ops-shell h3 {
-  color: #201512 !important;
+  color: #231916 !important;
   letter-spacing: 0;
 }
 

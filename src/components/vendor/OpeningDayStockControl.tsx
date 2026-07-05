@@ -193,13 +193,13 @@ export default function OpeningDayStockControl({
           )}
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4">
+          <div className="rounded-xl border border-[#85736C] bg-[#FFF8F6] p-4">
             <p className="text-xs font-black uppercase text-[#3d1a0a]">Estoque central</p>
-            <p className="mt-1 text-sm font-bold text-[#82533f]">Quantidade fisica guardada no quiosque.</p>
+            <p className="mt-1 text-sm font-bold text-[#53433E]">Quantidade fisica guardada no quiosque.</p>
           </div>
-          <div className="rounded-xl border border-[#ffb693] bg-[#fff1eb] p-4">
-            <p className="text-xs font-black uppercase text-[#a04100]">Estoque praia</p>
-            <p className="mt-1 text-sm font-bold text-[#572000]">Quantidade disponivel para venda no cardapio do cliente.</p>
+          <div className="rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-4">
+            <p className="text-xs font-black uppercase text-[#FF6B00]">Estoque praia</p>
+            <p className="mt-1 text-sm font-bold text-[#3D1A0A]">Quantidade disponivel para venda no cardapio do cliente.</p>
           </div>
         </div>
       </div>
@@ -259,7 +259,7 @@ export default function OpeningDayStockControl({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <div className="min-w-[9.5rem] rounded-xl border border-[#e2bfb0] bg-white p-3 shadow-sm">
+                    <div className="min-w-[9.5rem] rounded-xl border border-[#85736C] bg-white p-3 shadow-sm">
                       <label className="mb-2 block text-xs font-black uppercase text-[#3d1a0a]">Estoque central</label>
                       <input
                         type="number"
@@ -267,18 +267,18 @@ export default function OpeningDayStockControl({
                         value={physicalUpdates[product.id] || 0}
                         onChange={(event) => setPhysicalStock(product.id, event.target.value)}
                         disabled={!tracksStock}
-                        className="h-10 w-full rounded-lg border border-[#e2bfb0] bg-[#fff8f6] px-3 text-center font-black text-[#3d1a0a] outline-none focus:border-[#FF6B00] disabled:bg-gray-100"
+                        className="h-10 w-full rounded-lg border border-[#85736C] bg-[#fff8f6] px-3 text-center font-black text-[#3d1a0a] outline-none focus:border-[#FF6B00] disabled:bg-gray-100"
                         aria-label={`Estoque central de ${product.name}`}
                       />
                     </div>
-                    <div className="min-w-[14rem] rounded-xl border border-[#ffb693] bg-[#fff7f2] p-3 shadow-sm">
-                      <label className="mb-2 block text-xs font-black uppercase text-[#a04100]">Estoque praia</label>
+                    <div className="min-w-[14rem] rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-3 shadow-sm">
+                      <label className="mb-2 block text-xs font-black uppercase text-[#FF6B00]">Estoque praia</label>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => stepStock(product.id, -1)}
                           disabled={!tracksStock || quantity <= 0}
-                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#ffb693] bg-white text-[#a04100] hover:bg-[#fff1eb] disabled:opacity-40"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5] disabled:opacity-40"
                           aria-label={`Diminuir estoque de praia de ${product.name}`}
                         >
                           <Minus size={16} />
@@ -289,19 +289,19 @@ export default function OpeningDayStockControl({
                           value={quantity}
                           onChange={(event) => setStock(product.id, event.target.value)}
                           disabled={!tracksStock}
-                          className="h-10 w-20 rounded-lg border border-[#ffb693] bg-white px-3 text-center font-black text-[#572000] outline-none focus:border-[#FF6B00]"
+                          className="h-10 w-20 rounded-lg border border-[#FFDBCB] bg-white px-3 text-center font-black text-[#3D1A0A] outline-none focus:border-[#FF6B00]"
                           aria-label={`Estoque praia de ${product.name}`}
                         />
                         <button
                           type="button"
                           onClick={() => stepStock(product.id, 1)}
                           disabled={!tracksStock}
-                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#ffb693] bg-white text-[#a04100] hover:bg-[#fff1eb]"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5]"
                           aria-label={`Aumentar estoque de praia de ${product.name}`}
                         >
                           <Plus size={16} />
                         </button>
-                        <span className="text-sm font-semibold text-[#82533f]">unid.</span>
+                        <span className="text-sm font-semibold text-[#53433E]">unid.</span>
                       </div>
                     </div>
 
@@ -350,7 +350,7 @@ export default function OpeningDayStockControl({
         <button
           onClick={handleSavePhysicalStock}
           disabled={saving}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#3d1a0a] px-6 py-3 font-black text-white transition hover:bg-[#261812] disabled:bg-gray-400"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#3d1a0a] px-6 py-3 font-black text-white transition hover:bg-[#231916] disabled:bg-gray-400"
         >
           {saving ? <Loader className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
           Salvar estoque central
