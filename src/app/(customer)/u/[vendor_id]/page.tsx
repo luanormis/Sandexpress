@@ -126,7 +126,7 @@ export default function CustomerApp() {
     secondary: vendor?.secondary_color || "#82533f",
     button: vendor?.button_color || vendor?.primary_color || "#ff6b00",
     buttonText: vendor?.button_text_color || "#ffffff",
-    logo: vendor?.logo_url || "/logo-sandexpress.png",
+    logo: vendor?.logo_url || "/sandexpress-logo-fluid.png",
   };
   const customerThemeVars = {
     "--customer-primary": theme.primary,

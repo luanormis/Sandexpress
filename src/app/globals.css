@@ -94,6 +94,76 @@
   backdrop-filter: blur(1rem);
 }
 
+.landing-beach-carousel {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background: #fff8f6;
+}
+
+.landing-beach-carousel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 248, 246, 0.9) 42%, #fff8f6 86%),
+    radial-gradient(circle at 50% 10%, rgba(255, 107, 0, 0.08), transparent 34rem);
+}
+
+.landing-beach-carousel span {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transform: scale(1.04);
+  animation: landingBeachFade 24s infinite;
+}
+
+.landing-beach-carousel span:nth-child(1) {
+  background-image: url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=80");
+}
+
+.landing-beach-carousel span:nth-child(2) {
+  background-image: url("https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1800&q=80");
+  animation-delay: 8s;
+}
+
+.landing-beach-carousel span:nth-child(3) {
+  background-image: url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80");
+  animation-delay: 16s;
+}
+
+@keyframes landingBeachFade {
+  0%,
+  8% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  18%,
+  38% {
+    opacity: 0.18;
+    transform: scale(1);
+  }
+  48%,
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-beach-carousel span {
+    animation: none;
+  }
+
+  .landing-beach-carousel span:first-child {
+    opacity: 0.16;
+  }
+}
+
 @layer utilities {
   .min-h-app {
     min-height: 100dvh;

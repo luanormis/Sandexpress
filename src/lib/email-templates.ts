@@ -9,8 +9,7 @@ type PasswordResetEmailInput = VendorEmailInput & {
   expiresIn: string;
 };
 
-type VendorVerificationEmailInput = VendorEmailInput & {
-  verificationUrl: string;
+type VendorRegistrationConfirmationEmailInput = VendorEmailInput & {
   trialEndsAt?: string | null;
 };
 
@@ -25,7 +24,7 @@ function escapeHtml(value: string) {
 
 function getBrandLogoUrl() {
   const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  return publicUrl ? `${publicUrl}/logo-sandexpress.png` : '/logo-sandexpress.png';
+  return publicUrl ? `${publicUrl}/sandexpress-logo-fluid.png` : '/sandexpress-logo-fluid.png';
 }
 
 function shell(title: string, body: string) {
@@ -85,7 +84,7 @@ export function buildPasswordResetEmail(input: PasswordResetEmailInput) {
   };
 }
 
-export function buildVendorVerificationEmail(input: VendorVerificationEmailInput) {
+export function buildVendorRegistrationConfirmationEmail(input: VendorRegistrationConfirmationEmailInput) {
   const ownerLine = input.ownerName ? `, ${escapeHtml(input.ownerName)}` : '';
   const trialLine = input.trialEndsAt
     ? `<p style="margin:0 0 14px">Seu teste gratis fica ativo ate ${escapeHtml(new Date(input.trialEndsAt).toLocaleDateString('pt-BR'))}.</p>`
@@ -95,29 +94,27 @@ export function buildVendorVerificationEmail(input: VendorVerificationEmailInput
     : '';
 
   const html = shell(
-    'Confirme o cadastro do quiosque',
+    'Cadastro recebido',
     `
       <p style="margin:0 0 14px">Ola${ownerLine}.</p>
       <p style="margin:0 0 14px">O quiosque <strong>${escapeHtml(input.vendorName)}</strong> foi cadastrado no SandExpress.</p>
-      <p style="margin:0 0 14px">Confirme este email para validar o cadastro, recuperar senha com seguranca e receber comunicados operacionais.</p>
+      <p style="margin:0 0 14px">Seu acesso ja esta liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.</p>
       ${loginLine}
       ${trialLine}
-      ${button('Validar meu email', input.verificationUrl)}
-      <p style="margin:0;color:#82533f;font-size:13px;word-break:break-all">Link de apoio: ${escapeHtml(input.verificationUrl)}</p>
     `
   );
   const text = [
-    `Confirme o cadastro do quiosque SandExpress`,
+    `Cadastro recebido no SandExpress`,
     ``,
     `Quiosque: ${input.vendorName}`,
     input.ownerName ? `Responsavel: ${input.ownerName}` : '',
     input.login ? `Login do painel: ${input.login}` : '',
     input.trialEndsAt ? `Teste gratis ativo ate ${new Date(input.trialEndsAt).toLocaleDateString('pt-BR')}.` : '',
-    `Valide seu email neste link: ${input.verificationUrl}`,
+    `Seu acesso ja esta liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.`,
   ].filter(Boolean).join('\n');
 
   return {
-    subject: 'Valide o cadastro do seu quiosque SandExpress',
+    subject: 'Cadastro recebido no SandExpress',
     html,
     text,
   };

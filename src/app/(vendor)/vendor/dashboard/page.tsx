@@ -207,7 +207,7 @@ const DEFAULT_THEME: KioskTheme = {
   secondary_color: "#82533f",
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
-  logo_url: "/logo-sandexpress.png",
+  logo_url: "/sandexpress-logo-fluid.png",
   cash_fee_rate: 0,
   cash_fee_type: "percent",
   cash_fixed_fee_amount: 0,
@@ -334,12 +334,70 @@ function buildThemeForm(data: Partial<KioskTheme> & Record<string, unknown>): Ki
   };
 }
 
+type DailySalesPayment = {
+  count?: number;
+  gross?: number;
+  fees?: number;
+  net?: number;
+  total?: number;
+};
+
+type DailySalesProduct = {
+  name?: string;
+  quantity?: number;
+  revenue?: number;
+};
+
+type DailySalesOrder = {
+  umbrella_number?: string | number;
+  customer_name?: string;
+  customer_phone?: string;
+  items_count?: number;
+  payment_method?: string;
+  gross_total?: number;
+  total?: number;
+  payment_fee_amount?: number;
+  net_total?: number;
+  paid_at?: string;
+  created_at?: string;
+};
+
+type DailySalesReport = {
+  error?: string;
+  summary?: {
+    total_orders?: number;
+    total_revenue?: number;
+    total_items_sold?: number;
+    avg_ticket?: number;
+    unique_customers?: number;
+    total_gross_revenue?: number;
+    total_payment_fees?: number;
+    total_net_revenue?: number;
+    payment_methods?: Record<string, DailySalesPayment>;
+  };
+  orders?: DailySalesOrder[];
+  top_products?: DailySalesProduct[];
+};
+
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "Dinheiro",
   pix: "Pix",
   debit_card: "Cartao debito",
   credit_card: "Cartao credito",
 };
+
+function escapeReportValue(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatReportDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR");
+}
 
 const TABS = [
   { id: "orders", label: "Pedidos", icon: ShoppingBag },
@@ -737,6 +795,134 @@ export default function VendorDashboard() {
       setClosingMessage("Erro de rede ao fechar o dia.");
     } finally {
       setClosingDay(false);
+    }
+  };
+
+  const exportTodaySalesPdf = async () => {
+    if (!vendorId) return;
+    const today = new Date().toISOString().split("T")[0];
+    try {
+      const res = await fetch(`/api/daily-report?vendor_id=${vendorId}&date=${today}`);
+      const report = (await res.json()) as DailySalesReport;
+      if (!res.ok) {
+        alert(report.error || "Nao foi possivel exportar as vendas do dia.");
+        return;
+      }
+
+      const paymentRows = Object.entries(report.summary?.payment_methods || {})
+        .map(([method, data]) => `
+          <tr>
+            <td>${escapeReportValue(PAYMENT_METHOD_LABELS[method] || method)}</td>
+            <td>${Number(data.count || 0)}</td>
+            <td>${formatCurrency(Number(data.gross ?? data.total ?? 0))}</td>
+            <td>${formatCurrency(Number(data.fees || 0))}</td>
+            <td>${formatCurrency(Number(data.net ?? data.total ?? 0))}</td>
+          </tr>
+        `).join("");
+
+      const productRows = (report.top_products || [])
+        .map((product: DailySalesProduct) => `
+          <tr>
+            <td>${escapeReportValue(product.name)}</td>
+            <td>${Number(product.quantity || 0)}</td>
+            <td>${formatCurrency(Number(product.revenue || 0))}</td>
+          </tr>
+        `).join("");
+
+      const orderRows = (report.orders || [])
+        .map((order: DailySalesOrder) => {
+          const paymentMethod = order.payment_method || "cash";
+          return `
+            <tr>
+              <td>${escapeReportValue(order.umbrella_number)}</td>
+              <td>${escapeReportValue(order.customer_name)}</td>
+              <td>${escapeReportValue(order.customer_phone)}</td>
+              <td>${Number(order.items_count || 0)}</td>
+              <td>${escapeReportValue(PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod)}</td>
+              <td>${formatCurrency(Number(order.gross_total ?? order.total ?? 0))}</td>
+              <td>${formatCurrency(Number(order.payment_fee_amount || 0))}</td>
+              <td>${formatCurrency(Number(order.net_total ?? order.total ?? 0))}</td>
+              <td>${new Date(order.paid_at || order.created_at || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
+            </tr>
+          `;
+        }).join("");
+
+      const html = `
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <title>Vendas do dia - ${formatReportDate(today)}</title>
+            <style>
+              * { box-sizing: border-box; }
+              body { margin: 0; padding: 28px; color: #241711; font-family: Arial, sans-serif; background: #fffaf7; }
+              header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid #ff6b00; padding-bottom: 18px; margin-bottom: 22px; }
+              h1 { margin: 0; font-size: 28px; }
+              h2 { margin: 28px 0 10px; font-size: 17px; color: #8a2f00; }
+              p { margin: 4px 0; color: #6b5147; }
+              .brand { text-align: right; font-weight: 800; color: #ff6b00; }
+              .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+              .kpi { border: 1px solid #f0d2c4; border-radius: 10px; background: #fff; padding: 12px; }
+              .kpi span { display: block; color: #7a6258; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+              .kpi strong { display: block; margin-top: 6px; font-size: 20px; }
+              table { width: 100%; border-collapse: collapse; background: #fff; }
+              th, td { border: 1px solid #ead7cc; padding: 8px; text-align: left; font-size: 12px; }
+              th { background: #ffefe6; color: #572000; font-size: 11px; text-transform: uppercase; }
+              footer { margin-top: 28px; color: #8a746a; font-size: 11px; text-align: center; }
+              @media print { body { background: #fff; padding: 18px; } .kpis { break-inside: avoid; } }
+            </style>
+          </head>
+          <body>
+            <header>
+              <div>
+                <h1>Vendas do dia</h1>
+                <p>${formatReportDate(today)}</p>
+              </div>
+              <div class="brand">SandExpress<br />Relatorio operacional</div>
+            </header>
+            <section class="kpis">
+              <div class="kpi"><span>Faturamento bruto</span><strong>${formatCurrency(Number(report.summary?.total_gross_revenue ?? report.summary?.total_revenue ?? 0))}</strong></div>
+              <div class="kpi"><span>Taxas</span><strong>${formatCurrency(Number(report.summary?.total_payment_fees || 0))}</strong></div>
+              <div class="kpi"><span>Liquido</span><strong>${formatCurrency(Number(report.summary?.total_net_revenue ?? report.summary?.total_revenue ?? 0))}</strong></div>
+              <div class="kpi"><span>Pedidos pagos</span><strong>${Number(report.summary?.total_orders || 0)}</strong></div>
+            </section>
+            <section class="kpis">
+              <div class="kpi"><span>Itens vendidos</span><strong>${Number(report.summary?.total_items_sold || 0)}</strong></div>
+              <div class="kpi"><span>Ticket medio</span><strong>${formatCurrency(Number(report.summary?.avg_ticket || 0))}</strong></div>
+              <div class="kpi"><span>Clientes unicos</span><strong>${Number(report.summary?.unique_customers || 0)}</strong></div>
+              <div class="kpi"><span>Gerado em</span><strong>${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong></div>
+            </section>
+            <h2>Meios de pagamento</h2>
+            <table>
+              <thead><tr><th>Metodo</th><th>Contas</th><th>Bruto</th><th>Taxas</th><th>Liquido</th></tr></thead>
+              <tbody>${paymentRows || `<tr><td colspan="5">Nenhuma venda paga no dia.</td></tr>`}</tbody>
+            </table>
+            <h2>Produtos mais vendidos</h2>
+            <table>
+              <thead><tr><th>Produto</th><th>Quantidade</th><th>Faturamento</th></tr></thead>
+              <tbody>${productRows || `<tr><td colspan="3">Sem produtos vendidos.</td></tr>`}</tbody>
+            </table>
+            <h2>Pedidos pagos</h2>
+            <table>
+              <thead><tr><th>Guarda-sol</th><th>Cliente</th><th>Telefone</th><th>Itens</th><th>Pagamento</th><th>Bruto</th><th>Taxa</th><th>Liquido</th><th>Hora</th></tr></thead>
+              <tbody>${orderRows || `<tr><td colspan="9">Nenhum pedido pago no dia.</td></tr>`}</tbody>
+            </table>
+            <footer>Relatorio gerado pelo SandExpress.</footer>
+          </body>
+        </html>
+      `;
+
+      const printWindow = window.open("", "", "width=960,height=720");
+      if (!printWindow) {
+        alert("O navegador bloqueou a janela de PDF. Libere pop-ups para exportar.");
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    } catch (err) {
+      console.error("Export daily sales report error:", err);
+      alert("Erro de rede ao exportar vendas do dia.");
     }
   };
 
@@ -1665,7 +1851,7 @@ export default function VendorDashboard() {
                       <input
                         value={themeForm.logo_url}
                         onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
-                        placeholder="/logo-sandexpress.png ou https://..."
+                        placeholder="/sandexpress-logo-fluid.png ou https://..."
                         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
                       />
                       <span className="block text-xs font-semibold text-gray-500">Tambem e possivel colar uma URL manualmente.</span>
@@ -1843,14 +2029,23 @@ export default function VendorDashboard() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={closeBusinessDay}
-                  disabled={closingDay}
-                  className="bg-[#394E59] hover:bg-[#263640] text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <CalendarCheck size={18} />
-                  {closingDay ? "Fechando..." : "Fechar dia"}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={exportTodaySalesPdf}
+                    className="border-2 border-[#FF6B00] bg-white px-5 py-3 rounded-xl font-bold text-[#FF6B00] flex items-center justify-center gap-2 hover:bg-[#FFF2E5]"
+                  >
+                    <Download size={18} />
+                    Exportar vendas do dia
+                  </button>
+                  <button
+                    onClick={closeBusinessDay}
+                    disabled={closingDay}
+                    className="bg-[#394E59] hover:bg-[#263640] text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <CalendarCheck size={18} />
+                    {closingDay ? "Fechando..." : "Fechar dia"}
+                  </button>
+                </div>
               </div>
 
               {/* Period filter */}

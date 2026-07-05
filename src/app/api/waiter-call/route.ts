@@ -3,7 +3,7 @@ import { getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 
-const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
+const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed'];
 const SERVICE_REQUESTS = {
   waiter_call: {
     marker: '[WAITER_CALL]',
@@ -57,6 +57,23 @@ export async function POST(req: NextRequest) {
     }
     if (!await vendorFeatureEnabled(vendor_id, serviceRequest.feature)) {
       return NextResponse.json(featureDisabledResponse(serviceRequest.feature), { status: 403 });
+    }
+
+    const { data: closingOrders, error: closingErr } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('vendor_id', vendor_id)
+      .eq('umbrella_id', umbrella_id)
+      .eq('customer_id', customer_id)
+      .eq('paid', false)
+      .eq('status', 'closing_requested')
+      .limit(1);
+
+    if (closingErr) throw closingErr;
+    if ((closingOrders || []).length > 0) {
+      return NextResponse.json({
+        error: 'Conta ja solicitada. Para chamar atendente novamente, abra uma nova comanda.',
+      }, { status: 409 });
     }
 
     const { data: umbrella, error: umbrellaErr } = await supabaseAdmin

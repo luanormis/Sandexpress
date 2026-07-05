@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "Faça seu pedido diretamente da areia, sem enfrentar filas.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/logo-sandexpress.png",
+    icon: "/sandexpress-logo-fluid.png",
     apple: "/icon-192.png",
   },
 };

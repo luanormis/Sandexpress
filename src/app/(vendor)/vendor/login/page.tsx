@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 
 export default function VendorLogin() {
   const [document_login, setDocumentLogin] = useState("");
@@ -100,12 +99,11 @@ export default function VendorLogin() {
 
   return (
     <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-24 h-24 rounded-[32px] brand-card flex items-center justify-center mb-6">
-        <Image src="/logo-sandexpress.png" alt="SandExpress" width={128} height={72} priority />
+      <div className="mb-6 flex h-24 w-24 items-center justify-center">
+        <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={128} height={123} priority className="h-full w-auto object-contain" />
       </div>
       <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Painel do Quiosque</h1>
       <p className="text-gray-500 mb-8 max-w-sm">Entre com seu CPF/CNPJ e senha para gerenciar seus pedidos em tempo real.</p>
-      <InstallShortcutButton context="vendor" className="mb-5 w-full max-w-sm" />
       {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
         <div>

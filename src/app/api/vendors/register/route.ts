@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { getAppBaseUrl, sendEmail } from '@/lib/email';
-import { buildVendorVerificationEmail } from '@/lib/email-templates';
+import { sendEmail } from '@/lib/email';
+import { buildVendorRegistrationConfirmationEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getRequestSession } from '@/lib/auth-session';
 import { buildTenantFeatureRows } from '@/lib/features';
 import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
-import { consumeVerifiedOtp } from '@/lib/otp-challenges';
 import { isRateLimited } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/vendor-password';
 import { getPlatformPlanSettings } from '@/lib/platform-plans';
 import { seedDefaultMenuForVendor } from '@/lib/default-menu-products';
-
-function hashToken(token: string) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 function safeText(value: unknown, maxLength = 120) {
   return String(value || '').trim().slice(0, maxLength);
@@ -43,8 +36,6 @@ export async function POST(req: NextRequest) {
     const cleanCpf = String(body.cpf || '').replace(/\D/g, '');
     const cleanCnpj = String(body.cnpj || '').replace(/\D/g, '');
     const documentLogin = String(body.document_login || cleanCnpj || cleanCpf || cleanPhone).trim();
-    const session = getRequestSession(req);
-    const isAdminCreate = session?.role === 'admin';
     if (!documentLogin) {
       return NextResponse.json({ error: 'Informe telefone, CPF ou CNPJ para criar o login.' }, { status: 400 });
     }
@@ -53,9 +44,6 @@ export async function POST(req: NextRequest) {
     }
     if (body.terms_accepted !== true) {
       return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso e a Politica de Privacidade para concluir o cadastro.' }, { status: 400 });
-    }
-    if (!isAdminCreate && !body.otp_challenge_id) {
-      return NextResponse.json({ error: 'Valide o WhatsApp do responsavel antes de cadastrar o quiosque.' }, { status: 403 });
     }
 
     const duplicateFilters = [
@@ -98,17 +86,6 @@ export async function POST(req: NextRequest) {
     const cleanBeach = safeText(body.beach_name, 120);
     const cleanName = safeText(body.name, 120);
     const cleanOwnerName = safeText(body.owner_name, 120);
-    if (!isAdminCreate) {
-      const otpOk = await consumeVerifiedOtp({
-        challengeId: String(body.otp_challenge_id),
-        phone: cleanPhone,
-        purpose: 'vendor_register',
-      });
-      if (!otpOk) {
-        return NextResponse.json({ error: 'Codigo WhatsApp nao validado para o responsavel.' }, { status: 403 });
-      }
-    }
-
     const { data: beach, error: beachError } = await (supabaseAdmin.from('beaches') as any)
       .upsert({
         name: cleanBeach,
@@ -132,7 +109,7 @@ export async function POST(req: NextRequest) {
       secondary_color: body.secondary_color || '#82533f',
       button_color: body.button_color || body.primary_color || '#ff6b00',
       button_text_color: body.button_text_color || '#ffffff',
-      logo_url: body.logo_url || '/logo-sandexpress.png',
+      logo_url: body.logo_url || '/sandexpress-logo-fluid.png',
     };
     if (beachId) tenantPayload.beach_id = beachId;
 
@@ -142,9 +119,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (tenantError) throw tenantError;
-
-    const verificationToken = crypto.randomBytes(32).toString('base64url');
-    const verificationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const vendorPayload: Record<string, unknown> = {
         tenant_id: tenant.id,
@@ -159,16 +133,16 @@ export async function POST(req: NextRequest) {
         city: cleanCity,
         state: cleanState,
         beach_name: cleanBeach,
-        logo_url: body.logo_url || '/logo-sandexpress.png',
+        logo_url: body.logo_url || '/sandexpress-logo-fluid.png',
         primary_color: body.primary_color || '#ff6b00',
         secondary_color: body.secondary_color || '#82533f',
         button_color: body.button_color || body.primary_color || '#ff6b00',
         button_text_color: body.button_text_color || '#ffffff',
         password_hash: passwordHash,
         password_needs_reset: false,
-        owner_email_verified: false,
-        owner_email_verification_token: hashToken(verificationToken),
-        owner_email_verification_expires_at: verificationExpiresAt,
+        owner_email_verified: true,
+        owner_email_verification_token: null,
+        owner_email_verification_expires_at: null,
         subscription_status: 'trial',
         plan_type: 'trial',
         trial_ends_at: trialEndsAt,
@@ -209,27 +183,24 @@ export async function POST(req: NextRequest) {
       console.error('Default menu seed error:', menuError);
     }
 
-    const verificationUrl = `${getAppBaseUrl(req)}/api/vendors/verify-email?token=${encodeURIComponent(verificationToken)}`;
-    const verificationEmail = buildVendorVerificationEmail({
+    const confirmationEmail = buildVendorRegistrationConfirmationEmail({
       vendorName: vendor.name,
       ownerName: vendor.owner_name,
       login: documentLogin,
       trialEndsAt,
-      verificationUrl,
     });
     const emailResult = await sendEmail({
       to: String(vendor.owner_email).trim().toLowerCase(),
-      ...verificationEmail,
+      ...confirmationEmail,
     });
 
     return NextResponse.json({
       ...vendor,
       tenant_id: tenant.id,
       document_login: documentLogin,
-      email_verification: {
+      email_confirmation: {
         sent: emailResult.ok,
         reason: emailResult.ok ? null : emailResult.reason,
-        ...(process.env.NODE_ENV !== 'production' ? { verification_url: verificationUrl } : {}),
       },
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
