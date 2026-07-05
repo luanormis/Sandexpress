@@ -605,14 +605,15 @@ input[type="number"] {
 .customer-actions {
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
   gap: clamp(0.45rem, 2vw, 0.65rem);
 }
 
 .customer-icon-button {
   border: 0;
-  border-radius: 1rem;
-  width: clamp(5.9rem, 24vw, 7.3rem);
-  min-height: clamp(4.7rem, 18vw, 5.3rem);
+  border-radius: 0.95rem;
+  width: clamp(7.25rem, 27vw, 8.5rem);
+  min-height: clamp(3.35rem, 12vw, 3.85rem);
   padding: 0 clamp(0.65rem, 2.8vw, 0.9rem);
   background: var(--customer-button);
   color: var(--customer-button-text);
@@ -1134,18 +1135,18 @@ input[type="number"] {
 
 /* SandExpress reference rebuild: solar concierge + beach-tech operations */
 .customer-app {
-  --customer-primary: #ff5a00;
-  --customer-secondary: #a33a00;
-  --customer-button: #ff5a00;
+  --customer-primary: #d44800;
+  --customer-secondary: #572000;
+  --customer-button: #c24100;
   --customer-button-text: #ffffff;
-  --customer-bg: #fff6f2;
+  --customer-bg: #fff1eb;
   --customer-surface: #ffffff;
-  --customer-border: rgba(226, 191, 176, 0.42);
+  --customer-border: rgba(130, 83, 63, 0.34);
   --customer-text: #201512;
-  --customer-muted: #6b5147;
+  --customer-muted: #5b3a2d;
   background:
-    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.12), transparent 34rem),
-    linear-gradient(180deg, #fff8f6 0%, #fff2ed 100%);
+    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.16), transparent 34rem),
+    linear-gradient(180deg, #fff8f6 0%, #ffeae1 100%);
 }
 
 .customer-welcome {
@@ -1164,9 +1165,18 @@ input[type="number"] {
   inset-inline: clamp(0.8rem, 3vw, 1.4rem);
   top: calc(env(safe-area-inset-top) + 0.85rem);
   border: 0;
-  border-radius: 2.6rem;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 1.4rem 3.4rem rgba(61, 26, 10, 0.09);
+  border-radius: 2rem;
+  background: rgba(255, 248, 246, 0.94);
+  box-shadow: 0 1.4rem 3.4rem rgba(61, 26, 10, 0.16);
+}
+
+.customer-total-card {
+  border-color: rgba(255, 107, 0, 0.32);
+  background: linear-gradient(135deg, #fff7f2, #ffe6d6);
+}
+
+.customer-total-card strong {
+  color: #b83500;
 }
 
 .customer-shell {

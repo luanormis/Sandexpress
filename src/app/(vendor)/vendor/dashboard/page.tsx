@@ -2947,20 +2947,20 @@ function ProductModal({
           </div>
 
           {!isMenuMode && form.stock_tracking_enabled && (
-            <div className="grid grid-cols-1 gap-4 rounded-xl border border-orange-100 bg-orange-50 p-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Estoque fisico</label>
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#e2bfb0] bg-white p-3">
+                <label className="block text-sm font-black text-[#3d1a0a] mb-1">Estoque central</label>
                 <input
                   type="number"
                   min="0"
                   value={form.physical_stock_quantity || ""}
                   onChange={e => setForm(prev => ({ ...prev, physical_stock_quantity: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                  className="w-full border-2 border-orange-100 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                  className="w-full border-2 border-[#e2bfb0] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-[#fff8f6] font-black text-[#3d1a0a]"
                   placeholder="Ex: 80"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Estoque praia</label>
+              <div className="rounded-xl border border-[#ffb693] bg-[#fff1eb] p-3">
+                <label className="block text-sm font-black text-[#a04100] mb-1">Estoque praia</label>
                 <input
                   type="number"
                   min="0"
@@ -2974,7 +2974,7 @@ function ProductModal({
                       blocked_by_stock: nextStock <= 0,
                     }));
                   }}
-                  className="w-full border-2 border-orange-100 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                  className="w-full border-2 border-[#ffb693] rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white font-black text-[#572000]"
                   placeholder="Ex: 24"
                 />
               </div>
