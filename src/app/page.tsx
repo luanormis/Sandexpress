@@ -216,44 +216,44 @@ export default function LandingPage() {
       </section>
 
       {/* Planos */}
-      <section id="planos" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#EFD5CA]">
+      <section id="planos" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#231916]">
         <div className="max-w-5xl mx-auto text-center">
            <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#FF6B00]">Planos SandExpress</p>
-           <h2 className="text-4xl font-display font-bold text-[#231916] mb-4">Escolha seu ponto de partida</h2>
-           <p className="text-xl text-[#53433E] mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
+           <h2 className="text-4xl font-display font-bold text-[#FFF8F6] mb-4">Escolha seu ponto de partida</h2>
+           <p className="text-xl text-[#FFDBCB] mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
            
            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
               {/* Trial */}
-              <div className="border border-[#85736C] p-8 rounded-[40px] bg-[#F4DED5] shadow-[0_20px_40px_rgba(61,26,10,0.10)]">
-                 <h3 className="text-2xl font-bold mb-2 text-[#231916]">Trial</h3>
-                 <p className="text-[#53433E] mb-6 font-semibold">Para conhecer a plataforma</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-[#3D1A0A]">R$0</span><span className="text-[#53433E] font-bold">/{planSettings.trial_days} dias</span></div>
+              <div className="border border-[#7A2D00] p-8 rounded-[40px] bg-[#3D1A0A] shadow-[0_24px_55px_rgba(0,0,0,0.24)]">
+                 <h3 className="text-2xl font-bold mb-2 text-[#FFF8F6]">Trial</h3>
+                 <p className="text-[#FFDBCB] mb-6 font-semibold">Para conhecer a plataforma</p>
+                 <div className="mb-6"><span className="text-5xl font-display font-bold text-[#FF6B00]">R$0</span><span className="text-[#FFDBCB] font-bold">/{planSettings.trial_days} dias</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
+                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#3D1A0A] text-[#3D1A0A] hover:bg-[#3D1A0A] hover:text-white transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-[#231916] transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Mensal */}
-              <div className="border border-[#FFDBCB] p-8 rounded-[40px] bg-[#FF6B00] text-white shadow-[0_24px_50px_rgba(255,107,0,0.24)]">
+              <div className="border border-[#FF9A4D] p-8 rounded-[40px] bg-[#FF6B00] text-[#231916] shadow-[0_28px_65px_rgba(255,107,0,0.34)]">
                  <h3 className="text-2xl font-bold mb-2">Mensal</h3>
-                 <p className="text-[#341100] mb-6 font-black">Ideal para testar a temporada</p>
+                 <p className="text-[#3D1A0A] mb-6 font-black">Ideal para testar a temporada</p>
                  <div className="mb-6"><span className="text-5xl font-display font-bold">{formatPlanPriceLabel(planSettings.monthly_price)}</span><span className="text-[#341100] font-black">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Pedidos ilimitados</li>
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Relatórios completos</li>
+                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Relatórios completos</li>
                  </ul>
                  <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#3D1A0A] text-white hover:bg-[#231916] transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Anual */}
-              <div className="bg-[#3D1A0A] p-8 rounded-[40px] text-white relative shadow-[0_28px_60px_rgba(61,26,10,0.28)] scale-105 border border-[#FFDBCB]">
-                 <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FFDBCB] text-[#3D1A0A] px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
+              <div className="bg-[#2A1005] p-8 rounded-[40px] text-[#FFF8F6] relative shadow-[0_32px_70px_rgba(0,0,0,0.34)] scale-105 border border-[#FF6B00]">
+                 <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-[#231916] px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
                  <h3 className="text-2xl font-bold mb-2">Anual</h3>
-                 <p className="text-[#FFDBCB] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
+                 <p className="text-[#FF9A4D] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
                  <div className="mb-6"><span className="text-5xl font-display font-bold">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="text-[#FFDBCB] font-bold">/mês</span></div>
                  <ul className="space-y-3 mb-8">
                    <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
