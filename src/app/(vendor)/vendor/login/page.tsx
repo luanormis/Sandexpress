@@ -98,7 +98,7 @@ export default function VendorLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
+    <div className="vendor-ops-shell min-h-screen flex flex-col items-center justify-center p-6 text-center">
       <div className="mb-6 flex h-24 w-24 items-center justify-center">
         <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={128} height={123} priority className="h-full w-auto object-contain" />
       </div>

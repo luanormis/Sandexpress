@@ -74,12 +74,12 @@ export default function KioskConfigPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
+    <div className="admin-ops-shell min-h-screen p-6">
+      <div className="mx-auto max-w-2xl rounded-3xl border border-[#7a2b00] bg-[#451704]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.28)] sm:p-8">
         <h1 className="text-3xl font-bold mb-6">Configuração do Quiosque</h1>
 
         <div
-          className="mb-6 p-6 rounded-lg text-white"
+          className="mb-6 rounded-2xl border border-white/15 p-6 text-white shadow-inner"
           style={{
             backgroundColor: primaryColor,
           }}
@@ -89,105 +89,105 @@ export default function KioskConfigPage() {
               <img
                 src={logoPreview}
                 alt="Logo preview"
-                className="w-24 h-24 rounded"
+                className="h-24 w-24 rounded-2xl border border-white/25 bg-white/90 object-contain p-2"
               />
             )}
             <div>
-              <h2 className="text-2xl font-bold">{name || "Seu Quiosque"}</h2>
+              <h2 className="text-2xl font-black">{name || "Seu Quiosque"}</h2>
               <p>Cor secundária:</p>
               <span
-                className="inline-block w-6 h-6 rounded ml-2"
+                className="ml-2 inline-block h-7 w-7 rounded-lg border border-white/30"
                 style={{ backgroundColor: secondaryColor }}
               />
             </div>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
               Nome do Quiosque
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full rounded-xl border border-[#7a2b00] bg-[#201411] px-4 py-3 font-bold text-[#fff8f6] outline-none placeholder:text-[#b78f7d] focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/25"
               placeholder="Ex: Quiosque Praia Central"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
               Cor Primária
             </label>
             <input
               type="color"
               value={primaryColor}
               onChange={(e) => setPrimaryColor(e.target.value)}
-              className="w-16 h-10 border border-gray-300 rounded"
+              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
               Cor Secundária
             </label>
             <input
               type="color"
               value={secondaryColor}
               onChange={(e) => setSecondaryColor(e.target.value)}
-              className="w-16 h-10 border border-gray-300 rounded"
+              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
               Cor do Botao
             </label>
             <input
               type="color"
               value={buttonColor}
               onChange={(e) => setButtonColor(e.target.value)}
-              className="w-16 h-10 border border-gray-300 rounded"
+              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
               Texto do Botao
             </label>
             <input
               type="color"
               value={buttonTextColor}
               onChange={(e) => setButtonTextColor(e.target.value)}
-              className="w-16 h-10 border border-gray-300 rounded"
+              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Logo</label>
+            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">Logo</label>
             <input
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              className="w-full"
+              className="w-full rounded-xl border border-dashed border-[#7a2b00] bg-[#201411] px-4 py-3 text-sm font-bold text-[#fff8f6] file:mr-4 file:rounded-lg file:border-0 file:bg-[#ff6b00] file:px-4 file:py-2 file:font-black file:text-white"
             />
             {logoPreview && (
               <img
                 src={logoPreview}
                 alt="Logo"
-                className="mt-2 max-h-32"
+                className="mt-3 max-h-32 rounded-2xl border border-[#7a2b00] bg-white/95 object-contain p-2"
               />
             )}
           </div>
 
           {message && (
             <p
-              className={`p-3 rounded ${
+              className={`rounded-xl border p-3 font-bold ${
                 message.includes("sucesso")
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700"
+                  ? "border-green-500/30 bg-green-500/15 text-green-100"
+                  : "border-red-500/30 bg-red-500/15 text-red-100"
               }`}
             >
               {message}
@@ -197,7 +197,7 @@ export default function KioskConfigPage() {
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="w-full font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl py-3 font-black shadow-[0_14px_30px_rgba(255,107,0,0.28)] transition hover:brightness-110 disabled:opacity-50"
             style={{ backgroundColor: buttonColor, color: buttonTextColor }}
           >
             <Save size={20} />

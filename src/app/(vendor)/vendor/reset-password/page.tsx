@@ -87,7 +87,7 @@ function ResetPasswordForm() {
 
 export default function VendorResetPassword() {
   return (
-    <div className="min-h-screen bg-[#fff8f6] flex flex-col items-center justify-center p-6 text-center">
+    <div className="vendor-ops-shell min-h-screen flex flex-col items-center justify-center p-6 text-center">
       <div className="w-24 h-24 rounded-[32px] brand-card flex items-center justify-center mb-6">
         <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={128} height={123} priority className="h-24 w-auto object-contain" />
       </div>

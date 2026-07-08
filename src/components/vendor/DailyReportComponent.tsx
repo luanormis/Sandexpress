@@ -235,7 +235,7 @@ export default function DailyReportComponent() {
   const paymentMethods = report?.summary.payment_methods || {};
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div className="vendor-ops-shell max-w-7xl mx-auto p-6 space-y-6 min-h-screen">
       {/* Header */}
       <div className="border-b pb-4 bg-white rounded-lg p-6">
         <h1 className="text-4xl font-bold text-gray-900">📊 Encerramento do Dia</h1>

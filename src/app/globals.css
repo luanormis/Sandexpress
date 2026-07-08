@@ -259,14 +259,14 @@ input[type="number"] {
 
 .customer-app {
   --customer-primary: #ff6b00;
-  --customer-secondary: #451704;
+  --customer-secondary: #3d1a0a;
   --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #201411;
-  --customer-surface: #451704;
-  --customer-border: rgba(255, 107, 0, 0.4);
-  --customer-text: #fff8f6;
-  --customer-muted: #f4d6c8;
+  --customer-bg: #fff8f6;
+  --customer-surface: #ffffff;
+  --customer-border: #efd5ca;
+  --customer-text: #231916;
+  --customer-muted: #53433e;
   min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
@@ -1165,17 +1165,17 @@ input[type="number"] {
 /* SandExpress reference rebuild: solar concierge + beach-tech operations */
 .customer-app {
   --customer-primary: #ff6b00;
-  --customer-secondary: #451704;
+  --customer-secondary: #3d1a0a;
   --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #201411;
-  --customer-surface: #451704;
-  --customer-border: rgba(255, 107, 0, 0.4);
-  --customer-text: #fff8f6;
-  --customer-muted: #f4d6c8;
+  --customer-bg: #fff8f6;
+  --customer-surface: #ffffff;
+  --customer-border: rgba(133, 115, 108, 0.36);
+  --customer-text: #231916;
+  --customer-muted: #53433e;
   background:
-    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.18), transparent 34rem),
-    linear-gradient(180deg, #201411 0%, #2a1711 100%);
+    radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--customer-primary) 16%, transparent), transparent 34rem),
+    linear-gradient(180deg, var(--customer-bg) 0%, color-mix(in srgb, var(--customer-primary) 10%, var(--customer-bg)) 100%);
 }
 
 .customer-welcome {
@@ -1186,8 +1186,8 @@ input[type="number"] {
 
 .customer-login {
   background:
-    radial-gradient(circle at 80% 0%, rgba(255, 106, 0, 0.18), transparent 22rem),
-    linear-gradient(180deg, #201411 0%, #2a1711 100%);
+    radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--customer-primary) 12%, transparent), transparent 22rem),
+    linear-gradient(180deg, var(--customer-bg) 0%, color-mix(in srgb, var(--customer-primary) 10%, var(--customer-bg)) 100%);
 }
 
 .customer-topbar {
@@ -1924,4 +1924,34 @@ input[type="number"] {
   .landing-price-value {
     font-size: clamp(2rem, 11vw, 2.55rem);
   }
+}
+
+/* Customer screens stay tenant-branded and must not inherit the institutional admin theme. */
+.customer-app :where(.bg-white) {
+  background-color: var(--customer-surface) !important;
+}
+
+.customer-app :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-zinc-50, .bg-blue-50, .bg-green-50, .bg-purple-50, .bg-orange-50) {
+  background-color: color-mix(in srgb, var(--customer-primary) 10%, var(--customer-bg)) !important;
+}
+
+.customer-app :where(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-zinc-900) {
+  color: var(--customer-text) !important;
+}
+
+.customer-app :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500) {
+  color: var(--customer-muted) !important;
+}
+
+.customer-app :where(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200, .border-zinc-200) {
+  border-color: var(--customer-border) !important;
+}
+
+.customer-app :where(.bg-\[\#FF6B00\], .bg-orange-600, .bg-blue-600, .bg-green-600, .bg-purple-600) {
+  background-color: var(--customer-button) !important;
+  color: var(--customer-button-text) !important;
+}
+
+.customer-app :where(.text-\[\#FF6B00\], .text-orange-600, .text-blue-600, .text-green-600, .text-purple-600) {
+  color: var(--customer-primary) !important;
 }

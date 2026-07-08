@@ -91,28 +91,28 @@ const sections = [
 
 export default function TermsOfUsePage() {
   return (
-    <main className="min-h-screen bg-[#fff8f6] px-4 py-10 text-[#261812] sm:px-6">
-      <article className="mx-auto max-w-4xl rounded-2xl border border-[#e2bfb0] bg-white p-6 shadow-sm sm:p-10">
-        <Link href="/" className="text-sm font-bold text-[#FF6B00] hover:text-[#E56000]">
+    <main className="landing-shell min-h-screen bg-[#201411] px-4 py-10 text-[#fff8f6] sm:px-6">
+      <article className="mx-auto max-w-4xl rounded-3xl border border-[#7a2b00] bg-[#451704]/92 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-10">
+        <Link href="/" className="text-sm font-black text-[#ff8a2b] hover:text-[#ffb168]">
           Voltar para o cadastro
         </Link>
 
         <header className="mt-6">
-          <p className="text-sm font-black uppercase text-[#FF6B00]">Documento unico de aceite</p>
+          <p className="text-sm font-black uppercase text-[#ff8a2b]">Documento unico de aceite</p>
           <h1 className="mt-2 text-3xl font-display font-bold sm:text-4xl">{TERMS_DOCUMENT_TITLE}</h1>
-          <p className="mt-3 text-sm font-bold text-gray-500">Versao {TERMS_VERSION}</p>
-          <p className="mt-1 break-all text-xs text-gray-400">Hash SHA-256: {TERMS_DOCUMENT_HASH}</p>
+          <p className="mt-3 text-sm font-bold text-[#ffcfb1]">Versao {TERMS_VERSION}</p>
+          <p className="mt-1 break-all text-xs text-[#d8a892]">Hash SHA-256: {TERMS_DOCUMENT_HASH}</p>
         </header>
 
-        <div className="mt-8 rounded-2xl border border-[#e2bfb0] bg-[#fff8f6] p-5">
-          <h2 className="text-lg font-bold text-gray-900">Texto do aceite</h2>
-          <p className="mt-2 text-sm leading-7 text-gray-700">{TERMS_CONSENT_TEXT}</p>
+        <div className="mt-8 rounded-2xl border border-[#9b3a05] bg-[#2b160f] p-5">
+          <h2 className="text-lg font-bold text-[#fff8f6]">Texto do aceite</h2>
+          <p className="mt-2 text-sm leading-7 text-[#ffd7c4]">{TERMS_CONSENT_TEXT}</p>
         </div>
 
-        <div className="mt-8 space-y-6 text-sm leading-7 text-gray-700 sm:text-base">
+        <div className="mt-8 space-y-6 text-sm leading-7 text-[#ffd7c4] sm:text-base">
           {sections.map((section) => (
             <section key={section.title}>
-              <h2 className="text-xl font-bold text-gray-900">{section.title}</h2>
+              <h2 className="text-xl font-bold text-[#fff8f6]">{section.title}</h2>
               <p>{section.body}</p>
             </section>
           ))}
