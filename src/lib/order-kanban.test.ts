@@ -1,4 +1,4 @@
-import { mapOrderForKanban } from './order-kanban';
+import { mapOrderForKanban, shouldShowOrderInKanban } from './order-kanban';
 
 describe('order kanban mapper', () => {
   it('shows only the active request items in kanban', () => {
@@ -37,5 +37,16 @@ describe('order kanban mapper', () => {
     expect(mapped.active_request_id).toBeNull();
     expect(mapped.items).toEqual([]);
     expect(mapped.account_items).toHaveLength(1);
+  });
+
+  it('keeps cancelled empty accounts out of kanban after releasing an umbrella', () => {
+    expect(shouldShowOrderInKanban({
+      id: 'account-1',
+      status: 'cancelled',
+      paid: false,
+      total: 0,
+      customer_order_requests: [],
+      order_items: [],
+    })).toBe(false);
   });
 });

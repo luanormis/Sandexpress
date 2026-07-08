@@ -87,14 +87,14 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="landing-shell relative isolate min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
+    <div className="landing-shell relative isolate min-h-screen bg-[#201411] font-sans text-[#fff8f6] overflow-x-hidden">
       <div className="landing-beach-carousel" aria-hidden="true">
         <span />
         <span />
         <span />
       </div>
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 w-full bg-white/72 backdrop-blur-xl z-50 border-b border-white/50">
+      <nav className="fixed top-0 left-0 w-full bg-[#201411]/84 backdrop-blur-xl z-50 border-b border-[#ff6b00]/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
@@ -108,7 +108,7 @@ export default function LandingPage() {
              <button
                type="button"
                onClick={() => setMenuOpen(true)}
-               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e2bfb0] bg-white text-[#572000] shadow-sm hover:border-[#FF6B00]"
+               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ff6b00]/50 bg-[#451704] text-[#fff8f6] shadow-sm hover:border-[#FF6B00]"
                aria-label="Abrir menu"
              >
                <Menu size={20} />
@@ -119,37 +119,37 @@ export default function LandingPage() {
 
       {menuOpen && (
         <div className="fixed inset-0 z-[90] bg-black/40" onClick={() => setMenuOpen(false)}>
-          <aside className="ml-auto flex h-full w-[min(84vw,320px)] flex-col bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#e2bfb0] p-5">
-              <span className="font-display text-xl font-bold text-[#261812]">Menu</span>
-              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar menu">
+          <aside className="ml-auto flex h-full w-[min(84vw,320px)] flex-col bg-[#301107] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#ff6b00]/30 p-5">
+              <span className="font-display text-xl font-bold text-[#fff8f6]">Menu</span>
+              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-2 text-[#f4d6c8] hover:bg-[#451704]" aria-label="Fechar menu">
                 <X size={22} />
               </button>
             </div>
-            <nav className="flex flex-col gap-2 p-5 text-sm font-black text-gray-700">
-              <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Como funciona</a>
-              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Beneficios</a>
-              <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Planos</a>
-              <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Painel do quiosque</Link>
-              <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Admin</Link>
+            <nav className="flex flex-col gap-2 p-5 text-sm font-black text-[#f4d6c8]">
+              <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Como funciona</a>
+              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Beneficios</a>
+              <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Planos</a>
+              <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Painel do quiosque</Link>
+              <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Admin</Link>
             </nav>
           </aside>
         </div>
       )}
 
       {/* Hero Section */}
-      <section className="pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 text-center text-[#261812] relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-b from-white/70 via-[#fff8f6]/80 to-[#fff8f6]" />
+      <section className="pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 text-center text-white relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-b from-[#201411] via-[#301107] to-[#201411]" />
         <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
           <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={260} height={249} priority className="mx-auto mb-8 h-36 w-auto object-contain sm:h-48" />
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
             Seu quiosque vendendo mais, sem esforço.
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-[#572000] mb-10 sm:mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-10 sm:mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
           <div className="flex items-center justify-center">
-            <button onClick={openModal} className="w-full sm:w-auto bg-white text-[#FF6B00] px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl transition-all active:scale-95">
+            <button onClick={openModal} className="w-full sm:w-auto bg-[#FF6B00] text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:bg-[#E56000] hover:shadow-2xl transition-all active:scale-95">
               Cadastrar gratis
             </button>
           </div>
@@ -157,11 +157,11 @@ export default function LandingPage() {
       </section>
 
       {/* Como Funciona */}
-      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#fff8f6] border-b border-[#e2bfb0]/70">
+      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#201411] border-b border-[#ff6b00]/25">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-               <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Em 4 passos simples</h2>
-               <p className="text-xl text-gray-500">O fluxo perfeito para o seu cliente pedir sem complicação.</p>
+               <h2 className="text-4xl font-display font-bold text-white mb-4">Em 4 passos simples</h2>
+               <p className="text-xl text-white/85">O fluxo perfeito para o seu cliente pedir sem complicação.</p>
             </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-8">
@@ -175,11 +175,11 @@ export default function LandingPage() {
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FF6B00] text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
                       {idx + 1}
                     </div>
-                    <div className="w-16 h-16 bg-[#ffeae1] rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
+                    <div className="w-16 h-16 bg-[#301107] border border-[#ff6b00]/35 rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
                       <step.i size={32} className="text-[#FF6B00]" />
                     </div>
                     <h3 className="font-bold text-xl mb-2">{step.t}</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed">{step.d}</p>
+                    <p className="text-[#f4d6c8] text-sm leading-relaxed">{step.d}</p>
                  </div>
                ))}
             </div>
@@ -187,11 +187,11 @@ export default function LandingPage() {
       </section>
 
       {/* Benefícios */}
-      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-white">
+      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#2a1711]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Tudo que você precisa</h2>
-            <p className="text-xl text-gray-500">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
+            <h2 className="text-4xl font-display font-bold text-white mb-4">Tudo que você precisa</h2>
+            <p className="text-xl text-white/85">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
@@ -203,12 +203,12 @@ export default function LandingPage() {
               { icon: TrendingUp, title: "Relatórios Completos", desc: "Faturamento, ticket médio, produtos mais vendidos, melhores clientes. Tudo em um clique." },
               { icon: Gift, title: "Promoções e Combos", desc: "Crie combos, preços promocionais e destaque itens especiais para aumentar o ticket médio." },
             ].map((b, idx) => (
-              <div key={idx} className="bg-[#fff8f6] p-8 rounded-[40px] border border-[#e2bfb0]/70 transition-all hover:shadow-lg hover:border-[#FF6B00]/30 hover:-translate-y-1 group">
-                <div className="w-14 h-14 bg-[#FF6B00]/10 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
+              <div key={idx} className="bg-[#451704] p-8 rounded-[40px] border border-[#ff6b00]/35 transition-all hover:shadow-lg hover:border-[#FF6B00] hover:-translate-y-1 group">
+                <div className="w-14 h-14 bg-[#301107] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
                   <b.icon size={28} className="text-[#FF6B00] group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="font-bold text-lg mb-2 text-gray-900">{b.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{b.desc}</p>
+                <h3 className="font-bold text-lg mb-2 text-[#fff8f6]">{b.title}</h3>
+                <p className="text-[#f4d6c8] text-sm leading-relaxed">{b.desc}</p>
               </div>
             ))}
           </div>
@@ -216,49 +216,49 @@ export default function LandingPage() {
       </section>
 
       {/* Planos */}
-      <section id="planos" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#231916]">
+      <section id="planos" className="landing-pricing py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto text-center">
-           <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#FF6B00]">Planos SandExpress</p>
+           <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#ff6b00]">Planos SandExpress</p>
            <h2 className="text-4xl font-display font-bold text-[#FFF8F6] mb-4">Escolha seu ponto de partida</h2>
-           <p className="text-xl text-[#FFDBCB] mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
+           <p className="text-xl text-[#f4d6c8] mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
            
            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
               {/* Trial */}
-              <div className="border border-[#7A2D00] p-8 rounded-[40px] bg-[#3D1A0A] shadow-[0_24px_55px_rgba(0,0,0,0.24)]">
-                 <h3 className="text-2xl font-bold mb-2 text-[#FFF8F6]">Trial</h3>
-                 <p className="text-[#FFDBCB] mb-6 font-semibold">Para conhecer a plataforma</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold text-[#FF6B00]">R$0</span><span className="text-[#FFDBCB] font-bold">/{planSettings.trial_days} dias</span></div>
+              <div className="landing-plan-card p-7 sm:p-8 rounded-[40px]">
+                 <h3 className="text-2xl font-bold mb-2 text-[#fff8f6]">Trial</h3>
+                 <p className="text-[#f4d6c8] mb-6 font-semibold">Para conhecer a plataforma</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#FF6B00]">R$0</span><span className="landing-price-unit text-[#fff8f6]">/{planSettings.trial_days} dias</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
-                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
-                   <li className="flex gap-2 text-[#FFF8F6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-[#231916] transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Mensal */}
-              <div className="border border-[#FF9A4D] p-8 rounded-[40px] bg-[#FF6B00] text-[#231916] shadow-[0_28px_65px_rgba(255,107,0,0.34)]">
+              <div className="landing-plan-card landing-plan-card--featured p-7 sm:p-8 rounded-[40px]">
                  <h3 className="text-2xl font-bold mb-2">Mensal</h3>
-                 <p className="text-[#3D1A0A] mb-6 font-black">Ideal para testar a temporada</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold">{formatPlanPriceLabel(planSettings.monthly_price)}</span><span className="text-[#341100] font-black">/mês</span></div>
+                 <p className="mb-6 font-black">Ideal para testar a temporada</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-white">{formatPlanPriceLabel(planSettings.monthly_price)}</span><span className="landing-price-unit text-[#201411]">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Pedidos ilimitados</li>
-                   <li className="flex gap-2 text-[#231916]"><CheckCircle2 className="text-[#3D1A0A] shrink-0"/> Relatórios completos</li>
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Relatórios completos</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#3D1A0A] text-white hover:bg-[#231916] transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#451704] text-white hover:bg-[#301107] transition-colors">Cadastrar gratis</button>
               </div>
 
               {/* Anual */}
-              <div className="bg-[#2A1005] p-8 rounded-[40px] text-[#FFF8F6] relative shadow-[0_32px_70px_rgba(0,0,0,0.34)] scale-105 border border-[#FF6B00]">
-                 <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-[#231916] px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
+              <div className="landing-plan-card landing-plan-card--dark p-7 sm:p-8 rounded-[40px] text-[#fff8f6] relative scale-105">
+                 <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
                  <h3 className="text-2xl font-bold mb-2">Anual</h3>
-                 <p className="text-[#FF9A4D] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
-                 <div className="mb-6"><span className="text-5xl font-display font-bold">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="text-[#FFDBCB] font-bold">/mês</span></div>
+                 <p className="text-[#ff9b50] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#fff8f6]">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="landing-price-unit text-[#fff8f6]">/mês</span></div>
                  <ul className="space-y-3 mb-8">
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
-                   <li className="flex gap-2 text-white"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
                  </ul>
                  <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#d85a00] transition-colors">Cadastrar gratis</button>
               </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Secundário */}
-      <section className="bg-gradient-to-r from-[#3D1A0A] to-gray-900 py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
+      <section className="bg-gradient-to-r from-[#3D1A0A] to-[#231916] py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {planSettings.trial_days} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
@@ -275,7 +275,7 @@ export default function LandingPage() {
         </button>
       </section>
 
-      <footer className="bg-gray-50 py-12 text-center text-gray-500 text-sm font-semibold border-t border-gray-200">
+      <footer className="bg-[#231916] py-12 text-center text-[#FFDBCB] text-sm font-semibold border-t border-[#3D1A0A]">
          <p>© {new Date().getFullYear()} SandExpress. Todos os direitos reservados.</p>
       </footer>
 

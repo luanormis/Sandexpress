@@ -204,7 +204,7 @@ const CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petis
 
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
-  secondary_color: "#3d1a0a",
+  secondary_color: "#451704",
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
   logo_url: "/sandexpress-logo-fluid.png",
@@ -236,13 +236,13 @@ const DEFAULT_THEME: KioskTheme = {
 
 const BRAND_PALETTE = [
   { name: "Primary / Laranja", value: "#ff6b00" },
-  { name: "Secondary / Marrom", value: "#3d1a0a" },
-  { name: "Surface / Creme", value: "#efd5ca" },
-  { name: "Background", value: "#fff8f6" },
-  { name: "Surface variant", value: "#f4ded5" },
-  { name: "Primary container", value: "#ffdbcb" },
-  { name: "On surface", value: "#231916" },
-  { name: "Outline", value: "#85736c" },
+  { name: "Marrom escuro", value: "#201411" },
+  { name: "Card marrom", value: "#451704" },
+  { name: "Marrom profundo", value: "#301107" },
+  { name: "Texto creme", value: "#fff8f6" },
+  { name: "Texto suave", value: "#f4d6c8" },
+  { name: "Laranja suave", value: "#ff9b50" },
+  { name: "Borda laranja", value: "#7a2b00" },
 ];
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -1233,6 +1233,12 @@ export default function VendorDashboard() {
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     c.phone.includes(customerSearch)
   );
+  const panelThemeStyle = {
+    "--vendor-primary": themeForm.primary_color,
+    "--vendor-secondary": themeForm.secondary_color,
+    "--vendor-button": themeForm.button_color,
+    "--vendor-button-text": themeForm.button_text_color,
+  } as React.CSSProperties;
 
   const renderCompactKanbanColumn = (
     title: string,
@@ -1337,7 +1343,7 @@ export default function VendorDashboard() {
     const activeAccounts = orders.filter(order => !order.paid).length;
     const occupiedUmbrellas = umbrellas.filter(umbrella => umbrella.is_occupied || umbrella.current_order_id).length;
     return (
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <section className="vendor-beach-map rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-sm font-black text-gray-900">Mapa da praia</h3>
@@ -1364,6 +1370,7 @@ export default function VendorDashboard() {
                 onClick={() => order ? setSelectedOrder(order) : undefined}
                 className={cn(
                   "relative aspect-square min-h-12 rounded-xl border text-sm font-black transition-all",
+                  "vendor-umbrella-tile",
                   !umbrella.active && "border-gray-200 bg-gray-100 text-gray-300",
                   umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
                   umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
@@ -1404,7 +1411,7 @@ export default function VendorDashboard() {
   };
 
   return (
-    <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans">
+    <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans" style={panelThemeStyle}>
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
@@ -2007,7 +2014,7 @@ export default function VendorDashboard() {
           )}
 
           {activeTab === "reports" && (
-            <div className="space-y-6">
+            <div className="vendor-sales-surface space-y-6 rounded-2xl border border-white/40 bg-gradient-to-br from-[#ff7a1a] via-[#ff6b00] to-[#3d1a0a] p-3 sm:p-5">
               <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-start gap-3">
                   <div className="w-11 h-11 rounded-xl bg-[#FFF2E5] text-[#FF6B00] flex items-center justify-center shrink-0">
@@ -2076,23 +2083,23 @@ export default function VendorDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-4">
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Itens disponíveis</p>
-                      <p className="text-2xl font-display font-bold text-gray-900">{reportData.daily_summary.available_products}</p>
+                      <p className="sales-value-gradient text-2xl font-display font-bold">{reportData.daily_summary.available_products}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Guarda-sóis ativos</p>
-                      <p className="text-2xl font-display font-bold text-green-600">{reportData.daily_summary.active_umbrellas}</p>
+                      <p className="sales-value-gradient text-2xl font-display font-bold">{reportData.daily_summary.active_umbrellas}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Pedidos hoje</p>
-                      <p className="text-2xl font-display font-bold text-[#FF6B00]">{reportData.daily_summary.today_orders}</p>
+                      <p className="sales-value-gradient text-2xl font-display font-bold">{reportData.daily_summary.today_orders}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Receita hoje</p>
-                      <p className="text-2xl font-display font-bold text-blue-600">{formatCurrency(reportData.daily_summary.today_revenue)}</p>
+                      <p className="sales-value-gradient text-2xl font-display font-bold">{formatCurrency(reportData.daily_summary.today_revenue)}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                       <p className="text-gray-400 text-sm font-bold mb-1">Clientes novos hoje</p>
-                      <p className="text-2xl font-display font-bold text-purple-600">{reportData.daily_summary.new_customers_today}</p>
+                      <p className="sales-value-gradient text-2xl font-display font-bold">{reportData.daily_summary.new_customers_today}</p>
                     </div>
                   </div>
 
@@ -2100,19 +2107,19 @@ export default function VendorDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                     <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Faturamento</p>
-                      <p className="text-3xl font-display font-bold text-gray-900">{formatCurrency(reportData.kpis.total_revenue)}</p>
+                      <p className="sales-value-gradient text-3xl font-display font-bold">{formatCurrency(reportData.kpis.total_revenue)}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Pedidos</p>
-                      <p className="text-3xl font-display font-bold text-[#FF6B00]">{reportData.kpis.total_orders}</p>
+                      <p className="sales-value-gradient text-3xl font-display font-bold">{reportData.kpis.total_orders}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Ticket Médio</p>
-                      <p className="text-3xl font-display font-bold text-gray-900">{formatCurrency(reportData.kpis.avg_ticket)}</p>
+                      <p className="sales-value-gradient text-3xl font-display font-bold">{formatCurrency(reportData.kpis.avg_ticket)}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Clientes Únicos</p>
-                      <p className="text-3xl font-display font-bold text-green-600">{reportData.kpis.unique_customers}</p>
+                      <p className="sales-value-gradient text-3xl font-display font-bold">{reportData.kpis.unique_customers}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Satisfacao</p>

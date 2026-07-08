@@ -20,13 +20,27 @@ type OrderItemRecord = {
 type KanbanOrderRecord = {
   customer_order_requests?: OrderRequestRecord[] | null;
   order_items?: OrderItemRecord[] | null;
+  paid?: boolean | null;
   status?: string | null;
+  total?: number | string | null;
   [key: string]: unknown;
 };
+
+function hasBillableOrderItems(items?: OrderItemRecord[] | null) {
+  return Boolean((items || []).some((item) => !item.cancelled));
+}
 
 export function getActiveOrderRequest(requestsInput: OrderRequestRecord[] | null | undefined) {
   const requests = [...(requestsInput || [])].sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0));
   return [...requests].reverse().find((request) => isActiveOrderRequestStatus(request.status)) || null;
+}
+
+export function shouldShowOrderInKanban(order: KanbanOrderRecord) {
+  if (order.paid) return false;
+  if (getActiveOrderRequest(order.customer_order_requests)) return true;
+  if (order.status === 'cancelled') return false;
+  if (order.status === 'closing_requested') return true;
+  return Number(order.total || 0) > 0 || hasBillableOrderItems(order.order_items);
 }
 
 export function mapOrderForKanban(order: KanbanOrderRecord) {

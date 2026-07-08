@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
-import { mapOrderForKanban } from '@/lib/order-kanban';
+import { mapOrderForKanban, shouldShowOrderInKanban } from '@/lib/order-kanban';
 import { isCanonicalUuid } from '@/lib/uuid';
 
 const MAX_ORDER_ITEMS = 50;
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) throw error;
-    const mapped = (data || []).map((order: any) => {
+    const mapped = (data || []).filter((order: any) => shouldShowOrderInKanban(order)).map((order: any) => {
       const mappedOrder = mapOrderForKanban(order);
       return {
         ...mappedOrder,

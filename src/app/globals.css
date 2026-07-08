@@ -1,49 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff8f6;
-  --foreground: #231916;
-  --surface-dim: #efd5ca;
+  --background: #201411;
+  --foreground: #fff8f6;
+  --surface-dim: #2a1711;
   --surface-bright: #fff8f6;
-  --surface-container-lowest: #ffffff;
-  --surface-container-low: #fff8f6;
-  --surface: #fff8f6;
-  --surface-variant: #f4ded5;
-  --surface-container: #efd5ca;
-  --surface-container-high: #f4ded5;
-  --surface-container-highest: #ffdbcb;
-  --on-surface: #231916;
-  --on-surface-variant: #53433e;
-  --inverse-surface: #3d1a0a;
-  --inverse-on-surface: #ffede6;
-  --outline: #85736c;
-  --outline-variant: #efd5ca;
+  --surface-container-lowest: #160d0b;
+  --surface-container-low: #241512;
+  --surface: #2d160f;
+  --surface-variant: #451704;
+  --surface-container: #3a170d;
+  --surface-container-high: #4a1b08;
+  --surface-container-highest: #5a220b;
+  --on-surface: #fff8f6;
+  --on-surface-variant: #f4d6c8;
+  --inverse-surface: #fff8f6;
+  --inverse-on-surface: #241512;
+  --outline: #ff6b00;
+  --outline-variant: #7a2b00;
   --surface-tint: #ff6b00;
   --brand-primary: #ff6b00;
   --brand-primary-strong: #ff6b00;
   --brand-primary-container: #ff6b00;
-  --brand-primary-hover: #d85a00;
+  --brand-primary-hover: #f15b00;
   --on-primary: #ffffff;
-  --primary-container: #ffdbcb;
-  --on-primary-container: #341100;
-  --brand-secondary: #3d1a0a;
-  --brand-secondary-container: #efd5ca;
-  --on-secondary-container: #3d1a0a;
-  --brand-tertiary: #53433e;
-  --brand-tertiary-container: #f4ded5;
-  --brand-dark: #3d1a0a;
-  --brand-cream: #efd5ca;
-  --brand-sand: #efd5ca;
-  --brand-outline: #85736c;
-  --brand-outline-soft: #efd5ca;
+  --primary-container: #5a220b;
+  --on-primary-container: #fff8f6;
+  --brand-secondary: #451704;
+  --brand-secondary-container: #301107;
+  --on-secondary-container: #fff8f6;
+  --brand-tertiary: #ff9b50;
+  --brand-tertiary-container: #5a220b;
+  --brand-dark: #201411;
+  --brand-cream: #fff8f6;
+  --brand-sand: #f4d6c8;
+  --brand-outline: #ff6b00;
+  --brand-outline-soft: #7a2b00;
   --brand-orange: #ff6b00;
-  --brand-orange-soft: #ffdbcb;
-  --brand-error: #ba1a1a;
-  --brand-error-soft: #ffdad6;
-  --brand-success: #3d1a0a;
-  --brand-success-soft: #efd5ca;
-  --shadow-brand: 0 1.25rem 2.5rem rgba(61, 26, 10, 0.08);
-  --brand-accent: #efd5ca;
+  --brand-orange-soft: #ff9b50;
+  --brand-error: #ffdad6;
+  --brand-error-soft: #5a1010;
+  --brand-success: #ff9b50;
+  --brand-success-soft: #451704;
+  --shadow-brand: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.22);
+  --brand-accent: #ff9b50;
 }
 
 @theme inline {
@@ -117,9 +117,9 @@
 }
 
 .brand-card {
-  background: rgba(255, 255, 255, 0.72);
-  border: 0.0625rem solid rgba(226, 191, 176, 0.8);
-  box-shadow: 0 1.25rem 2.5rem rgba(61, 26, 10, 0.08);
+  background: rgba(69, 23, 4, 0.86);
+  border: 0.0625rem solid rgba(255, 107, 0, 0.42);
+  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(1rem);
 }
 
@@ -129,7 +129,7 @@
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  background: #fff8f6;
+  background: #201411;
 }
 
 .landing-beach-carousel::after {
@@ -137,8 +137,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 248, 246, 0.9) 42%, #fff8f6 86%),
-    radial-gradient(circle at 50% 10%, rgba(255, 107, 0, 0.08), transparent 34rem);
+    linear-gradient(180deg, rgba(32, 20, 17, 0.94), rgba(45, 22, 15, 0.96) 42%, #201411 86%),
+    radial-gradient(circle at 50% 10%, rgba(255, 107, 0, 0.18), transparent 34rem);
 }
 
 .landing-beach-carousel span {
@@ -173,7 +173,7 @@
   }
   18%,
   38% {
-    opacity: 0.18;
+    opacity: 0.08;
     transform: scale(1);
   }
   48%,
@@ -259,14 +259,14 @@ input[type="number"] {
 
 .customer-app {
   --customer-primary: #ff6b00;
-  --customer-secondary: #3d1a0a;
+  --customer-secondary: #451704;
   --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #fff8f6;
-  --customer-surface: #ffffff;
-  --customer-border: #efd5ca;
-  --customer-text: #231916;
-  --customer-muted: #53433e;
+  --customer-bg: #201411;
+  --customer-surface: #451704;
+  --customer-border: rgba(255, 107, 0, 0.4);
+  --customer-text: #fff8f6;
+  --customer-muted: #f4d6c8;
   min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
@@ -1165,17 +1165,17 @@ input[type="number"] {
 /* SandExpress reference rebuild: solar concierge + beach-tech operations */
 .customer-app {
   --customer-primary: #ff6b00;
-  --customer-secondary: #3d1a0a;
+  --customer-secondary: #451704;
   --customer-button: #ff6b00;
   --customer-button-text: #ffffff;
-  --customer-bg: #fff8f6;
-  --customer-surface: #ffffff;
-  --customer-border: rgba(133, 115, 108, 0.36);
-  --customer-text: #231916;
-  --customer-muted: #53433e;
+  --customer-bg: #201411;
+  --customer-surface: #451704;
+  --customer-border: rgba(255, 107, 0, 0.4);
+  --customer-text: #fff8f6;
+  --customer-muted: #f4d6c8;
   background:
-    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.16), transparent 34rem),
-    linear-gradient(180deg, #fff8f6 0%, #efd5ca 100%);
+    radial-gradient(circle at 50% -12%, rgba(255, 106, 0, 0.18), transparent 34rem),
+    linear-gradient(180deg, #201411 0%, #2a1711 100%);
 }
 
 .customer-welcome {
@@ -1186,8 +1186,8 @@ input[type="number"] {
 
 .customer-login {
   background:
-    radial-gradient(circle at 80% 0%, rgba(255, 106, 0, 0.12), transparent 22rem),
-    linear-gradient(180deg, #fff8f6 0%, #efd5ca 100%);
+    radial-gradient(circle at 80% 0%, rgba(255, 106, 0, 0.18), transparent 22rem),
+    linear-gradient(180deg, #201411 0%, #2a1711 100%);
 }
 
 .customer-topbar {
@@ -1445,9 +1445,9 @@ input[type="number"] {
 .vendor-ops-shell,
 .admin-ops-shell {
   background:
-    radial-gradient(circle at 70% 0%, rgba(255, 106, 0, 0.08), transparent 28rem),
-    linear-gradient(180deg, #fff8f6 0%, #fff3ef 100%) !important;
-  color: #231916 !important;
+    radial-gradient(circle at 70% 0%, rgba(255, 106, 0, 0.18), transparent 28rem),
+    linear-gradient(180deg, #201411 0%, #2a1711 100%) !important;
+  color: #fff8f6 !important;
 }
 
 .vendor-ops-shell aside,
@@ -1456,16 +1456,16 @@ input[type="number"] {
   height: calc(100dvh - 2rem);
   border: 0 !important;
   border-radius: 2.5rem !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  color: #231916 !important;
-  box-shadow: 0 1.5rem 4rem rgba(61, 26, 10, 0.08) !important;
+  background: rgba(45, 22, 15, 0.92) !important;
+  color: #fff8f6 !important;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(1rem);
 }
 
 .vendor-ops-shell main,
 .admin-ops-shell main {
   background: transparent !important;
-  color: #231916 !important;
+  color: #fff8f6 !important;
 }
 
 .vendor-ops-shell h1,
@@ -1474,13 +1474,13 @@ input[type="number"] {
 .admin-ops-shell h1,
 .admin-ops-shell h2,
 .admin-ops-shell h3 {
-  color: #231916 !important;
+  color: #fff8f6 !important;
   letter-spacing: 0;
 }
 
 .vendor-ops-shell [class*="bg-gray-"],
 .admin-ops-shell [class*="bg-gray-"] {
-  background-color: rgba(255, 255, 255, 0.84) !important;
+  background-color: rgba(69, 23, 4, 0.82) !important;
 }
 
 .vendor-ops-shell [class*="border-gray-"],
@@ -1490,7 +1490,7 @@ input[type="number"] {
 
 .vendor-ops-shell [class*="text-gray-"],
 .admin-ops-shell [class*="text-gray-"] {
-  color: #6b5147 !important;
+  color: #f4d6c8 !important;
 }
 
 .vendor-ops-shell .bg-white,
@@ -1528,7 +1528,7 @@ input[type="number"] {
 .vendor-ops-shell :where(.text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500),
 .admin-ops-shell :where(.text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500),
 .customer-app :where(.text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500) {
-  color: #7a6258 !important;
+  color: #f4d6c8 !important;
 }
 
 .landing-shell :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-zinc-50),
@@ -1542,7 +1542,7 @@ input[type="number"] {
 .vendor-ops-shell :where(.bg-white),
 .admin-ops-shell :where(.bg-white),
 .customer-app :where(.bg-white) {
-  background-color: rgba(255, 255, 255, 0.88) !important;
+  background-color: rgba(69, 23, 4, 0.94) !important;
 }
 
 .landing-shell :where(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200, .border-zinc-200),
@@ -1785,4 +1785,143 @@ input[type="number"] {
 .to-\[\#FF9B50\],
 .to-orange-400 {
   --tw-gradient-to: var(--brand-orange-soft) var(--tw-gradient-to-position) !important;
+}
+
+.vendor-ops-shell {
+  --vendor-primary: var(--brand-primary);
+  --vendor-secondary: var(--brand-secondary);
+  --vendor-button: var(--brand-primary);
+  --vendor-button-text: var(--on-primary);
+}
+
+.vendor-ops-shell :where(.bg-\[\#FF6B00\], .bg-orange-600, .bg-blue-600, .bg-green-600, .bg-purple-600) {
+  background-color: var(--vendor-button) !important;
+  color: var(--vendor-button-text) !important;
+}
+
+.vendor-ops-shell :where(.hover\:bg-\[\#E56000\]:hover, .hover\:bg-orange-700:hover, .hover\:bg-blue-700:hover, .hover\:bg-green-700:hover, .hover\:bg-purple-700:hover) {
+  background-color: var(--vendor-secondary) !important;
+  color: var(--vendor-button-text) !important;
+}
+
+.vendor-ops-shell :where(.text-\[\#FF6B00\], .text-orange-600, .text-blue-600, .text-green-600, .text-purple-600) {
+  color: var(--vendor-primary) !important;
+}
+
+.vendor-ops-shell :where(.border-\[\#FF6B00\], .border-orange-600, .border-blue-600, .border-green-600) {
+  border-color: var(--vendor-primary) !important;
+}
+
+.vendor-ops-shell :where(input, select, textarea):focus {
+  border-color: var(--vendor-primary) !important;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--vendor-primary) 18%, transparent);
+}
+
+.vendor-kanban-board {
+  border: 0.0625rem solid color-mix(in srgb, var(--vendor-primary) 28%, white);
+  border-radius: 1.25rem;
+  padding: 0.75rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--vendor-primary) 11%, white), rgba(255, 255, 255, 0.8)),
+    color-mix(in srgb, var(--vendor-secondary) 6%, white);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.75), 0 1rem 2rem rgba(61, 26, 10, 0.08);
+}
+
+.vendor-kanban-column,
+.vendor-beach-map {
+  border: 0.0625rem solid color-mix(in srgb, var(--vendor-primary) 24%, white) !important;
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.85), 0 0.875rem 1.75rem rgba(61, 26, 10, 0.08);
+}
+
+.vendor-umbrella-tile {
+  box-shadow:
+    inset 0 0 0 0.125rem rgba(255, 255, 255, 0.72),
+    inset 0 -0.45rem 0.8rem rgba(61, 26, 10, 0.08),
+    0 0.45rem 0.9rem rgba(61, 26, 10, 0.08);
+}
+
+.vendor-sales-surface {
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.4), 0 1.5rem 3rem rgba(61, 26, 10, 0.12);
+}
+
+.vendor-sales-surface :where(.bg-white) {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
+.sales-value-gradient {
+  color: transparent !important;
+  background-image: linear-gradient(135deg, #ff6b00 10%, #8a3500 52%, #3d1a0a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  overflow-wrap: anywhere;
+}
+
+.landing-pricing {
+  background: #201411 !important;
+  color: #fff8f6;
+}
+
+.landing-plan-card {
+  min-width: 0;
+  border: 0.0625rem solid rgba(255, 107, 0, 0.72);
+  background: #451704 !important;
+  color: #fff8f6 !important;
+  box-shadow: 0 1.5rem 3.5rem rgba(0, 0, 0, 0.22);
+}
+
+.landing-plan-card--featured {
+  background: linear-gradient(135deg, #ff6b00 0%, #ff6b00 62%, #f45c00 100%) !important;
+  color: #201411 !important;
+  border-color: #ff6b00;
+}
+
+.landing-plan-card--featured :where(h3, p, li, span) {
+  color: #201411 !important;
+}
+
+.landing-plan-card--featured .landing-price-value {
+  color: #fff8f6 !important;
+}
+
+.landing-plan-card--featured .landing-price-unit {
+  color: #201411 !important;
+}
+
+.landing-plan-card--dark {
+  background: #301107 !important;
+}
+
+.landing-price-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.18rem;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  line-height: 0.92;
+}
+
+.landing-price-value {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+  font-size: clamp(2rem, 2.45vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.landing-price-unit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding-bottom: 0.18rem;
+  font-size: clamp(0.76rem, 0.95vw, 0.95rem);
+  font-weight: 900;
+}
+
+@media (max-width: 420px) {
+  .landing-price-value {
+    font-size: clamp(2rem, 11vw, 2.55rem);
+  }
 }
