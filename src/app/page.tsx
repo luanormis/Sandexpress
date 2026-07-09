@@ -87,19 +87,28 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="landing-shell relative isolate min-h-screen bg-[#201411] font-sans text-[#fff8f6] overflow-x-hidden">
+    <div className="landing-shell relative isolate min-h-screen bg-[#2d1b14] font-sans text-[#fff8f6] overflow-x-hidden">
       <div className="landing-beach-carousel" aria-hidden="true">
         <span />
         <span />
         <span />
       </div>
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 w-full bg-[#201411]/84 backdrop-blur-xl z-50 border-b border-[#ff6b00]/30">
+      <nav className="fixed top-0 left-0 w-full bg-[#2d1b14]/78 backdrop-blur-xl z-50 border-b border-[#ff8a2b]/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
               <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={72} height={69} priority className="h-11 w-auto object-contain sm:h-12" />
+              <span className="hidden font-display text-2xl font-black text-[#fff8f6] sm:inline">
+                Sand<span className="text-[#ff7a18]">Express</span>
+              </span>
             </div>
+          </div>
+          <div className="hidden items-center gap-7 text-xs font-black text-[#ffe7dc] lg:flex">
+            <a href="#como-funciona" className="hover:text-[#ff8a2b]">Como funciona</a>
+            <a href="#beneficios" className="hover:text-[#ff8a2b]">Recursos</a>
+            <a href="#planos" className="hover:text-[#ff8a2b]">Planos</a>
+            <Link href="/vendor/login" className="hover:text-[#ff8a2b]">Entrar</Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
              <button onClick={openModal} className="bg-[#FF6B00] text-white px-4 sm:px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-xs sm:text-sm whitespace-nowrap">
@@ -108,7 +117,7 @@ export default function LandingPage() {
              <button
                type="button"
                onClick={() => setMenuOpen(true)}
-               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ff6b00]/50 bg-[#451704] text-[#fff8f6] shadow-sm hover:border-[#FF6B00]"
+               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ff8a2b]/45 bg-[#4b2a1e] text-[#fff8f6] shadow-sm hover:border-[#FF6B00] lg:hidden"
                aria-label="Abrir menu"
              >
                <Menu size={20} />
@@ -138,26 +147,56 @@ export default function LandingPage() {
       )}
 
       {/* Hero Section */}
-      <section className="pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 text-center text-white relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-b from-[#201411] via-[#301107] to-[#201411]" />
-        <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
-          <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={260} height={249} priority className="mx-auto mb-8 h-36 w-auto object-contain sm:h-48" />
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
-            Seu quiosque vendendo mais, sem esforço.
+      <section className="landing-hero relative overflow-hidden px-4 pb-12 pt-20 text-white sm:px-6 sm:pb-16 sm:pt-24">
+        <div className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-[#3a2118] via-[#2d1b14] to-[#3a2118]" />
+        <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 pt-4 sm:pt-6 lg:min-h-[610px] lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="max-w-2xl text-left">
+          <p className="mb-5 inline-flex rounded-full border border-[#ff8a2b]/35 bg-[#fff2e8]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-[#ffd8c5]">
+            Sistema de pedidos para quiosques de praia
+          </p>
+          <h1 className="mb-6 font-display text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl md:text-7xl">
+            Mais agilidade.<br />
+            Mais vendas.<br />
+            <span className="text-[#ff7a18]">Mais praia.</span>
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-10 sm:mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
+          <h2 className="sr-only">
+            Seu quiosque vendendo mais, sem esforço.
+          </h2>
+          <p className="mb-8 max-w-xl font-sans text-lg leading-relaxed text-[#ffe7dc] sm:text-xl">
+            Organize pedidos, controle seus guarda-sois e aumente seus lucros com um painel feito para funcionar bem mesmo em dia de sol forte.
+          </p>
+          <p className="sr-only">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
-          <div className="flex items-center justify-center">
-            <button onClick={openModal} className="w-full sm:w-auto bg-[#FF6B00] text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:bg-[#E56000] hover:shadow-2xl transition-all active:scale-95">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button onClick={openModal} className="bg-[#FF6B00] px-8 py-4 text-base font-black text-white shadow-xl transition-all hover:bg-[#E56000] hover:shadow-2xl active:scale-95 rounded-xl">
               Cadastrar gratis
             </button>
+            <a href="#planos" className="inline-flex items-center justify-center rounded-xl border-2 border-[#ff8a2b] px-8 py-4 text-base font-black text-[#fff8f6] hover:bg-[#ff8a2b] hover:text-[#2d1b14]">
+              Ver planos
+            </a>
+          </div>
+          <div className="mt-8 hidden gap-3 text-xs font-black text-[#ffe7dc] sm:grid sm:max-w-xl sm:grid-cols-3">
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">3 dias gratis</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Ate 50 guarda-sois</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Pedidos em tempo real</span>
+          </div>
+        </div>
+          <div className="landing-hero-media relative z-10">
+            <Image
+              src="/sandexpress-beach-hero.png"
+              alt="Tablet com painel SandExpress em uma mesa de quiosque na praia"
+              width={1200}
+              height={760}
+              priority
+              className="h-full w-full object-cover"
+            />
           </div>
         </div>
       </section>
 
       {/* Como Funciona */}
-      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#201411] border-b border-[#ff6b00]/25">
+      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#3a2118] border-y border-[#ff8a2b]/18">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
                <h2 className="text-4xl font-display font-bold text-white mb-4">Em 4 passos simples</h2>
@@ -175,7 +214,7 @@ export default function LandingPage() {
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FF6B00] text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
                       {idx + 1}
                     </div>
-                    <div className="w-16 h-16 bg-[#301107] border border-[#ff6b00]/35 rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
+                    <div className="w-16 h-16 bg-[#fff0e4] border border-[#ff8a2b]/35 rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
                       <step.i size={32} className="text-[#FF6B00]" />
                     </div>
                     <h3 className="font-bold text-xl mb-2">{step.t}</h3>
@@ -187,11 +226,11 @@ export default function LandingPage() {
       </section>
 
       {/* Benefícios */}
-      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#2a1711]">
+      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#f9e2cf] text-[#2d1b14]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-display font-bold text-white mb-4">Tudo que você precisa</h2>
-            <p className="text-xl text-white/85">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
+            <h2 className="text-4xl font-display font-bold text-[#2d1b14] mb-4">Tudo que você precisa</h2>
+            <p className="text-xl text-[#6b3a28]">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
@@ -203,12 +242,12 @@ export default function LandingPage() {
               { icon: TrendingUp, title: "Relatórios Completos", desc: "Faturamento, ticket médio, produtos mais vendidos, melhores clientes. Tudo em um clique." },
               { icon: Gift, title: "Promoções e Combos", desc: "Crie combos, preços promocionais e destaque itens especiais para aumentar o ticket médio." },
             ].map((b, idx) => (
-              <div key={idx} className="bg-[#451704] p-8 rounded-[40px] border border-[#ff6b00]/35 transition-all hover:shadow-lg hover:border-[#FF6B00] hover:-translate-y-1 group">
-                <div className="w-14 h-14 bg-[#301107] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
+              <div key={idx} className="bg-[#fff8f3] p-8 rounded-[32px] border border-[#dfb799] shadow-[0_18px_45px_rgba(93,45,25,0.12)] transition-all hover:shadow-lg hover:border-[#FF6B00] hover:-translate-y-1 group">
+                <div className="w-14 h-14 bg-[#ffe6d2] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
                   <b.icon size={28} className="text-[#FF6B00] group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="font-bold text-lg mb-2 text-[#fff8f6]">{b.title}</h3>
-                <p className="text-[#f4d6c8] text-sm leading-relaxed">{b.desc}</p>
+                <h3 className="font-bold text-lg mb-2 text-[#2d1b14]">{b.title}</h3>
+                <p className="text-[#6b3a28] text-sm leading-relaxed">{b.desc}</p>
               </div>
             ))}
           </div>
@@ -267,7 +306,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Secundário */}
-      <section className="bg-gradient-to-r from-[#3D1A0A] to-[#231916] py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
+      <section className="bg-gradient-to-r from-[#5d3323] via-[#3a2118] to-[#2d1b14] py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {planSettings.trial_days} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
