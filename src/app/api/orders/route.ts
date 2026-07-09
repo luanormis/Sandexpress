@@ -57,6 +57,22 @@ function orderRpcStatus(message: string) {
   return 500;
 }
 
+async function calculatePromotionPreview(vendorId: string, items: IncomingOrderItem[]) {
+  const { data, error } = await supabaseAdmin.rpc('calcular_promocoes_carrinho', {
+    p_vendor_id: vendorId,
+    p_cart: items,
+    p_momento: new Date().toISOString(),
+  });
+
+  if (error) {
+    const optionalCodes = new Set(['42P01', 'PGRST205', '42703', '42883']);
+    if (optionalCodes.has(error.code || '') || String(error.message || '').includes('promocoes')) return null;
+    throw error;
+  }
+
+  return data;
+}
+
 /**
  * GET /api/orders?vendor_id=xxx&status=received
  * Lista pedidos de um vendor, filtravel por status.
@@ -153,6 +169,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('orders'), { status: 403 });
     }
 
+    const promotionPreview = await calculatePromotionPreview(vendor_id, normalizedItems);
+
     if (session.role === 'customer') {
       await touchKioskSession({
         vendorId: vendor_id,
@@ -175,7 +193,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: orderRpcStatus(message) });
     }
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json({
+      ...(order && typeof order === 'object' ? order : { order }),
+      promotion_preview: promotionPreview,
+    }, { status: 201 });
   } catch (err) {
     console.error('Orders POST error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

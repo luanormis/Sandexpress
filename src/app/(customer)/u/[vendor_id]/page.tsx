@@ -29,6 +29,21 @@ type CartItem = {
   quantity: number;
 };
 
+type PromotionPreview = {
+  subtotal: number | null;
+  discount_total: number;
+  total: number | null;
+  applied_promotions: Array<{
+    promocao_id?: string;
+    titulo?: string;
+    tipo?: string;
+    desconto_tipo?: string;
+    conjuntos_aplicados?: number;
+    desconto?: number;
+  }>;
+  unavailable?: boolean;
+};
+
 type Order = {
   id: string;
   account_id?: string;
@@ -101,9 +116,14 @@ export default function CustomerApp() {
   const [satisfactionSent, setSatisfactionSent] = useState(false);
   const [satisfactionLoading, setSatisfactionLoading] = useState(false);
   const [features, setFeatures] = useState<FeatureFlags>({});
+  const [promotionPreview, setPromotionPreview] = useState<PromotionPreview | null>(null);
+  const [promotionLoading, setPromotionLoading] = useState(false);
 
   const visibleProducts = useMemo(() => filterCustomerMenuProducts(products, activeCategory), [activeCategory, products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
+  const promotionDiscount = Math.max(0, Number(promotionPreview?.discount_total || 0));
+  const discountedCartTotal = typeof promotionPreview?.total === "number" ? Number(promotionPreview.total) : cartTotal;
+  const appliedPromotions = promotionPreview?.applied_promotions || [];
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const ordersTotal = orders
     .filter((order) => BILLABLE_STATUSES.has(order.status))
@@ -111,7 +131,7 @@ export default function CustomerApp() {
   const pendingOrdersTotal = orders
     .filter((order) => !BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
-  const openTotal = ordersTotal + pendingOrdersTotal + cartTotal;
+  const openTotal = ordersTotal + pendingOrdersTotal + discountedCartTotal;
   const serviceFeeAmount = serviceFeeEnabled ? Number((openTotal * 0.1).toFixed(2)) : 0;
   const billTotal = Number((openTotal + serviceFeeAmount).toFixed(2));
   const parsedPartialAmount = Math.max(0, Number(partialAmount.replace(",", ".")) || 0);
@@ -263,6 +283,46 @@ export default function CustomerApp() {
     return () => window.clearInterval(timer);
   }, [customerId, vendor?.id, umbrellaId]);
 
+  useEffect(() => {
+    if (!vendor?.id || cart.length === 0 || !customerId) {
+      setPromotionPreview(null);
+      setPromotionLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setPromotionLoading(true);
+      try {
+        const res = await fetch("/api/promotions/calculate", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vendor_id: vendor.id,
+            items: cart.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok && data && !data.unavailable) {
+          setPromotionPreview(data);
+        }
+        if (!cancelled && (!res.ok || data?.unavailable)) {
+          setPromotionPreview(null);
+        }
+      } catch {
+        if (!cancelled) setPromotionPreview(null);
+      } finally {
+        if (!cancelled) setPromotionLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cart, customerId, vendor?.id]);
+
   async function startTab() {
     if (!vendor) return;
     if (name.trim().length < 2) {
@@ -407,9 +467,11 @@ export default function CustomerApp() {
         return;
       }
       setOrders((prev) => {
+        const responsePromotion = data.promotion_preview as PromotionPreview | undefined;
+        const responseTotal = typeof responsePromotion?.total === "number" ? responsePromotion.total : Number(data.total ?? discountedCartTotal);
         const nextOrder = {
           id: data.id,
-          total: Number(data.total ?? cartTotal),
+          total: responseTotal,
           status: data.status || "received",
           created_at: data.created_at || new Date().toISOString(),
         };
@@ -420,6 +482,7 @@ export default function CustomerApp() {
         }
         return [nextOrder, ...prev];
       });
+      setPromotionPreview(null);
       setCart([]);
       setNotes("");
       setStep("orders");
@@ -728,7 +791,7 @@ export default function CustomerApp() {
             <div className="customer-cart-dock" role="status" aria-live="polite">
               <div>
                 <strong>{cartItemsCount} {cartItemsCount === 1 ? "item" : "itens"}</strong>
-                <span>{formatCurrency(cartTotal)}</span>
+                <span>{formatCurrency(discountedCartTotal)}</span>
               </div>
               <button type="button" onClick={() => setStep("cart")}>
                 Ver carrinho
@@ -755,6 +818,38 @@ export default function CustomerApp() {
               </article>
             ))}
           </div>
+          {cart.length > 0 && (
+            <div className="customer-bill-panel">
+              <div className="customer-bill-row">
+                <span>Subtotal</span>
+                <strong>{formatCurrency(cartTotal)}</strong>
+              </div>
+              {promotionLoading && (
+                <p className="customer-small">Verificando promocoes do quiosque...</p>
+              )}
+              {promotionDiscount > 0 && (
+                <>
+                  <div className="customer-bill-row">
+                    <span>Desconto promocional</span>
+                    <strong>-{formatCurrency(promotionDiscount)}</strong>
+                  </div>
+                  {appliedPromotions.length > 0 && (
+                    <div className="customer-bill-summary">
+                      {appliedPromotions.map((promotion, index) => (
+                        <small key={promotion.promocao_id || index}>
+                          {promotion.titulo || "Promocao aplicada"}: -{formatCurrency(Number(promotion.desconto || 0))}
+                        </small>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="customer-bill-total">
+                <span>Total do pedido</span>
+                <strong>{formatCurrency(discountedCartTotal)}</strong>
+              </div>
+            </div>
+          )}
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" aria-label="Observacoes do pedido" rows={3} className="customer-textarea" />
           <button onClick={createOrder} disabled={loading || cart.length === 0} className="customer-primary-button">Enviar pedido</button>
         </section>
