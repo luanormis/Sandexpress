@@ -3,6 +3,7 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { fetchArchivedOrders } from '@/lib/order-archive';
 import { returnBeachStockToPhysical } from '@/lib/stock-handler';
+import { closeKioskSessions } from '@/lib/kiosk-session';
 
 type PaymentSummary = Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
 
@@ -248,6 +249,7 @@ export async function POST(req: NextRequest) {
 
     if (closingErr) throw closingErr;
     const stock_return = await returnBeachStockToPhysical(vendorId);
+    await closeKioskSessions(vendorId);
 
     return NextResponse.json({
       closed: true,

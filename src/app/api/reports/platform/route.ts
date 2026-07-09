@@ -63,17 +63,17 @@ function getBeerBrandFamily(name: string) {
 
 function isBeerProduct(name: string, category: string) {
   const text = normalizeText(`${name} ${category}`);
-  return /(cerveja|chopp|long neck|latao|latão|ambev|heineken|petropolis|petropolis|brahma|skol|amstel|itaipava|budweiser|stella|corona|eisenbahn|petra)/.test(text);
+  return /(cerveja|chopp|long neck|latao|ambev|heineken|petropolis|brahma|skol|amstel|itaipava|budweiser|stella|corona|eisenbahn|petra)/.test(text);
 }
 
 function isPortionProduct(name: string, category: string) {
   const text = normalizeText(`${name} ${category}`);
-  return /(porcao|porção|petisco|batata|isca|peixe|camarao|mandioca|fritas|pasteis|pastel)/.test(text);
+  return /(porcao|petisco|batata|isca|peixe|camarao|mandioca|fritas|pasteis|pastel)/.test(text);
 }
 
 function isBeverageProduct(name: string, category: string) {
   const text = normalizeText(`${name} ${category}`);
-  return isBeerProduct(name, category) || /(bebida|refrigerante|agua|água|suco|drink|caipirinha|batida|gin|tonica|tônica)/.test(text);
+  return isBeerProduct(name, category) || /(bebida|refrigerante|agua|suco|drink|caipirinha|batida|gin|tonica)/.test(text);
 }
 
 function extractDdd(phone: string | null | undefined) {

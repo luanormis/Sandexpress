@@ -4,6 +4,7 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { mapOrderForKanban, shouldShowOrderInKanban } from '@/lib/order-kanban';
 import { isCanonicalUuid } from '@/lib/uuid';
+import { touchKioskSession } from '@/lib/kiosk-session';
 
 const MAX_ORDER_ITEMS = 50;
 const MAX_ITEM_QUANTITY = 50;
@@ -150,6 +151,15 @@ export async function POST(req: NextRequest) {
 
     if (!await vendorFeatureEnabled(vendor_id, 'orders')) {
       return NextResponse.json(featureDisabledResponse('orders'), { status: 403 });
+    }
+
+    if (session.role === 'customer') {
+      await touchKioskSession({
+        vendorId: vendor_id,
+        customerId: customer_id,
+        umbrellaId: umbrella_id,
+        userAgent: req.headers.get('user-agent'),
+      });
     }
 
     const { data: order, error: orderErr } = await supabaseAdmin.rpc('create_customer_order', {

@@ -246,6 +246,23 @@ export default function CustomerApp() {
     return () => window.clearInterval(timer);
   }, [customerId, vendor?.id]);
 
+  useEffect(() => {
+    if (!customerId || !vendor?.id || !umbrellaId) return;
+
+    const touchSession = () => {
+      fetch("/api/kiosk-sessions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ umbrella_id: umbrellaId }),
+      }).catch(() => undefined);
+    };
+
+    touchSession();
+    const timer = window.setInterval(touchSession, 60000);
+    return () => window.clearInterval(timer);
+  }, [customerId, vendor?.id, umbrellaId]);
+
   async function startTab() {
     if (!vendor) return;
     if (name.trim().length < 2) {

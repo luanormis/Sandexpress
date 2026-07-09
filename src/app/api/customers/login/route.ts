@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { normalizeBrazilPhoneWithDdd } from '@/lib/phone';
 import { OPEN_ACCOUNT_STATUSES } from '@/lib/order-account';
+import { touchKioskSession } from '@/lib/kiosk-session';
 
 async function ensureOpenAccount({
   tenantId,
@@ -185,6 +186,12 @@ export async function POST(req: NextRequest) {
       if (account?.error) {
         return NextResponse.json({ error: account.error }, { status: 409 });
       }
+      await touchKioskSession({
+        vendorId: vendor_id,
+        customerId: updated.id,
+        umbrellaId: umbrella_id,
+        userAgent: req.headers.get('user-agent'),
+      });
       const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id }, 12 * 60 * 60);
       const response = NextResponse.json({
         ...updated,
@@ -226,6 +233,12 @@ export async function POST(req: NextRequest) {
     if (account?.error) {
       return NextResponse.json({ error: account.error }, { status: 409 });
     }
+    await touchKioskSession({
+      vendorId: vendor_id,
+      customerId: newCustomer.id,
+      umbrellaId: umbrella_id,
+      userAgent: req.headers.get('user-agent'),
+    });
     const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id }, 12 * 60 * 60);
     const response = NextResponse.json({
       ...newCustomer,
