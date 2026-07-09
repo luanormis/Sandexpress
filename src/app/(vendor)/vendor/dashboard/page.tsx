@@ -386,6 +386,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   credit_card: "Cartao credito",
 };
 
+const SALES_CHART_COLORS = ["#FF6B00", "#8A3E22", "#C65300", "#2F4858", "#B65F32", "#6D4A3A", "#D9802E", "#4B2A1E"];
+
 function escapeReportValue(value: unknown) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -439,6 +441,7 @@ export default function VendorDashboard() {
 
   // --- Reports State ---
   const [reportPeriod, setReportPeriod] = useState("month");
+  const [salesChartType, setSalesChartType] = useState<"bars" | "pie">("bars");
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [closingDay, setClosingDay] = useState(false);
@@ -2014,10 +2017,10 @@ export default function VendorDashboard() {
           )}
 
           {activeTab === "reports" && (
-            <div className="vendor-sales-surface space-y-6 rounded-2xl border border-white/40 bg-gradient-to-br from-[#ff7a1a] via-[#ff6b00] to-[#3d1a0a] p-3 sm:p-5">
-              <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="vendor-sales-surface space-y-6 rounded-2xl border border-[#e5c2ae] bg-[#fff3ec] p-3 text-[#2d1b14] sm:p-5">
+              <div className="bg-white border border-[#e5c2ae] shadow-sm rounded-2xl p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#FFF2E5] text-[#FF6B00] flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-[#F7E5D8] text-[#6B3321] flex items-center justify-center shrink-0">
                     <CalendarCheck size={22} />
                   </div>
                   <div>
@@ -2029,25 +2032,25 @@ export default function VendorDashboard() {
                     {closingMessage && (
                       <p className={cn(
                         "mt-3 rounded-lg px-3 py-2 text-sm font-bold",
-                        closingMessage.startsWith("Erro") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                        closingMessage.startsWith("Erro") ? "bg-red-50 text-red-700" : "bg-[#F7E5D8] text-[#5A2D1D]"
                       )}>
                         {closingMessage}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="grid grid-cols-2 gap-2 sm:flex-none">
                   <button
                     onClick={exportTodaySalesPdf}
-                    className="border-2 border-[#FF6B00] bg-white px-5 py-3 rounded-xl font-bold text-[#FF6B00] flex items-center justify-center gap-2 hover:bg-[#FFF2E5]"
+                    className="min-h-11 rounded-xl border-2 border-[#8A3E22] bg-white px-3 py-2 text-sm font-black text-[#5A2D1D] flex items-center justify-center gap-2 hover:bg-[#FFF2E5] sm:w-44"
                   >
                     <Download size={18} />
-                    Exportar vendas do dia
+                    Exportar vendas
                   </button>
                   <button
                     onClick={closeBusinessDay}
                     disabled={closingDay}
-                    className="bg-[#394E59] hover:bg-[#263640] text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="min-h-11 rounded-xl bg-[#2F4858] px-3 py-2 text-sm font-black text-white flex items-center justify-center gap-2 hover:bg-[#243845] disabled:opacity-50 sm:w-44"
                   >
                     <CalendarCheck size={18} />
                     {closingDay ? "Fechando..." : "Fechar dia"}
@@ -2187,22 +2190,64 @@ export default function VendorDashboard() {
                     {/* Hourly Sales Chart (CSS bars) */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-[#FF6B00]" /> Vendas por Horário</h4>
+                      <div className="mb-4 inline-grid grid-cols-2 rounded-xl border border-[#e5c2ae] bg-[#fff8f3] p-1 text-xs font-black">
+                        <button type="button" onClick={() => setSalesChartType("bars")} className={cn("rounded-lg px-3 py-2", salesChartType === "bars" ? "bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Barras</button>
+                        <button type="button" onClick={() => setSalesChartType("pie")} className={cn("rounded-lg px-3 py-2", salesChartType === "pie" ? "bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Pizza</button>
+                      </div>
+                      {salesChartType === "bars" ? (
                       <div className="flex items-end gap-2 h-40">
                         {reportData.hourly_sales.map((h, i) => {
                           const maxOrders = Math.max(...reportData.hourly_sales.map(s => s.orders));
                           const height = maxOrders > 0 ? (h.orders / maxOrders) * 100 : 0;
                           return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                              <span className="text-[10px] text-gray-400 font-bold">{h.orders}</span>
+                              <span className="text-[10px] text-[#5A2D1D] font-bold">{h.orders}</span>
                               <div
-                                className="w-full bg-gradient-to-t from-[#FF6B00] to-[#FF9B50] rounded-t-md transition-all"
+                                className="w-full rounded-t-md bg-gradient-to-t from-[#8A3E22] to-[#FF6B00] transition-all"
                                 style={{ height: `${height}%`, minHeight: 4 }}
                               />
-                              <span className="text-[10px] text-gray-400">{h.hour}</span>
+                              <span className="text-[10px] font-bold text-[#6B3A28]">{h.hour}</span>
                             </div>
                           );
                         })}
                       </div>
+                      ) : (
+                        (() => {
+                          const slices = reportData.hourly_sales.filter((h) => h.orders > 0);
+                          const total = slices.reduce((sum, h) => sum + h.orders, 0);
+                          let cursor = 0;
+                          const gradient = total > 0
+                            ? slices.map((h, i) => {
+                                const start = cursor;
+                                const end = cursor + (h.orders / total) * 100;
+                                cursor = end;
+                                return `${SALES_CHART_COLORS[i % SALES_CHART_COLORS.length]} ${start}% ${end}%`;
+                              }).join(", ")
+                            : "#E5C2AE 0% 100%";
+                          return (
+                            <div className="grid gap-5 sm:grid-cols-[12rem_1fr] sm:items-center">
+                              <div
+                                className="mx-auto h-44 w-44 rounded-full border-[10px] border-[#fff8f3] shadow-inner"
+                                style={{ background: `conic-gradient(${gradient})` }}
+                                aria-label="Grafico de pizza de vendas por horario"
+                              />
+                              <div className="grid gap-2 text-sm">
+                                {slices.length === 0 ? (
+                                  <p className="rounded-xl bg-[#fff8f3] p-4 font-bold text-[#6B3A28]">Sem vendas no periodo.</p>
+                                ) : slices.map((h, i) => (
+                                  <div key={h.hour} className="flex items-center justify-between gap-3 rounded-xl bg-[#fff8f3] px-3 py-2">
+                                    <span className="flex items-center gap-2 font-black text-[#2d1b14]">
+                                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: SALES_CHART_COLORS[i % SALES_CHART_COLORS.length] }} />
+                                      {h.hour}
+                                    </span>
+                                    <span className="font-black text-[#5A2D1D]">{h.orders} venda{h.orders === 1 ? "" : "s"}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      )}
                     </div>
 
                     {/* Top Products */}

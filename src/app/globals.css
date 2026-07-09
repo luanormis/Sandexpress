@@ -1633,6 +1633,39 @@ input[type="number"] {
   border-spacing: 0;
 }
 
+.vendor-sales-surface :where(.bg-white) {
+  background-color: #fffaf6 !important;
+}
+
+.vendor-sales-surface :where(.bg-gray-50, .bg-gray-100) {
+  background-color: #fff1e8 !important;
+}
+
+.vendor-sales-surface :where(.text-gray-900, .text-gray-800, .text-gray-700) {
+  color: #2d1b14 !important;
+}
+
+.vendor-sales-surface :where(.text-gray-600, .text-gray-500, .text-gray-400) {
+  color: #6b3a28 !important;
+}
+
+.vendor-sales-surface :where(.border-gray-100, .border-gray-200, .border-gray-300) {
+  border-color: #e5c2ae !important;
+}
+
+.vendor-sales-surface :where(.text-green-600, .text-green-700, .text-green-900) {
+  color: #2f4858 !important;
+}
+
+.vendor-sales-surface :where(.bg-green-50, .bg-green-100) {
+  background-color: #e7f0f2 !important;
+}
+
+.vendor-sales-surface .sales-value-gradient {
+  color: #a44100 !important;
+  background-image: none !important;
+}
+
 .vendor-kanban-board {
   min-width: 0;
 }
