@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     const { data: orders } = await enforceTenantScope(
       supabaseAdmin
         .from('orders')
-        .select('*, order_items(*, products(name, price)), customers(name, phone)')
+        .select('*, order_items(*, products(name, price, category)), customers(name, phone)')
         .eq('vendor_id', vendor_id)
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false }),
@@ -112,7 +112,10 @@ export async function GET(req: NextRequest) {
     // Produtos ativos e guarda-sóis ativos
     const [productsResult, umbrellasResult] = await Promise.all([
       enforceTenantScope(
-        supabaseAdmin.from('products').select('active').eq('vendor_id', vendor_id),
+        supabaseAdmin
+          .from('products')
+          .select('active, name, category, price, promotional_price, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock')
+          .eq('vendor_id', vendor_id),
         tenantId
       ),
       enforceTenantScope(
@@ -121,8 +124,20 @@ export async function GET(req: NextRequest) {
       ),
     ]);
 
-    const available_products = ((productsResult.data || []) as any[]).filter((p) => p.active).length;
+    const productRows = (productsResult.data || []) as any[];
+    const available_products = productRows.filter((p) => p.active).length;
     const umbrellasActiveCount = ((umbrellasResult.data || []) as any[]).filter((u) => u.active).length;
+    const low_stock_alerts = productRows
+      .filter((product) => product.active && product.stock_tracking_enabled)
+      .map((product) => ({
+        name: product.name || 'Produto',
+        category: product.category || 'Sem categoria',
+        quantity: Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0),
+        blocked: Boolean(product.blocked_by_stock),
+      }))
+      .filter((product) => product.blocked || product.quantity <= 10)
+      .sort((a, b) => a.quantity - b.quantity)
+      .slice(0, 8);
 
     // Relatórios diários
     const todayOrders = paidOrders.filter(o => o.paid_at ? new Date(o.paid_at) >= todayStart : o.created_at && new Date(o.created_at) >= todayStart);
@@ -149,6 +164,23 @@ export async function GET(req: NextRequest) {
     const top_products = Array.from(topProductsMap.values())
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
+
+    const categoryMap = new Map<string, { category: string; quantity: number; revenue: number }>();
+    paidOrders.forEach(order => {
+      (order.order_items || []).forEach((item: any) => {
+        const category = item.products?.category || 'Sem categoria';
+        const quantity = Number(item.quantity) || 0;
+        const revenue = Number(item.unit_price || 0) * quantity;
+        const existing = categoryMap.get(category) || { category, quantity: 0, revenue: 0 };
+        existing.quantity += quantity;
+        existing.revenue += revenue;
+        categoryMap.set(category, existing);
+      });
+    });
+
+    const category_performance = Array.from(categoryMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
 
     const top_customers = Array.from(
       new Map((paidOrders || []).map(order => [order.customer_id, order])).values()
@@ -260,6 +292,8 @@ export async function GET(req: NextRequest) {
         new_customers_today: today_customers,
       },
       top_products,
+      category_performance,
+      low_stock_alerts,
       top_customers,
       hourly_sales,
       payment_methods,

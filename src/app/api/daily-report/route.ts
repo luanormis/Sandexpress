@@ -62,39 +62,69 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     });
   });
 
-  const productNameMap: Record<string, string> = {};
+  const productMetaMap: Record<string, { name: string; category: string }> = {};
   if (productIds.size > 0) {
     const { data: products } = await supabaseAdmin
       .from('products')
-      .select('id, name')
+      .select('id, name, category')
       .in('id', Array.from(productIds));
     (products || []).forEach((product: any) => {
-      productNameMap[product.id] = product.name;
+      productMetaMap[product.id] = {
+        name: product.name || 'Produto desconhecido',
+        category: product.category || 'Sem categoria',
+      };
     });
   }
 
   const productsMap: Record<string, { name: string; quantity: number; revenue: number; product_id: string }> = {};
+  const categoryMap: Record<string, { category: string; quantity: number; revenue: number }> = {};
   completedOrders.forEach((order: any) => {
     (order.order_items || []).forEach((item: any) => {
       const productId = item.product_id;
       if (!productId) return;
+      const meta = productMetaMap[productId] || { name: item.products?.name || 'Produto desconhecido', category: 'Sem categoria' };
       if (!productsMap[productId]) {
         productsMap[productId] = {
-          name: productNameMap[productId] || item.products?.name || 'Produto desconhecido',
+          name: meta.name,
           quantity: 0,
           revenue: 0,
           product_id: productId,
         };
       }
       const quantity = Number(item.quantity || 0);
+      const revenue = Number(item.unit_price || 0) * quantity;
       productsMap[productId].quantity += quantity;
-      productsMap[productId].revenue += Number(item.unit_price || 0) * quantity;
+      productsMap[productId].revenue += revenue;
+      if (!categoryMap[meta.category]) categoryMap[meta.category] = { category: meta.category, quantity: 0, revenue: 0 };
+      categoryMap[meta.category].quantity += quantity;
+      categoryMap[meta.category].revenue += revenue;
     });
   });
 
   const topProducts = Object.values(productsMap)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10);
+
+  const categoryPerformance = Object.values(categoryMap)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8);
+
+  const { data: stockProducts } = await supabaseAdmin
+    .from('products')
+    .select('name, category, active, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock')
+    .eq('vendor_id', vendorId);
+
+  const lowStockAlerts = ((stockProducts || []) as any[])
+    .filter((product) => product.active && product.stock_tracking_enabled)
+    .map((product) => ({
+      name: product.name || 'Produto',
+      category: product.category || 'Sem categoria',
+      quantity: Number(product.beach_stock_quantity ?? product.stock_quantity ?? 0),
+      blocked: Boolean(product.blocked_by_stock),
+    }))
+    .filter((product) => product.blocked || product.quantity <= 10)
+    .sort((a, b) => a.quantity - b.quantity)
+    .slice(0, 8);
 
   const hourlyMap: Record<string, { orders: number; revenue: number }> = {};
   completedOrders.forEach((order: any) => {
@@ -140,6 +170,8 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     },
     orders: formattedOrders,
     top_products: topProducts,
+    category_performance: categoryPerformance,
+    low_stock_alerts: lowStockAlerts,
     hourly_breakdown: hourlyBreakdown,
   };
 }

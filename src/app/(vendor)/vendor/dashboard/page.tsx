@@ -122,6 +122,8 @@ interface ReportData {
     new_customers_today: number;
   };
   top_products: { name: string; quantity: number; revenue: number }[];
+  category_performance?: { category: string; quantity: number; revenue: number }[];
+  low_stock_alerts?: { name: string; category: string; quantity: number; blocked: boolean }[];
   top_customers: { name: string; phone: string; visits: number; total_spent: number }[];
   hourly_sales: { hour: string; orders: number }[];
   payment_methods?: Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
@@ -348,6 +350,19 @@ type DailySalesProduct = {
   revenue?: number;
 };
 
+type DailySalesCategory = {
+  category?: string;
+  quantity?: number;
+  revenue?: number;
+};
+
+type DailySalesStockAlert = {
+  name?: string;
+  category?: string;
+  quantity?: number;
+  blocked?: boolean;
+};
+
 type DailySalesOrder = {
   umbrella_number?: string | number;
   customer_name?: string;
@@ -377,6 +392,8 @@ type DailySalesReport = {
   };
   orders?: DailySalesOrder[];
   top_products?: DailySalesProduct[];
+  category_performance?: DailySalesCategory[];
+  low_stock_alerts?: DailySalesStockAlert[];
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -832,6 +849,25 @@ export default function VendorDashboard() {
           </tr>
         `).join("");
 
+      const stockRows = (report.low_stock_alerts || [])
+        .map((item: DailySalesStockAlert) => `
+          <tr>
+            <td>${escapeReportValue(item.name)}</td>
+            <td>${escapeReportValue(item.category)}</td>
+            <td>${Number(item.quantity || 0)} un.</td>
+            <td>${item.blocked || Number(item.quantity || 0) <= 0 ? "Sem estoque" : "Baixo"}</td>
+          </tr>
+        `).join("");
+
+      const categoryRows = (report.category_performance || [])
+        .map((item: DailySalesCategory) => `
+          <tr>
+            <td>${escapeReportValue(item.category)}</td>
+            <td>${Number(item.quantity || 0)}</td>
+            <td>${formatCurrency(Number(item.revenue || 0))}</td>
+          </tr>
+        `).join("");
+
       const orderRows = (report.orders || [])
         .map((order: DailySalesOrder) => {
           const paymentMethod = order.payment_method || "cash";
@@ -899,6 +935,16 @@ export default function VendorDashboard() {
             <table>
               <thead><tr><th>Metodo</th><th>Contas</th><th>Bruto</th><th>Taxas</th><th>Liquido</th></tr></thead>
               <tbody>${paymentRows || `<tr><td colspan="5">Nenhuma venda paga no dia.</td></tr>`}</tbody>
+            </table>
+            <h2>Alertas de estoque</h2>
+            <table>
+              <thead><tr><th>Produto</th><th>Categoria</th><th>Restante</th><th>Status</th></tr></thead>
+              <tbody>${stockRows || `<tr><td colspan="4">Nenhum produto com estoque baixo.</td></tr>`}</tbody>
+            </table>
+            <h2>Drinks, porcoes e categorias</h2>
+            <table>
+              <thead><tr><th>Categoria</th><th>Itens vendidos</th><th>Faturamento</th></tr></thead>
+              <tbody>${categoryRows || `<tr><td colspan="3">Sem vendas por categoria.</td></tr>`}</tbody>
             </table>
             <h2>Produtos mais vendidos</h2>
             <table>
@@ -2027,8 +2073,8 @@ export default function VendorDashboard() {
                   <div>
                     <h3 className="font-display font-bold text-gray-900 text-lg">Fechamento do Dia</h3>
                     <p className="text-sm text-gray-500 max-w-2xl">
-                      Consolida as vendas completadas e pagas de hoje em um registro fixo para relatorios,
-                      auditoria e comparacao futura.
+                      Relatorio simples para ver o que vendeu, quanto entrou, o que esta acabando e onde precisa agir.
+                      O PDF sai em preto e cinza para facilitar impressao e leitura.
                     </p>
                     {closingMessage && (
                       <p className={cn(
@@ -2132,6 +2178,64 @@ export default function VendorDashboard() {
                         {reportData.satisfaction?.average_rating || 0}
                       </p>
                       <p className="text-xs text-gray-400 font-bold">{reportData.satisfaction?.total_responses || 0} respostas</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="rounded-2xl border border-[#e5c2ae] bg-[#fffaf6] p-5 shadow-sm">
+                      <h4 className="mb-2 flex items-center gap-2 text-base font-black text-[#2d1b14]">
+                        <PackageCheck size={18} className="text-[#a44100]" />
+                        Como ler rapido
+                      </h4>
+                      <p className="text-sm font-bold leading-6 text-[#5a2d1d]">
+                        Primeiro veja faturamento e pedidos. Depois confira estoque baixo. Por ultimo olhe produtos e categorias
+                        para saber o que comprar mais e o que vende melhor.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#e5c2ae] bg-white p-5 shadow-sm">
+                      <h4 className="mb-3 flex items-center gap-2 text-base font-black text-[#2d1b14]">
+                        <PackageCheck size={18} className="text-[#a44100]" />
+                        Estoque quase acabando
+                      </h4>
+                      <div className="space-y-2">
+                        {(reportData.low_stock_alerts || []).length === 0 ? (
+                          <p className="rounded-xl bg-[#fff1e8] p-3 text-sm font-bold text-[#5a2d1d]">Nenhum produto com alerta agora.</p>
+                        ) : (reportData.low_stock_alerts || []).slice(0, 4).map((item) => (
+                          <div key={`${item.name}-${item.category}`} className="flex items-center justify-between gap-3 rounded-xl border border-[#e5c2ae] bg-[#fffaf6] px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-[#2d1b14]">{item.name}</p>
+                              <p className="text-xs font-bold text-[#5a2d1d]">{item.category}</p>
+                            </div>
+                            <span className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-black", item.blocked || item.quantity <= 0 ? "bg-[#8f1d1d] text-white" : "bg-[#fff1e8] text-[#8a3e22]")}>
+                              {item.quantity} un.
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#e5c2ae] bg-white p-5 shadow-sm">
+                      <h4 className="mb-3 flex items-center gap-2 text-base font-black text-[#2d1b14]">
+                        <Award size={18} className="text-[#a44100]" />
+                        Drinks e porcoes
+                      </h4>
+                      <p className="mb-3 text-sm font-bold leading-6 text-[#5a2d1d]">
+                        Aqui aparece o faturamento por categoria. Margem real entra quando o custo dos insumos for cadastrado.
+                      </p>
+                      <div className="space-y-2">
+                        {(reportData.category_performance || []).length === 0 ? (
+                          <p className="rounded-xl bg-[#fff1e8] p-3 text-sm font-bold text-[#5a2d1d]">Sem vendas pagas no periodo.</p>
+                        ) : (reportData.category_performance || []).slice(0, 4).map((item) => (
+                          <div key={item.category} className="rounded-xl bg-[#fff1e8] px-3 py-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="truncate text-sm font-black text-[#2d1b14]">{item.category}</span>
+                              <span className="text-sm font-black text-[#a44100]">{formatCurrency(item.revenue)}</span>
+                            </div>
+                            <p className="text-xs font-bold text-[#5a2d1d]">{item.quantity} itens vendidos</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
