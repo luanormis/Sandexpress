@@ -857,21 +857,22 @@ export default function VendorDashboard() {
             <title>Vendas do dia - ${formatReportDate(today)}</title>
             <style>
               * { box-sizing: border-box; }
-              body { margin: 0; padding: 28px; color: #241711; font-family: Arial, sans-serif; background: #fffaf7; }
-              header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid #ff6b00; padding-bottom: 18px; margin-bottom: 22px; }
+              body { margin: 0; padding: 28px; color: #111111; font-family: Arial, sans-serif; background: #ffffff; }
+              header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid #111111; padding-bottom: 18px; margin-bottom: 22px; }
               h1 { margin: 0; font-size: 28px; }
-              h2 { margin: 28px 0 10px; font-size: 17px; color: #8a2f00; }
-              p { margin: 4px 0; color: #6b5147; }
-              .brand { text-align: right; font-weight: 800; color: #ff6b00; }
+              h2 { margin: 28px 0 10px; font-size: 17px; color: #111111; }
+              p { margin: 4px 0; color: #444444; }
+              .brand { text-align: right; font-weight: 800; color: #111111; }
               .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
-              .kpi { border: 1px solid #f0d2c4; border-radius: 10px; background: #fff; padding: 12px; }
-              .kpi span { display: block; color: #7a6258; font-size: 11px; font-weight: 800; text-transform: uppercase; }
-              .kpi strong { display: block; margin-top: 6px; font-size: 20px; }
-              table { width: 100%; border-collapse: collapse; background: #fff; }
-              th, td { border: 1px solid #ead7cc; padding: 8px; text-align: left; font-size: 12px; }
-              th { background: #ffdbcb; color: #3d1a0a; font-size: 11px; text-transform: uppercase; }
-              footer { margin-top: 28px; color: #8a746a; font-size: 11px; text-align: center; }
-              @media print { body { background: #fff; padding: 18px; } .kpis { break-inside: avoid; } }
+              .kpi { border: 1px solid #bdbdbd; border-radius: 10px; background: #f4f4f4; padding: 12px; }
+              .kpi span { display: block; color: #555555; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+              .kpi strong { display: block; margin-top: 6px; color: #111111; font-size: 20px; }
+              table { width: 100%; border-collapse: collapse; background: #ffffff; }
+              th, td { border: 1px solid #cfcfcf; padding: 8px; color: #111111; text-align: left; font-size: 12px; }
+              th { background: #e5e5e5; font-size: 11px; text-transform: uppercase; }
+              tr:nth-child(even) td { background: #f7f7f7; }
+              footer { margin-top: 28px; color: #555555; font-size: 11px; text-align: center; }
+              @media print { body { background: #ffffff; padding: 18px; } .kpis { break-inside: avoid; } }
             </style>
           </head>
           <body>
