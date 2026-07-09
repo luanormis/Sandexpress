@@ -172,13 +172,13 @@ export default function OpeningDayStockControl({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="border-b border-gray-200 pb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">Controle de estoque</h1>
             <p className="mt-1 text-sm font-semibold text-gray-500">
-              Cada quiosque controla seu estoque central e o estoque levado para a praia.
+              aqui voce controla seu estoque central e o estoque que envia para a praia.
             </p>
           </div>
           {onAddProduct && (
@@ -237,48 +237,53 @@ export default function OpeningDayStockControl({
               return (
                 <div
                   key={product.id}
-                  className="flex flex-col gap-3 rounded-xl bg-gray-50 p-3 transition hover:bg-gray-100 sm:flex-row sm:items-center sm:justify-between"
+                  className="grid gap-3 rounded-2xl bg-gray-50 p-3 transition hover:bg-gray-100 lg:grid-cols-[minmax(18rem,1fr)_8.5rem_15rem_auto] lg:items-center"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-gray-300">
+                  <div className="min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white text-gray-300">
                         {product.image_url ? (
                           <img src={product.image_url} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <Utensils size={18} />
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-gray-900">{product.name}</p>
-                        <p className="text-sm font-semibold text-gray-500">R$ {product.price.toFixed(2)}</p>
-                        <p className="text-xs font-bold text-gray-500">
-                          Estoque central: {product.physical_stock_quantity || 0} un. | Estoque praia: {product.beach_stock_quantity ?? product.stock_quantity ?? 0} un.
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-[#FF6B00]">Descricao do item</p>
+                        <p className="break-words text-base font-black leading-tight text-gray-900">{product.name}</p>
+                        {product.description && (
+                          <p className="line-clamp-2 break-words text-xs font-semibold leading-snug text-gray-500">
+                            {product.description}
+                          </p>
+                        )}
+                        <p className="text-sm font-black text-[#3d1a0a]">R$ {product.price.toFixed(2)}</p>
+                        <p className="text-xs font-bold leading-snug text-gray-500">
+                          Central: {product.physical_stock_quantity || 0} un. | Praia: {product.beach_stock_quantity ?? product.stock_quantity ?? 0} un.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <div className="min-w-[9.5rem] rounded-xl border border-[#85736C] bg-white p-3 shadow-sm">
-                      <label className="mb-2 block text-xs font-black uppercase text-[#3d1a0a]">Estoque central</label>
+                  <div className="rounded-xl border border-[#85736C] bg-white p-2.5 shadow-sm">
+                      <label className="mb-1.5 block text-[0.65rem] font-black uppercase text-[#3d1a0a]">Estoque central</label>
                       <input
                         type="number"
                         min="0"
                         value={physicalUpdates[product.id] || 0}
                         onChange={(event) => setPhysicalStock(product.id, event.target.value)}
                         disabled={!tracksStock}
-                        className="h-10 w-full rounded-lg border border-[#85736C] bg-[#fff8f6] px-3 text-center font-black text-[#3d1a0a] outline-none focus:border-[#FF6B00] disabled:bg-gray-100"
+                        className="h-9 w-full rounded-lg border border-[#85736C] bg-[#fff8f6] px-2 text-center text-base font-black text-[#3d1a0a] outline-none focus:border-[#FF6B00] disabled:bg-gray-100"
                         aria-label={`Estoque central de ${product.name}`}
                       />
                     </div>
-                    <div className="min-w-[14rem] rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-3 shadow-sm">
-                      <label className="mb-2 block text-xs font-black uppercase text-[#FF6B00]">Estoque praia</label>
-                      <div className="flex items-center gap-2">
+                    <div className="rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-2.5 shadow-sm">
+                      <label className="mb-1.5 block text-[0.65rem] font-black uppercase text-[#FF6B00]">Estoque praia</label>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => stepStock(product.id, -1)}
                           disabled={!tracksStock || quantity <= 0}
-                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5] disabled:opacity-40"
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5] disabled:opacity-40"
                           aria-label={`Diminuir estoque de praia de ${product.name}`}
                         >
                           <Minus size={16} />
@@ -289,22 +294,23 @@ export default function OpeningDayStockControl({
                           value={quantity}
                           onChange={(event) => setStock(product.id, event.target.value)}
                           disabled={!tracksStock}
-                          className="h-10 w-20 rounded-lg border border-[#FFDBCB] bg-white px-3 text-center font-black text-[#3D1A0A] outline-none focus:border-[#FF6B00]"
+                          className="h-9 w-16 rounded-full border border-[#FFDBCB] bg-white px-2 text-center text-base font-black text-[#3D1A0A] outline-none focus:border-[#FF6B00]"
                           aria-label={`Estoque praia de ${product.name}`}
                         />
                         <button
                           type="button"
                           onClick={() => stepStock(product.id, 1)}
                           disabled={!tracksStock}
-                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5]"
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#FFDBCB] bg-white text-[#FF6B00] hover:bg-[#F4DED5]"
                           aria-label={`Aumentar estoque de praia de ${product.name}`}
                         >
                           <Plus size={16} />
                         </button>
-                        <span className="text-sm font-semibold text-[#53433E]">unid.</span>
+                        <span className="text-xs font-black text-[#53433E]">un.</span>
                       </div>
                     </div>
 
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     {!tracksStock ? (
                       <span className="rounded-lg bg-gray-200 px-2 py-1 text-xs font-black text-gray-600">Nao contabiliza</span>
                     ) : quantity === 0 ? (
