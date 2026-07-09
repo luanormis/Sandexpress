@@ -55,6 +55,11 @@ interface PlatformReport {
   hourly_sales: { hour: number; orders: number; quantity: number; revenue: number }[];
   peak_hour: { hour: number; orders: number; quantity: number; revenue: number };
   peak_product_hours: { product: string; category: string; hour: number; quantity: number; revenue: number }[];
+  beer_brand_share?: { brand: string; quantity: number; revenue: number; orders: number; share_quantity: number; share_revenue: number }[];
+  beer_price_elasticity?: { brand: string; product: string; avg_price: number; quantity: number; revenue: number; orders: number; quantity_per_order: number }[];
+  climate_consumption?: { status: string; message: string };
+  cross_sell_patterns?: { portion: string; beverage: string; brand: string; orders: number; beverage_quantity: number; beverage_revenue: number }[];
+  ddd_brand_preferences?: { ddd: string; segment: string; brand: string; quantity: number; revenue: number; orders: number; share_quantity: number }[];
   monthly_received: number;
   next_cycle_receivable: number;
   overdue_amount: number;
@@ -953,6 +958,125 @@ export default function AdminDashboard() {
                   {platformReport!.satisfaction_average || 0}
                 </p>
                 <p className="text-xs text-gray-500 font-bold">{platformReport!.satisfaction_total || 0} respostas</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide text-amber-400">Dados agregados e anonimos</p>
+                  <h3 className="mt-1 font-display text-2xl font-bold text-white">Inteligencia de marcas na praia</h3>
+                  <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-gray-300">
+                    Estes relatorios usam apenas vendas agregadas. Nao exibem nome, telefone ou pedido individual de cliente.
+                  </p>
+                </div>
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
+                  Baseado nas vendas filtradas
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5">
+                  <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
+                    <TrendingUp size={18} className="text-amber-400" />
+                    Share of Wallet de cervejas
+                  </h4>
+                  <div className="space-y-3">
+                    {(platformReport!.beer_brand_share || []).length === 0 ? (
+                      <p className="text-sm font-bold text-gray-500">Sem cervejas identificadas neste filtro.</p>
+                    ) : (platformReport!.beer_brand_share || []).map((brand) => (
+                      <div key={brand.brand} className="space-y-1">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="font-black text-white">{brand.brand}</span>
+                          <span className="font-bold text-amber-300">{brand.share_quantity}% das unidades</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-gray-700">
+                          <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.min(100, brand.share_quantity)}%` }} />
+                        </div>
+                        <p className="text-xs font-bold text-gray-400">
+                          {brand.quantity} un - {formatCurrency(brand.revenue)} - {brand.share_revenue}% do faturamento de cervejas
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5">
+                  <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
+                    <DollarSign size={18} className="text-amber-400" />
+                    Elasticidade de preco no litoral
+                  </h4>
+                  <div className="space-y-3">
+                    {(platformReport!.beer_price_elasticity || []).length === 0 ? (
+                      <p className="text-sm font-bold text-gray-500">Sem pontos de preco de cerveja neste filtro.</p>
+                    ) : (platformReport!.beer_price_elasticity || []).slice(0, 6).map((item) => (
+                      <div key={`${item.brand}-${item.product}-${item.avg_price}`} className="rounded-xl border border-gray-700 bg-gray-800 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="truncate text-sm font-black text-white">{item.product}</p>
+                          <span className="shrink-0 text-sm font-black text-amber-300">{formatCurrency(item.avg_price)}</span>
+                        </div>
+                        <p className="mt-1 text-xs font-bold text-gray-400">
+                          {item.brand} - {item.quantity} un - {item.quantity_per_order} un/pedido
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5">
+                  <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
+                    <AlertTriangle size={18} className="text-amber-400" />
+                    Clima vs. consumo
+                  </h4>
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                    <p className="text-sm font-bold leading-6 text-amber-100">
+                      {platformReport!.climate_consumption?.message || "Aguardando base de temperatura por dia, cidade e praia."}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-xs font-bold text-gray-500">
+                    Proxima etapa: gravar temperatura diaria para medir o efeito acima de 32 graus por produto e categoria.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5">
+                  <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
+                    <Store size={18} className="text-amber-400" />
+                    Padroes de combo e cross-selling
+                  </h4>
+                  <div className="space-y-3">
+                    {(platformReport!.cross_sell_patterns || []).length === 0 ? (
+                      <p className="text-sm font-bold text-gray-500">Sem padroes de porcao + bebida neste filtro.</p>
+                    ) : (platformReport!.cross_sell_patterns || []).slice(0, 6).map((pair) => (
+                      <div key={`${pair.portion}-${pair.beverage}-${pair.brand}`} className="rounded-xl border border-gray-700 bg-gray-800 p-3">
+                        <p className="text-sm font-black text-white">{pair.portion}</p>
+                        <p className="mt-1 text-xs font-bold text-gray-400">
+                          Puxa {pair.beverage} ({pair.brand}) em {pair.orders} pedidos - {pair.beverage_quantity} bebidas
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-gray-700 bg-gray-900 p-5">
+                <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
+                  <Phone size={18} className="text-amber-400" />
+                  Turista vs. local por DDD
+                </h4>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {(platformReport!.ddd_brand_preferences || []).length === 0 ? (
+                    <p className="text-sm font-bold text-gray-500">Sem DDD suficiente para comparar preferencias.</p>
+                  ) : (platformReport!.ddd_brand_preferences || []).slice(0, 9).map((row) => (
+                    <div key={`${row.ddd}-${row.brand}`} className="rounded-xl border border-gray-700 bg-gray-800 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-white">DDD {row.ddd}</p>
+                        <span className="rounded-full bg-gray-700 px-2 py-1 text-[11px] font-black text-gray-300">{row.segment}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-bold text-amber-300">{row.brand}: {row.share_quantity}%</p>
+                      <p className="mt-1 text-xs font-bold text-gray-400">{row.quantity} un - {formatCurrency(row.revenue)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

@@ -46,6 +46,49 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   return value || null;
 }
 
+function normalizeText(value: string | null | undefined) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function getBeerBrandFamily(name: string) {
+  const text = normalizeText(name);
+  if (/(brahma|skol|antarctica|original|bohemia|budweiser|stella|corona|serramalte|beck'?s)/.test(text)) return 'Ambev';
+  if (/(heineken|amstel|eisenbahn|sol|devassa|baden baden|kaiser)/.test(text)) return 'Heineken';
+  if (/(itaipava|petra|crystal|lokal|black princess|cabrare|weltenburger)/.test(text)) return 'Petropolis';
+  return 'Outras marcas';
+}
+
+function isBeerProduct(name: string, category: string) {
+  const text = normalizeText(`${name} ${category}`);
+  return /(cerveja|chopp|long neck|latao|latão|ambev|heineken|petropolis|petropolis|brahma|skol|amstel|itaipava|budweiser|stella|corona|eisenbahn|petra)/.test(text);
+}
+
+function isPortionProduct(name: string, category: string) {
+  const text = normalizeText(`${name} ${category}`);
+  return /(porcao|porção|petisco|batata|isca|peixe|camarao|mandioca|fritas|pasteis|pastel)/.test(text);
+}
+
+function isBeverageProduct(name: string, category: string) {
+  const text = normalizeText(`${name} ${category}`);
+  return isBeerProduct(name, category) || /(bebida|refrigerante|agua|água|suco|drink|caipirinha|batida|gin|tonica|tônica)/.test(text);
+}
+
+function extractDdd(phone: string | null | undefined) {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length > 10) digits = digits.slice(2);
+  return digits.length >= 10 ? digits.slice(0, 2) : '';
+}
+
+function getDddSegment(ddd: string) {
+  if (ddd === '13') return 'Local litoral';
+  if (ddd === '11') return 'Turista SP capital';
+  if (ddd) return 'Outros DDDs';
+  return 'DDD nao informado';
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = getRequestSession(req);
@@ -97,7 +140,7 @@ export async function GET(req: NextRequest) {
     let orderQuery = supabaseAdmin
       .from('orders')
       .select(
-        'id, vendor_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, subtotal, product_id, products(name, category)), customers(visit_count)'
+        'id, vendor_id, customer_id, total, status, paid, payment_method, created_at, order_items(quantity, unit_price, subtotal, product_id, products(name, category)), customers(visit_count, phone)'
       )
       .neq('status', 'cancelled')
       .gte('created_at', from || monthStart.toISOString());
@@ -133,8 +176,14 @@ export async function GET(req: NextRequest) {
     const vendorAgg = new Map<string, { name: string; city: string; beach: string; revenue: number; orders: number; visitors: number }>();
     const hourlyAgg = new Map<number, { hour: number; orders: number; quantity: number; revenue: number }>();
     const productHourlyAgg = new Map<string, { product: string; category: string; hour: number; quantity: number; revenue: number }>();
+    const beerBrandAgg = new Map<string, { brand: string; quantity: number; revenue: number; orders: number; share_quantity: number; share_revenue: number }>();
+    const beerPriceAgg = new Map<string, { brand: string; product: string; avg_price: number; quantity: number; revenue: number; orders: number }>();
+    const crossSellAgg = new Map<string, { portion: string; beverage: string; brand: string; orders: number; beverage_quantity: number; beverage_revenue: number }>();
+    const dddBrandAgg = new Map<string, { ddd: string; segment: string; brand: string; quantity: number; revenue: number; orders: number; share_quantity: number }>();
 
     let totalProductsSold = 0;
+    let totalBeerQuantity = 0;
+    let totalBeerRevenue = 0;
 
     let satisfactionRows: any[] = [];
     if (selectedVendorIds.size > 0) {
@@ -190,6 +239,9 @@ export async function GET(req: NextRequest) {
       const hour = new Date(order.created_at).getHours();
 
       if (order.customer_id) countedCustomers.add(order.customer_id);
+      const customer = firstRelation<{ phone?: string }>(order.customers);
+      const ddd = extractDdd(customer?.phone);
+      const dddSegment = getDddSegment(ddd);
 
       const currentVendor = vendorAgg.get(order.vendor_id) || {
         name: vendorName,
@@ -210,6 +262,9 @@ export async function GET(req: NextRequest) {
       hourlyAgg.set(hour, currentHour);
 
       const items = Array.isArray(order.order_items) ? order.order_items : [];
+      const orderPortions = new Set<string>();
+      const orderBeverages = new Map<string, { beverage: string; brand: string; quantity: number; revenue: number }>();
+      const orderDddBrands = new Set<string>();
       items.forEach((item: any) => {
         const product = firstRelation<{ name?: string; category?: string }>(item.products);
         const productName = product?.name || 'Produto';
@@ -217,7 +272,8 @@ export async function GET(req: NextRequest) {
         if (productFilter && !`${productName} ${category}`.toLowerCase().includes(productFilter)) return;
 
         const quantity = Number(item.quantity || 0);
-        const revenue = Number(item.subtotal ?? Number(item.unit_price || 0) * quantity);
+        const unitPrice = Number(item.unit_price || 0);
+        const revenue = Number(item.subtotal ?? unitPrice * quantity);
         totalProductsSold += quantity;
 
         const productKey = item.product_id || productName;
@@ -261,6 +317,70 @@ export async function GET(req: NextRequest) {
         productHour.quantity += quantity;
         productHour.revenue += revenue;
         productHourlyAgg.set(productHourKey, productHour);
+
+        if (isPortionProduct(productName, category)) {
+          orderPortions.add(productName);
+        }
+
+        if (isBeverageProduct(productName, category)) {
+          const brand = isBeerProduct(productName, category) ? getBeerBrandFamily(productName) : 'Bebidas nao alcoolicas/drinks';
+          const beverageKey = `${productName}:${brand}`;
+          const currentBeverage = orderBeverages.get(beverageKey) || { beverage: productName, brand, quantity: 0, revenue: 0 };
+          currentBeverage.quantity += quantity;
+          currentBeverage.revenue += revenue;
+          orderBeverages.set(beverageKey, currentBeverage);
+        }
+
+        if (isBeerProduct(productName, category)) {
+          const brand = getBeerBrandFamily(productName);
+          totalBeerQuantity += quantity;
+          totalBeerRevenue += revenue;
+
+          const currentBrand = beerBrandAgg.get(brand) || { brand, quantity: 0, revenue: 0, orders: 0, share_quantity: 0, share_revenue: 0 };
+          currentBrand.quantity += quantity;
+          currentBrand.revenue += revenue;
+          currentBrand.orders += 1;
+          beerBrandAgg.set(brand, currentBrand);
+
+          const priceKey = `${brand}:${productName}:${unitPrice.toFixed(2)}`;
+          const currentPrice = beerPriceAgg.get(priceKey) || { brand, product: productName, avg_price: unitPrice, quantity: 0, revenue: 0, orders: 0 };
+          currentPrice.quantity += quantity;
+          currentPrice.revenue += revenue;
+          currentPrice.orders += 1;
+          beerPriceAgg.set(priceKey, currentPrice);
+
+          const dddBrandKey = `${ddd || 'sem-ddd'}:${brand}`;
+          if (!orderDddBrands.has(dddBrandKey)) {
+            const currentDddBrand = dddBrandAgg.get(dddBrandKey) || { ddd: ddd || 'Nao informado', segment: dddSegment, brand, quantity: 0, revenue: 0, orders: 0, share_quantity: 0 };
+            currentDddBrand.orders += 1;
+            dddBrandAgg.set(dddBrandKey, currentDddBrand);
+            orderDddBrands.add(dddBrandKey);
+          }
+          const updatedDddBrand = dddBrandAgg.get(dddBrandKey);
+          if (updatedDddBrand) {
+            updatedDddBrand.quantity += quantity;
+            updatedDddBrand.revenue += revenue;
+            dddBrandAgg.set(dddBrandKey, updatedDddBrand);
+          }
+        }
+      });
+
+      orderPortions.forEach((portion) => {
+        orderBeverages.forEach((beverage) => {
+          const pairKey = `${portion}:${beverage.beverage}:${beverage.brand}`;
+          const currentPair = crossSellAgg.get(pairKey) || {
+            portion,
+            beverage: beverage.beverage,
+            brand: beverage.brand,
+            orders: 0,
+            beverage_quantity: 0,
+            beverage_revenue: 0,
+          };
+          currentPair.orders += 1;
+          currentPair.beverage_quantity += beverage.quantity;
+          currentPair.beverage_revenue += beverage.revenue;
+          crossSellAgg.set(pairKey, currentPair);
+        });
       });
     });
 
@@ -270,6 +390,34 @@ export async function GET(req: NextRequest) {
       (best, current) => (current.revenue > best.revenue ? current : best),
       { hour: 0, orders: 0, quantity: 0, revenue: 0 }
     );
+    const beer_brand_share = Array.from(beerBrandAgg.values())
+      .map((brand) => ({
+        ...brand,
+        share_quantity: totalBeerQuantity > 0 ? Math.round((brand.quantity / totalBeerQuantity) * 1000) / 10 : 0,
+        share_revenue: totalBeerRevenue > 0 ? Math.round((brand.revenue / totalBeerRevenue) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.quantity - a.quantity);
+
+    const beer_price_elasticity = Array.from(beerPriceAgg.values())
+      .map((pricePoint) => ({
+        ...pricePoint,
+        avg_price: Math.round(pricePoint.avg_price * 100) / 100,
+        quantity_per_order: pricePoint.orders > 0 ? Math.round((pricePoint.quantity / pricePoint.orders) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => a.avg_price - b.avg_price || b.quantity - a.quantity)
+      .slice(0, 16);
+
+    const dddTotals = new Map<string, number>();
+    dddBrandAgg.forEach((row) => {
+      dddTotals.set(row.ddd, (dddTotals.get(row.ddd) || 0) + row.quantity);
+    });
+    const ddd_brand_preferences = Array.from(dddBrandAgg.values())
+      .map((row) => ({
+        ...row,
+        share_quantity: (dddTotals.get(row.ddd) || 0) > 0 ? Math.round((row.quantity / (dddTotals.get(row.ddd) || 1)) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 18);
 
     return NextResponse.json({
       gmv,
@@ -296,6 +444,16 @@ export async function GET(req: NextRequest) {
       peak_product_hours: Array.from(productHourlyAgg.values())
         .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
         .slice(0, 10),
+      beer_brand_share,
+      beer_price_elasticity,
+      climate_consumption: {
+        status: 'pending_weather_data',
+        message: 'Para cruzar consumo com calor extremo, falta salvar temperatura diaria por cidade/praia. O relatorio ja esta preparado para receber esta base.',
+      },
+      cross_sell_patterns: Array.from(crossSellAgg.values())
+        .sort((a, b) => b.orders - a.orders || b.beverage_revenue - a.beverage_revenue)
+        .slice(0, 12),
+      ddd_brand_preferences,
       monthly_received: gmv,
       next_cycle_receivable,
       overdue_amount,
