@@ -92,3 +92,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Erro ao salvar categoria.' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const id = String(req.nextUrl.searchParams.get('id') || '').trim();
+    const vendorId = String(req.nextUrl.searchParams.get('vendor_id') || '').trim();
+
+    if (!id || !vendorId) {
+      return NextResponse.json({ error: 'id e vendor_id sao obrigatorios.' }, { status: 400 });
+    }
+
+    const session = getRequestSession(req);
+    if (!canAccessVendor(session, vendorId)) {
+      return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
+    }
+
+    const { data: category, error: categoryError } = await (supabaseAdmin.from('product_categories') as any)
+      .select('id, vendor_id')
+      .eq('id', id)
+      .eq('vendor_id', vendorId)
+      .single();
+
+    if (categoryError || !category) {
+      return NextResponse.json({ error: 'Categoria nao encontrada.' }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const { error: childrenError } = await (supabaseAdmin.from('product_categories') as any)
+      .update({ active: false, updated_at: now })
+      .eq('vendor_id', vendorId)
+      .eq('parent_id', id);
+    if (childrenError) throw childrenError;
+
+    const { error } = await (supabaseAdmin.from('product_categories') as any)
+      .update({ active: false, updated_at: now })
+      .eq('id', id)
+      .eq('vendor_id', vendorId);
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('Product categories DELETE error:', err);
+    return NextResponse.json({ error: 'Erro ao excluir categoria.' }, { status: 500 });
+  }
+}

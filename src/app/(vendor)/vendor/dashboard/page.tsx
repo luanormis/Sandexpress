@@ -1073,6 +1073,28 @@ export default function VendorDashboard() {
     }
   };
 
+  const deleteProductCategory = async (category: ProductCategory) => {
+    if (!vendorId) return;
+    const confirmed = confirm(`Excluir "${category.name}" do menu de categorias? Os produtos não serão apagados.`);
+    if (!confirmed) return;
+    setCategoryMessage("");
+    try {
+      const res = await fetch(`/api/product-categories?id=${encodeURIComponent(category.id)}&vendor_id=${encodeURIComponent(vendorId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCategoryMessage(data.error || 'Não foi possível excluir a categoria.');
+        return;
+      }
+      setProductCategories(prev => prev.filter(item => item.id !== category.id && item.parent_id !== category.id));
+      if (productFilter === category.name) setProductFilter("Todos");
+      setCategoryMessage("Categoria excluída do menu.");
+    } catch {
+      setCategoryMessage("Erro de rede ao excluir categoria.");
+    }
+  };
+
   // Umbrella management
   const addUmbrella = async () => {
     const num = parseInt(newUmbrellaNumber);
@@ -1309,7 +1331,9 @@ export default function VendorDashboard() {
   const rootProductCategories = productCategories.filter(category => !category.parent_id && category.active !== false);
   const customCategoryNames = rootProductCategories.map(category => category.name);
   const productCategoryNames = products.map(product => product.category).filter(Boolean);
-  const menuCategories = Array.from(new Set([...customCategoryNames, ...productCategoryNames]));
+  const menuCategories = customCategoryNames.length > 0
+    ? Array.from(new Set(customCategoryNames))
+    : Array.from(new Set(productCategoryNames));
   const filteredProducts = productFilter === "Todos" ? products : products.filter(p => p.category === productFilter);
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -1640,7 +1664,7 @@ export default function VendorDashboard() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                   <div>
-                    <h3 className="font-bold text-lg">Cardapio do cliente</h3>
+                    <h3 className="font-bold text-lg">Cardápio do cliente</h3>
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -1663,8 +1687,8 @@ export default function VendorDashboard() {
                         setProductDraft({
                           id: "",
                           name: "",
-                          category: "Combos",
-                          subcategory: "Promocoes",
+                          category: rootProductCategories.find(category => category.name.toLowerCase().includes("combo"))?.name || rootProductCategories[0]?.name || "",
+                          subcategory: "Promoções",
                           price: 0,
                           promotional_price: null,
                           description: "",
@@ -1686,7 +1710,7 @@ export default function VendorDashboard() {
                       }}
                       className="rounded-xl border border-[#FF6B00] bg-white px-4 py-2 text-sm font-black text-[#d45700] hover:bg-orange-50"
                     >
-                      Montar combo / promocao
+                      Montar combo / promoção
                     </button>
                   </div>
                 </div>
@@ -1724,8 +1748,45 @@ export default function VendorDashboard() {
                     </button>
                   </div>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#5a2d1d]">
-                    Use subcategorias para cardapios como Caipirinha de pinga com sabores limao, abacaxi e outras frutas.
+                    Use categorias para montar o menu superior, como Bebidas, Petiscos e Porções. Use subcategorias para separar itens como Caipirinha de pinga.
                   </p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {rootProductCategories.map(category => {
+                      const children = productCategories.filter(item => item.parent_id === category.id && item.active !== false);
+                      return (
+                        <div key={category.id} className="rounded-xl border border-orange-200 bg-white p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-[#3d1a0a]">{category.name}</p>
+                              <p className="text-xs font-bold text-[#8a3e22]">{children.length} subcategorias</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deleteProductCategory(category)}
+                              className="rounded-lg border border-red-200 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-50"
+                              title="Excluir categoria do menu superior"
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                          {children.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {children.map(child => (
+                                <span key={child.id} className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-black text-[#8a3e22]">
+                                  {child.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {rootProductCategories.length === 0 && (
+                      <p className="rounded-xl border border-orange-200 bg-white p-3 text-sm font-bold text-[#8a3e22]">
+                        Nenhuma categoria cadastrada. Crie uma categoria para ela aparecer no menu superior e no cadastro de produto.
+                      </p>
+                    )}
+                  </div>
                   {categoryMessage && <p className="mt-2 text-sm font-black text-[#8a3e22]">{categoryMessage}</p>}
                 </div>
 
@@ -1752,7 +1813,7 @@ export default function VendorDashboard() {
                       <tr>
                         <th className="p-3 rounded-tl-lg">Produto</th>
                         <th className="p-3">Preço</th>
-                        <th className="p-3">Promocao/Combo</th>
+                        <th className="p-3">Promoção/Combo</th>
                         <th className="p-3">Status</th>
                         <th className="p-3 rounded-tr-lg">Ações</th>
                       </tr>
@@ -1776,7 +1837,7 @@ export default function VendorDashboard() {
                                 </p>
                                 {Array.isArray(p.option_values) && p.option_values.length > 0 && (
                                   <p className="text-[11px] font-bold text-orange-700 truncate max-w-[240px]">
-                                    {p.option_group_name || "Opcoes"}: {p.option_values.join(", ")}
+                                    {p.option_group_name || "Opções"}: {p.option_values.join(", ")}
                                   </p>
                                 )}
                               </div>
@@ -1786,7 +1847,7 @@ export default function VendorDashboard() {
                           <td className="p-3">
                             <div className="flex flex-col gap-1">
                               <span className={cn("w-fit rounded-full px-2.5 py-1 text-xs font-black", p.promotional_price ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500")}>
-                                {p.promotional_price ? formatCurrency(p.promotional_price) : "Sem promocao"}
+                                {p.promotional_price ? formatCurrency(p.promotional_price) : "Sem promoção"}
                               </span>
                               {p.is_combo && (
                                 <span className="w-fit rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-700">Combo</span>
@@ -1814,7 +1875,7 @@ export default function VendorDashboard() {
                                   setShowProductModal(true);
                                 }}
                                 className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors"
-                                title="Alterar preco, promocao e combo"
+                                title="Alterar preço, promoção e combo"
                               >
                                 <Pencil size={16} />
                               </button>
@@ -2051,7 +2112,7 @@ export default function VendorDashboard() {
                     )}
                   </div>
                   <h4 className="mt-5 text-2xl font-black">Preview cliente</h4>
-                  <p className="text-sm font-semibold text-white/80">Login, cardapio e botoes do QR.</p>
+                  <p className="text-sm font-semibold text-white/80">Login, cardápio e botões do QR.</p>
                 </div>
                 <div className="space-y-4 bg-[#fff8f6] p-6">
                   <div className="rounded-xl border border-[#85736C] bg-white p-4">
@@ -3090,7 +3151,7 @@ function ProductModal({
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h3 className="text-xl font-display font-bold">{isMenuMode ? "Alterar cardapio" : product ? "Editar Produto" : "Novo Produto"}</h3>
+          <h3 className="text-xl font-display font-bold">{isMenuMode ? "Alterar cardápio" : product ? "Editar Produto" : "Novo Produto"}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
 
@@ -3200,16 +3261,19 @@ function ProductModal({
           {!isMenuMode && (
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
-              <input
+              <select
                 value={form.category}
                 onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
-                list="product-root-categories"
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
-                placeholder="Digite ou escolha uma categoria real"
-              />
-              <datalist id="product-root-categories">
-                {categoryNames.map(c => <option key={c} value={c} />)}
-              </datalist>
+              >
+                <option value="">Selecione uma categoria cadastrada</option>
+                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              {categoryNames.length === 0 && (
+                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900">
+                  Crie primeiro uma categoria no bloco “Categoria ou subcategoria” para ela aparecer aqui.
+                </p>
+              )}
             </div>
           )}
 
@@ -3217,16 +3281,14 @@ function ProductModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Subcategoria / submenu</label>
-                <input
+                <select
                   value={form.subcategory || ""}
                   onChange={e => setForm(prev => ({ ...prev, subcategory: e.target.value }))}
-                  list="product-subcategories"
                   className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
-                  placeholder="Ex: Caipirinha de pinga"
-                />
-                <datalist id="product-subcategories">
-                  {subcategories.map(category => <option key={category.id} value={category.name} />)}
-                </datalist>
+                >
+                  <option value="">Sem subcategoria</option>
+                  {subcategories.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="flex items-center gap-2 rounded-xl border-2 border-orange-100 bg-orange-50/70 p-3 cursor-pointer">
@@ -3240,7 +3302,7 @@ function ProductModal({
                     }}
                     className="w-5 h-5 accent-[#FF6B00]"
                   />
-                  <span className="text-sm font-black text-[#5a2d1d]">Este produto tem sabores/opcoes para o cliente escolher</span>
+                  <span className="text-sm font-black text-[#5a2d1d]">Este produto tem sabores/opções para o cliente escolher</span>
                 </label>
                 {hasOptions && (
                   <div className="mt-3 space-y-3 rounded-xl border border-orange-100 bg-white p-4">
@@ -3255,13 +3317,13 @@ function ProductModal({
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-bold text-gray-700">Linhas de opcao</label>
+                        <label className="text-sm font-bold text-gray-700">Linhas de opção</label>
                         <button
                           type="button"
                           onClick={addOptionRow}
                           className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-black text-white hover:bg-[#e56000]"
                         >
-                          + Adicionar opcao
+                          + Adicionar opção
                         </button>
                       </div>
                       {optionRows.map((value, index) => (
@@ -3270,7 +3332,7 @@ function ProductModal({
                             value={value}
                             onChange={e => updateOptionRow(index, e.target.value)}
                             className="min-w-0 flex-1 border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                            placeholder={index === 0 ? "Ex: Limao" : "Nova opcao"}
+                            placeholder={index === 0 ? "Ex: Limão" : "Nova opção"}
                           />
                           <button
                             type="button"
@@ -3282,7 +3344,7 @@ function ProductModal({
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs font-bold text-gray-500">Cada linha vira uma escolha no cardapio do cliente antes de adicionar ao carrinho.</p>
+                    <p className="text-xs font-bold text-gray-500">Cada linha vira uma escolha no cardápio do cliente antes de adicionar ao carrinho.</p>
                   </div>
                 )}
               </div>
@@ -3307,7 +3369,7 @@ function ProductModal({
                 onChange={e => setForm(prev => ({ ...prev, menu_highlight: e.target.checked }))}
                 className="w-5 h-5 accent-[#FF6B00]"
               />
-              <span className="text-sm font-bold text-gray-700">Mostrar primeiro no cardapio</span>
+              <span className="text-sm font-bold text-gray-700">Mostrar primeiro no cardápio</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -3396,7 +3458,7 @@ function ProductModal({
                 return;
               }
               if (hasOptions && normalizedOptionValues.length === 0) {
-                alert("Adicione pelo menos uma linha de sabor/opcao ou desmarque sabores/opcoes.");
+                alert("Adicione pelo menos uma linha de sabor/opção ou desmarque sabores/opções.");
                 return;
               }
               onSave({
@@ -3410,7 +3472,7 @@ function ProductModal({
             }}
             className="flex-1 py-3 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] active:scale-95 transition-all"
           >
-            {isMenuMode ? "Salvar cardapio" : product ? "Salvar alteracoes" : "Adicionar Produto"}
+            {isMenuMode ? "Salvar cardápio" : product ? "Salvar alterações" : "Adicionar Produto"}
           </button>
         </div>
       </div>
