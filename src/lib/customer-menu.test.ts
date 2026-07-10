@@ -9,6 +9,7 @@ const products = [
   { name: 'Pastel de carne', category: 'Comidas' },
   { name: 'Batata frita', category: 'Petiscos' },
   { name: 'Agua com gas', category: 'Nao Alcoolicos' },
+  { name: 'Caipirinha de pinga', category: 'Drinks', subcategory: 'Frutas', option_values: ['Limao', 'Abacaxi'] },
 ];
 
 describe('customer menu helpers', () => {
@@ -21,6 +22,7 @@ describe('customer menu helpers', () => {
     expect(filterCustomerMenuProducts(products, 'Pastéis')).toEqual([products[1]]);
     expect(filterCustomerMenuProducts(products, 'Porções')).toEqual([products[2]]);
     expect(filterCustomerMenuProducts(products, 'Bebidas')).toEqual([products[3]]);
+    expect(filterCustomerMenuProducts(products, 'Drinks')).toEqual([products[4]]);
   });
 
   it('compresses Unsplash thumbnails for row images', () => {

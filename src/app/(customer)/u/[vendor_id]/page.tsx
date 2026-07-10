@@ -18,15 +18,23 @@ type Product = {
   id: string;
   name: string;
   category: string;
+  subcategory?: string | null;
   description: string | null;
   image_url?: string | null;
   price: number;
   promotional_price: number | null;
+  is_combo?: boolean | null;
+  option_group_name?: string | null;
+  option_values?: string[] | null;
+  menu_highlight?: boolean | null;
+  promotion_starts_at?: string | null;
+  promotion_ends_at?: string | null;
 };
 
 type CartItem = {
   product: Product;
   quantity: number;
+  option?: string | null;
 };
 
 type PromotionPreview = {
@@ -99,6 +107,7 @@ export default function CustomerApp() {
   const [otpMessage, setOtpMessage] = useState("");
   const [partySize, setPartySize] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [orders, setOrders] = useState<Order[]>([]);
   const [notes, setNotes] = useState("");
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
@@ -119,7 +128,19 @@ export default function CustomerApp() {
   const [promotionPreview, setPromotionPreview] = useState<PromotionPreview | null>(null);
   const [promotionLoading, setPromotionLoading] = useState(false);
 
-  const visibleProducts = useMemo(() => filterCustomerMenuProducts(products, activeCategory), [activeCategory, products]);
+  const visibleProducts = useMemo(() => {
+    const now = Date.now();
+    return filterCustomerMenuProducts(products, activeCategory).sort((a, b) => {
+      const aActivePromo = Boolean(a.menu_highlight || a.is_combo || a.promotional_price) &&
+        (!a.promotion_starts_at || new Date(a.promotion_starts_at).getTime() <= now) &&
+        (!a.promotion_ends_at || new Date(a.promotion_ends_at).getTime() >= now);
+      const bActivePromo = Boolean(b.menu_highlight || b.is_combo || b.promotional_price) &&
+        (!b.promotion_starts_at || new Date(b.promotion_starts_at).getTime() <= now) &&
+        (!b.promotion_ends_at || new Date(b.promotion_ends_at).getTime() >= now);
+      if (aActivePromo !== bActivePromo) return aActivePromo ? -1 : 1;
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [activeCategory, products]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
   const promotionDiscount = Math.max(0, Number(promotionPreview?.discount_total || 0));
   const discountedCartTotal = typeof promotionPreview?.total === "number" ? Number(promotionPreview.total) : cartTotal;
@@ -419,25 +440,29 @@ export default function CustomerApp() {
   }
 
   function addToCart(product: Product) {
+    const options = Array.isArray(product.option_values) ? product.option_values.filter(Boolean) : [];
+    const option = options.length > 0 ? selectedOptions[product.id] || options[0] : null;
     setLastAddedProductId(product.id);
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find((item) => item.product.id === product.id && (item.option || null) === option);
       if (existing) {
-        return prev.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map((item) => item.product.id === product.id && (item.option || null) === option ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, option }];
     });
     window.setTimeout(() => setLastAddedProductId((current) => current === product.id ? "" : current), 1400);
   }
 
-  function updateQuantity(productId: string, delta: number) {
+  function updateQuantity(productId: string, delta: number, option?: string | null) {
     setCart((prev) => prev
-      .map((item) => item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item)
+      .map((item) => item.product.id === productId && (option === undefined || (item.option || null) === (option || null)) ? { ...item, quantity: item.quantity + delta } : item)
       .filter((item) => item.quantity > 0));
   }
 
-  function getCartQuantity(productId: string) {
-    return cart.find((item) => item.product.id === productId)?.quantity || 0;
+  function getCartQuantity(productId: string, option?: string | null) {
+    return cart
+      .filter((item) => item.product.id === productId && (option === undefined || (item.option || null) === (option || null)))
+      .reduce((sum, item) => sum + item.quantity, 0);
   }
 
   async function createOrder() {
@@ -445,6 +470,11 @@ export default function CustomerApp() {
     setLoading(true);
     setError("");
     try {
+      const optionNotes = cart
+        .filter((item) => item.option)
+        .map((item) => `${item.product.name}: ${item.option}`)
+        .join("; ");
+      const orderNotes = [notes.trim(), optionNotes ? `Opcoes escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
       const res = await fetch("/api/orders", {
         method: "POST",
         credentials: "include",
@@ -454,7 +484,7 @@ export default function CustomerApp() {
           customer_id: customerId,
           umbrella_id: umbrellaId,
           items: cart.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
-          notes,
+          notes: orderNotes,
         }),
       });
       const data = await res.json();
@@ -749,7 +779,10 @@ export default function CustomerApp() {
             {visibleProducts.length === 0 ? (
               <p className="customer-empty">Nenhum produto nesta categoria.</p>
             ) : visibleProducts.map((product) => {
-              const quantity = getCartQuantity(product.id);
+              const options = Array.isArray(product.option_values) ? product.option_values.filter(Boolean) : [];
+              const selectedOption = options.length > 0 ? selectedOptions[product.id] || options[0] : null;
+              const quantity = getCartQuantity(product.id, selectedOption);
+              const highlighted = Boolean(product.menu_highlight || product.is_combo || product.promotional_price);
               return (
                 <article key={product.id} className={`customer-product-row${lastAddedProductId === product.id ? " is-added" : ""}`}>
                   {product.image_url && (
@@ -759,13 +792,33 @@ export default function CustomerApp() {
                   )}
                   <div className="customer-product-info">
                     <h2 className="customer-product-name">{product.name}</h2>
-                    <p className="customer-product-description">{product.description || product.category}</p>
+                    <p className="customer-product-description">{product.description || product.subcategory || product.category}</p>
+                    {highlighted && (
+                      <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promocao"}</span>
+                    )}
+                    {options.length > 0 && (
+                      <div className="customer-option-group" aria-label={product.option_group_name || "Opcoes"}>
+                        <p>{product.option_group_name || "Escolha uma opcao"}</p>
+                        <div>
+                          {options.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => setSelectedOptions(prev => ({ ...prev, [product.id]: option }))}
+                              className={selectedOption === option ? "is-selected" : ""}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
                   </div>
                   <div className="customer-product-side">
                     {quantity > 0 ? (
                       <div className="customer-qty customer-qty--compact">
-                        <button onClick={() => updateQuantity(product.id, -1)} className="customer-qty-button" aria-label={`Remover ${product.name}`}>
+                        <button onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}>
                           <Minus size="1rem" />
                         </button>
                         <span>{quantity}</span>
@@ -805,15 +858,16 @@ export default function CustomerApp() {
         <section className="customer-content">
           <div className="customer-list">
             {cart.length === 0 ? <p className="customer-empty">Carrinho vazio.</p> : cart.map((item) => (
-              <article key={item.product.id} className="customer-cart-row">
+              <article key={`${item.product.id}-${item.option || "padrao"}`} className="customer-cart-row">
                 <div className="customer-cart-info">
                   <h2 className="customer-cart-name">{item.product.name}</h2>
+                  {item.option && <p className="customer-cart-option">{item.product.option_group_name || "Opcao"}: {item.option}</p>}
                   <p className="customer-cart-meta">{formatCurrency(Number(item.product.promotional_price ?? item.product.price) * item.quantity)}</p>
                 </div>
                 <div className="customer-qty">
-                  <button onClick={() => updateQuantity(item.product.id, -1)} className="customer-qty-button" aria-label={`Remover ${item.product.name}`}>-</button>
+                  <button onClick={() => updateQuantity(item.product.id, -1, item.option)} className="customer-qty-button" aria-label={`Remover ${item.product.name}`}>-</button>
                   <span>{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.product.id, 1)} className="customer-qty-button" aria-label={`Adicionar ${item.product.name}`}>+</button>
+                  <button onClick={() => updateQuantity(item.product.id, 1, item.option)} className="customer-qty-button" aria-label={`Adicionar ${item.product.name}`}>+</button>
                 </div>
               </article>
             ))}

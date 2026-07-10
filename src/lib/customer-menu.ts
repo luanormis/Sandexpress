@@ -12,6 +12,9 @@ export type CustomerMenuCategory = (typeof CUSTOMER_MENU_CATEGORIES)[number];
 type MenuProductLike = {
   name?: string | null;
   category?: string | null;
+  subcategory?: string | null;
+  option_group_name?: string | null;
+  option_values?: string[] | null;
 };
 
 function normalizeText(value: unknown) {
@@ -22,7 +25,7 @@ function normalizeText(value: unknown) {
 }
 
 function productSearchText(product: MenuProductLike) {
-  return `${normalizeText(product.category)} ${normalizeText(product.name)}`;
+  return `${normalizeText(product.category)} ${normalizeText(product.subcategory)} ${normalizeText(product.name)} ${normalizeText(product.option_group_name)} ${normalizeText((product.option_values || []).join(' '))}`;
 }
 
 export function productMatchesCustomerCategory(product: MenuProductLike, category: CustomerMenuCategory) {

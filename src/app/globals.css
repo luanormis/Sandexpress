@@ -2086,3 +2086,56 @@ input[type="number"] {
 .vendor-sales-surface :where(h3, h4, strong) {
   color: #fff7ed !important;
 }
+
+.customer-promo-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--customer-primary) 16%, #ffffff);
+  color: var(--customer-primary);
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.customer-option-group {
+  margin-top: 0.45rem;
+}
+
+.customer-option-group p {
+  color: var(--customer-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  margin-bottom: 0.35rem;
+}
+
+.customer-option-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.customer-option-group button {
+  border: 1px solid color-mix(in srgb, var(--customer-primary) 28%, #ffffff);
+  border-radius: 999px;
+  background: #fff7ed;
+  color: var(--customer-ink);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 0.35rem 0.6rem;
+}
+
+.customer-option-group button.is-selected {
+  background: var(--customer-primary);
+  border-color: var(--customer-primary);
+  color: var(--customer-button-text);
+}
+
+.customer-cart-option {
+  color: var(--customer-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-top: 0.15rem;
+}

@@ -9,6 +9,22 @@ function normalizeMoney(value: unknown) {
   return Number.isFinite(numeric) && numeric >= 0 ? Number(numeric.toFixed(2)) : null;
 }
 
+function normalizeText(value: unknown, max = 120) {
+  const text = String(value || '').trim();
+  return text ? text.slice(0, max) : null;
+}
+
+function normalizeOptions(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 30);
+  }
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
 function productErrorResponse(error: any) {
   console.error('Products POST error:', {
     code: error?.code,
@@ -136,6 +152,12 @@ export async function POST(req: NextRequest) {
       price,
       promotional_price: promotionalPrice,
       category: String(body.category || 'Geral').trim().slice(0, 80),
+      subcategory: normalizeText(body.subcategory, 80),
+      option_group_name: normalizeText(body.option_group_name, 80),
+      option_values: normalizeOptions(body.option_values),
+      menu_highlight: Boolean(body.menu_highlight || body.is_combo || promotionalPrice !== null),
+      promotion_starts_at: body.promotion_starts_at || null,
+      promotion_ends_at: body.promotion_ends_at || null,
       image_url: body.image_url ? String(body.image_url).trim().slice(0, 2048) : null,
       is_default_image: body.image_url ? body.is_default_image !== false : true,
       active: body.active !== false,

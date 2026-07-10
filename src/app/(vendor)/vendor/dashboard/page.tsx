@@ -21,12 +21,18 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  subcategory?: string | null;
   price: number;
   promotional_price: number | null;
   description: string;
   image_url: string;
   active: boolean;
   is_combo: boolean;
+  option_group_name?: string | null;
+  option_values?: string[] | null;
+  menu_highlight?: boolean | null;
+  promotion_starts_at?: string | null;
+  promotion_ends_at?: string | null;
   stock_tracking_enabled?: boolean;
   stock_quantity?: number | null;
   physical_stock_quantity?: number | null;
@@ -79,6 +85,14 @@ function getServiceRequest(order?: Pick<Order, "notes"> | null) {
 
 function getVisibleOrderNotes(notes?: string) {
   return getVisibleVendorOrderNotes(notes, SERVICE_REQUEST_MARKERS.map((request) => request.marker));
+}
+
+interface ProductCategory {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  active: boolean;
+  sort_order: number;
 }
 
 function isOrderEmpty(order: Pick<Order, "total" | "items" | "account_items">) {
@@ -446,10 +460,14 @@ export default function VendorDashboard() {
 
   // --- Products State ---
   const [products, setProducts] = useState<Product[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
   const [productFilter, setProductFilter] = useState("Todos");
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productDraft, setProductDraft] = useState<Product | null>(null);
   const [productModalMode, setProductModalMode] = useState<"stock" | "menu">("stock");
+  const [categoryForm, setCategoryForm] = useState({ name: "", parent_id: "" });
+  const [categoryMessage, setCategoryMessage] = useState("");
 
   // --- Umbrellas State ---
   const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
@@ -637,6 +655,7 @@ export default function VendorDashboard() {
       // Load initial data
       loadOrders(vid);
       loadProducts(vid);
+      loadProductCategories(vid);
       loadUmbrellas(vid);
       loadCustomers(vid);
       loadTeam(vid);
@@ -787,6 +806,18 @@ export default function VendorDashboard() {
       setClosingMessage("Erro de rede ao fechar o dia.");
     } finally {
       setClosingDay(false);
+    }
+  };
+
+  const loadProductCategories = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/product-categories?vendor_id=${vid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProductCategories(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to load product categories:', err);
     }
   };
 
@@ -1011,9 +1042,36 @@ export default function VendorDashboard() {
       }
       setShowProductModal(false);
       setEditingProduct(null);
+      setProductDraft(null);
     } catch (err) {
       console.error('Save product error:', err);
       alert('Erro de rede ao salvar produto.');
+    }
+  };
+
+  const saveProductCategory = async () => {
+    if (!vendorId || !categoryForm.name.trim()) return;
+    setCategoryMessage("");
+    try {
+      const res = await fetch('/api/product-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          name: categoryForm.name,
+          parent_id: categoryForm.parent_id || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCategoryMessage(data.error || 'Nao foi possivel salvar categoria.');
+        return;
+      }
+      setProductCategories(prev => [data, ...prev.filter(item => item.id !== data.id)]);
+      setCategoryForm({ name: "", parent_id: "" });
+      setCategoryMessage(data.parent_id ? "Subcategoria salva." : "Categoria salva.");
+    } catch {
+      setCategoryMessage("Erro de rede ao salvar categoria.");
     }
   };
 
@@ -1250,6 +1308,9 @@ export default function VendorDashboard() {
   };
 
   // Filtered products
+  const rootProductCategories = productCategories.filter(category => !category.parent_id && category.active !== false);
+  const customCategoryNames = rootProductCategories.map(category => category.name);
+  const menuCategories = Array.from(new Set([...CATEGORIES, ...customCategoryNames]));
   const filteredProducts = productFilter === "Todos" ? products : products.filter(p => p.category === productFilter);
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -1549,6 +1610,7 @@ export default function VendorDashboard() {
               })))}
               onAddProduct={() => {
                 setEditingProduct(null);
+                setProductDraft(null);
                 setProductModalMode("stock");
                 setShowProductModal(true);
               }}
@@ -1565,6 +1627,7 @@ export default function VendorDashboard() {
                   blocked_by_stock: product.blocked_by_stock ?? false,
                   sort_order: product.sort_order ?? 0,
                 });
+                setProductDraft(null);
                 setProductModalMode("stock");
                 setShowProductModal(true);
               }}
@@ -1581,14 +1644,81 @@ export default function VendorDashboard() {
                     <h3 className="font-bold text-lg">Cardapio do cliente</h3>
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
                   </div>
-                  <p className="rounded-xl bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700">
-                    Cadastro e estoque ficam na aba Estoque
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setProductDraft({
+                        id: "",
+                        name: "",
+                        category: "Combos",
+                        subcategory: "Promocoes",
+                        price: 0,
+                        promotional_price: null,
+                        description: "",
+                        image_url: "",
+                        active: true,
+                        is_combo: true,
+                        menu_highlight: true,
+                        option_group_name: "",
+                        option_values: [],
+                        stock_tracking_enabled: false,
+                        stock_quantity: null,
+                        physical_stock_quantity: 0,
+                        beach_stock_quantity: 0,
+                        blocked_by_stock: false,
+                        sort_order: -10,
+                      });
+                      setProductModalMode("stock");
+                      setShowProductModal(true);
+                    }}
+                    className="rounded-xl bg-[#FF6B00] px-4 py-2 text-sm font-black text-white hover:bg-[#e56000]"
+                  >
+                    Montar combo / promocao
+                  </button>
+                </div>
+
+                <div className="mb-6 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                    <div className="min-w-0 flex-1">
+                      <label className="mb-1 block text-xs font-black uppercase text-[#8a3e22]">Categoria ou subcategoria</label>
+                      <input
+                        value={categoryForm.name}
+                        onChange={(event) => setCategoryForm(prev => ({ ...prev, name: event.target.value }))}
+                        className="w-full rounded-xl border border-orange-200 bg-white px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#ff6b00]"
+                        placeholder="Ex: Drinks, Refrigerantes, Sabores de caipirinha"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <label className="mb-1 block text-xs font-black uppercase text-[#8a3e22]">Dentro de</label>
+                      <select
+                        value={categoryForm.parent_id}
+                        onChange={(event) => setCategoryForm(prev => ({ ...prev, parent_id: event.target.value }))}
+                        className="w-full rounded-xl border border-orange-200 bg-white px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#ff6b00]"
+                      >
+                        <option value="">Categoria principal</option>
+                        {rootProductCategories.map(category => (
+                          <option key={category.id} value={category.id}>{category.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={saveProductCategory}
+                      className="rounded-xl bg-[#ff6b00] px-5 py-3 text-sm font-black text-white hover:bg-[#e56000]"
+                    >
+                      Criar
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#5a2d1d]">
+                    Use subcategorias para cardapios como Caipirinha de pinga com sabores limao, abacaxi e outras frutas.
                   </p>
+                  {categoryMessage && <p className="mt-2 text-sm font-black text-[#8a3e22]">{categoryMessage}</p>}
                 </div>
 
                 {/* Category filter */}
                 <div className="flex gap-2 overflow-x-auto mb-6 hide-scrollbar">
-                  {["Todos", ...CATEGORIES].map(c => (
+                  {["Todos", ...menuCategories].map(c => (
                     <button
                       key={c}
                       onClick={() => setProductFilter(c)}
@@ -1628,7 +1758,14 @@ export default function VendorDashboard() {
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900">{p.name}</p>
-                                <p className="text-xs text-gray-400 truncate max-w-[200px]">{p.is_combo ? "Combo" : p.category}</p>
+                                <p className="text-xs text-gray-400 truncate max-w-[240px]">
+                                  {p.is_combo ? "Combo" : p.category}{p.subcategory ? ` / ${p.subcategory}` : ""}
+                                </p>
+                                {Array.isArray(p.option_values) && p.option_values.length > 0 && (
+                                  <p className="text-[11px] font-bold text-orange-700 truncate max-w-[240px]">
+                                    {p.option_group_name || "Opcoes"}: {p.option_values.join(", ")}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -1640,6 +1777,9 @@ export default function VendorDashboard() {
                               </span>
                               {p.is_combo && (
                                 <span className="w-fit rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-700">Combo</span>
+                              )}
+                              {p.menu_highlight && (
+                                <span className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">Destaque no topo</span>
                               )}
                             </div>
                           </td>
@@ -1656,6 +1796,7 @@ export default function VendorDashboard() {
                               <button
                                 onClick={() => {
                                   setEditingProduct(p);
+                                  setProductDraft(null);
                                   setProductModalMode("menu");
                                   setShowProductModal(true);
                                 }}
@@ -2590,11 +2731,13 @@ export default function VendorDashboard() {
       {/* ========== MODAL: ADD/EDIT PRODUCT ========== */}
       {showProductModal && (
         <ProductModal
-          product={editingProduct}
+          product={editingProduct || productDraft}
           vendorId={vendorId}
           mode={productModalMode}
+          categories={productCategories}
+          fallbackCategories={menuCategories}
           onSave={saveProduct}
-          onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductModalMode("stock"); }}
+          onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductDraft(null); setProductModalMode("stock"); }}
         />
       )}
 
@@ -2840,24 +2983,37 @@ function ProductModal({
   product,
   vendorId,
   mode = "stock",
+  categories,
+  fallbackCategories,
   onSave,
   onClose,
 }: {
   product: Product | null;
   vendorId: string | null;
   mode?: "stock" | "menu";
+  categories: ProductCategory[];
+  fallbackCategories: string[];
   onSave: (p: Product) => Promise<void> | void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<Product>(product || {
     id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
+    subcategory: "", option_group_name: "", option_values: [], menu_highlight: false,
     description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false,
     stock_quantity: null, physical_stock_quantity: 0, beach_stock_quantity: 0, blocked_by_stock: false,
     sort_order: 99,
   });
+  const [optionText, setOptionText] = useState(() => Array.isArray(product?.option_values) ? product.option_values.join(", ") : "");
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
   const isMenuMode = mode === "menu";
+  const rootCategories = categories.filter(category => !category.parent_id && category.active !== false);
+  const selectedRoot = rootCategories.find(category => category.name === form.category);
+  const subcategories = selectedRoot
+    ? categories.filter(category => category.parent_id === selectedRoot.id && category.active !== false)
+    : [];
+  const categoryNames = Array.from(new Set([...fallbackCategories, ...rootCategories.map(category => category.name)]));
+  const normalizedOptionValues = optionText.split(",").map(item => item.trim()).filter(Boolean).slice(0, 30);
 
   useEffect(() => {
     if (isMenuMode) return;
@@ -3022,8 +3178,45 @@ function ProductModal({
                 value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
               >
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+            </div>
+          )}
+
+          {!isMenuMode && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Subcategoria / submenu</label>
+                <input
+                  value={form.subcategory || ""}
+                  onChange={e => setForm(prev => ({ ...prev, subcategory: e.target.value }))}
+                  list="product-subcategories"
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
+                  placeholder="Ex: Caipirinha de pinga"
+                />
+                <datalist id="product-subcategories">
+                  {subcategories.map(category => <option key={category.id} value={category.name} />)}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Nome das opcoes</label>
+                <input
+                  value={form.option_group_name || ""}
+                  onChange={e => setForm(prev => ({ ...prev, option_group_name: e.target.value }))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                  placeholder="Ex: Sabor, Fruta, Refrigerante"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-1">Opcoes separadas por virgula</label>
+                <input
+                  value={optionText}
+                  onChange={e => setOptionText(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                  placeholder="Ex: Limao, Abacaxi, Maracuja"
+                />
+                <p className="mt-1 text-xs font-bold text-gray-500">No cardapio o cliente escolhe uma opcao antes de adicionar ao carrinho.</p>
+              </div>
             </div>
           )}
 
@@ -3033,10 +3226,19 @@ function ProductModal({
               <input
                 type="checkbox"
                 checked={form.is_combo}
-                onChange={e => setForm(prev => ({ ...prev, is_combo: e.target.checked }))}
+                onChange={e => setForm(prev => ({ ...prev, is_combo: e.target.checked, menu_highlight: e.target.checked ? true : prev.menu_highlight }))}
                 className="w-5 h-5 accent-[#FF6B00]"
               />
               <span className="text-sm font-bold text-gray-700">É um combo?</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(form.menu_highlight)}
+                onChange={e => setForm(prev => ({ ...prev, menu_highlight: e.target.checked }))}
+                className="w-5 h-5 accent-[#FF6B00]"
+              />
+              <span className="text-sm font-bold text-gray-700">Mostrar primeiro no cardapio</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -3111,7 +3313,15 @@ function ProductModal({
             Cancelar
           </button>
           <button
-            onClick={() => { if (form.name && form.price) onSave(form); }}
+            onClick={() => {
+              if (form.name && form.price) {
+                onSave({
+                  ...form,
+                  option_values: normalizedOptionValues,
+                  menu_highlight: Boolean(form.menu_highlight || form.is_combo || form.promotional_price),
+                });
+              }
+            }}
             className="flex-1 py-3 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] active:scale-95 transition-all"
           >
             {isMenuMode ? "Salvar cardapio" : product ? "Salvar alteracoes" : "Adicionar Produto"}
