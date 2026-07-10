@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
+import { getRequestSession } from '@/lib/auth-session';
 import { validateImageUpload } from '@/lib/upload-guard';
 
 const LOGO_MAX_BYTES = 1024 * 1024;
@@ -17,8 +17,8 @@ export async function POST(
   try {
     const { id } = await params;
     const session = getRequestSession(req);
-    if (!canAccessVendor(session, id)) {
-      return NextResponse.json({ error: 'Acesso restrito ao quiosque.' }, { status: 403 });
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Apenas o admin geral pode alterar a logo do quiosque.' }, { status: 403 });
     }
 
     const formData = await req.formData();

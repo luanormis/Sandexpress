@@ -30,26 +30,46 @@ function galleryResponse(images: any[]) {
 export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category");
+    const search = String(request.nextUrl.searchParams.get("q") || "").trim().toLowerCase();
     const planType = request.nextUrl.searchParams.get("planType") || "free";
     const requestedCategoryKey = category ? categoryKey(category) : null;
-    let query = supabaseAdmin.from("product_images").select("*");
 
-    // Free users get only free images
-    // Plus users can see all images
-    if (planType === "free") {
-      query = query.eq("plan_type", "free");
+    const buildQuery = () => {
+      let query = supabaseAdmin.from("product_images").select("*");
+      if (planType === "free") {
+        query = query.eq("plan_type", "free");
+      }
+      return query.order("category").order("name");
+    };
+
+    let activeQuery = buildQuery();
+    let { data, error } = await activeQuery.eq("active", true);
+    if (error && ["42703", "PGRST204"].includes(error.code || "")) {
+      const fallback = await buildQuery();
+      data = fallback.data;
+      error = fallback.error;
     }
-
-    const { data, error } = await query.order("category").order("name");
 
     if (error) {
       console.error("Product gallery query error:", error);
       return NextResponse.json({ error: 'Galeria product_images indisponivel no banco.' }, { status: 500 });
     }
 
-    const images = requestedCategoryKey
+    const categoryImages = requestedCategoryKey
       ? (data || []).filter((image: any) => categoryKey(image.category) === requestedCategoryKey)
       : (data || []);
+    const images = search
+      ? categoryImages.filter((image: any) => {
+          const haystack = [
+            image.category,
+            image.title,
+            image.name,
+            image.description,
+            ...(Array.isArray(image.tags) ? image.tags : []),
+          ].join(" ").toLowerCase();
+          return haystack.includes(search);
+        })
+      : categoryImages;
 
     return galleryResponse(images);
   } catch (error) {

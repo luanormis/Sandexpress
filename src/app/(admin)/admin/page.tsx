@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu, Trash2, Star, Save,
+  Upload, ImageIcon,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
@@ -21,6 +22,7 @@ interface Vendor {
   beach_name?: string | null;
   cnpj: string | null;
   cpf: string | null;
+  logo_url?: string | null;
   subscription_status: string;
   plan_type: string | null;
   trial_ends_at: string | null;
@@ -70,14 +72,29 @@ interface PlatformReport {
   };
 }
 
+interface CatalogImage {
+  id: string;
+  category: string;
+  title?: string | null;
+  name: string;
+  image_url: string;
+  description?: string | null;
+  plan_type: "free" | "plus";
+  tags?: string[];
+  active?: boolean;
+}
+
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "vendors", label: "Quiosques", icon: Store },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
+  { id: "catalog", label: "Catalogo", icon: ImageIcon },
   { id: "plans", label: "Planos", icon: DollarSign },
   { id: "new", label: "Novo Quiosque", icon: Plus },
   { id: "danger", label: "Risco", icon: Trash2 },
 ];
+
+const CATALOG_CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petiscos", "Pasteis", "Porcoes", "Sobremesas", "Combos"];
 
 const ANNUAL_PLAN_TYPES = new Set(["annual", "12months"]);
 
@@ -122,6 +139,44 @@ function getVendorBillingSummary(vendor: Vendor) {
   return "Cobranca mensal";
 }
 
+function convertImageToWebp(file: File, quality = 0.82): Promise<File> {
+  return new Promise((resolve, reject) => {
+    if (file.type === "image/webp") {
+      resolve(file);
+      return;
+    }
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxSide = 1200;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Canvas indisponivel para converter imagem."));
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(objectUrl);
+        if (!blob) {
+          reject(new Error("Nao foi possivel converter a imagem para WebP."));
+          return;
+        }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp" }));
+      }, "image/webp", quality);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Imagem invalida."));
+    };
+    image.src = objectUrl;
+  });
+}
+
 // =========================================================
 // MAIN COMPONENT
 // =========================================================
@@ -148,6 +203,18 @@ export default function AdminDashboard() {
   });
   const [planSaving, setPlanSaving] = useState(false);
   const [planMessage, setPlanMessage] = useState("");
+  const [catalogImages, setCatalogImages] = useState<CatalogImage[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogSaving, setCatalogSaving] = useState(false);
+  const [catalogMessage, setCatalogMessage] = useState("");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogForm, setCatalogForm] = useState({
+    name: "",
+    category: "Bebidas",
+    tags: "bebidas, alimentos, pasteis, petiscos",
+    description: "",
+  });
+  const [logoUploadingVendorId, setLogoUploadingVendorId] = useState<string | null>(null);
   const [dangerForm, setDangerForm] = useState({
     vendor_id: "",
     admin_password: "",
@@ -181,6 +248,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAuthenticated && (activeTab === "analytics" || activeTab === "overview")) {
       loadPlatformReport();
+    }
+    if (isAuthenticated && activeTab === "catalog") {
+      loadCatalogImages();
     }
   }, [activeTab, isAuthenticated]);
 
@@ -297,6 +367,109 @@ export default function AdminDashboard() {
       applyPlanSettings(data);
     } catch {
       setPlanMessage("Erro de rede ao carregar valores dos planos.");
+    }
+  };
+
+  const loadCatalogImages = async (search = catalogSearch) => {
+    try {
+      setCatalogLoading(true);
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("q", search.trim());
+      const res = await fetch(`/api/admin/catalog-images${params.toString() ? `?${params.toString()}` : ""}`, { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        handleAdminSessionExpired();
+        return;
+      }
+      if (!res.ok) {
+        setCatalogMessage(data.error || "Nao foi possivel carregar o catalogo.");
+        return;
+      }
+      setCatalogImages(Array.isArray(data.images) ? data.images : []);
+    } catch {
+      setCatalogMessage("Erro de rede ao carregar catalogo.");
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
+  const uploadCatalogImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!catalogForm.name.trim() || !catalogForm.category.trim()) {
+      setCatalogMessage("Informe nome e categoria antes de subir a imagem.");
+      return;
+    }
+    setCatalogSaving(true);
+    setCatalogMessage("");
+    try {
+      const webpFile = await convertImageToWebp(file);
+      const formData = new FormData();
+      formData.append("file", webpFile);
+      formData.append("name", catalogForm.name);
+      formData.append("category", catalogForm.category);
+      formData.append("tags", catalogForm.tags);
+      formData.append("description", catalogForm.description);
+      formData.append("plan_type", "free");
+      const res = await fetch("/api/admin/catalog-images", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCatalogMessage(data.error || "Nao foi possivel salvar imagem global.");
+        return;
+      }
+      setCatalogImages(prev => [data.image, ...prev.filter((image) => image.id !== data.image?.id)]);
+      setCatalogMessage("Imagem convertida para WebP e adicionada ao catalogo global.");
+    } catch (err) {
+      setCatalogMessage(err instanceof Error ? err.message : "Erro ao converter imagem.");
+    } finally {
+      setCatalogSaving(false);
+    }
+  };
+
+  const toggleCatalogImage = async (image: CatalogImage) => {
+    const nextActive = !image.active;
+    setCatalogMessage("");
+    const res = await fetch("/api/admin/catalog-images", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: image.id, active: nextActive }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setCatalogMessage(data.error || "Nao foi possivel atualizar imagem.");
+      return;
+    }
+    setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
+  };
+
+  const uploadVendorLogo = async (vendor: Vendor, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setLogoUploadingVendorId(vendor.id);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/vendors/${vendor.id}/theme/logo`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Nao foi possivel subir a logo.");
+        return;
+      }
+      setVendors(prev => prev.map((item) => item.id === vendor.id ? { ...item, logo_url: data.logo_url } : item));
+      setSelectedVendor(prev => prev?.id === vendor.id ? { ...prev, logo_url: data.logo_url } : prev);
+    } finally {
+      setLogoUploadingVendorId(null);
     }
   };
 
@@ -769,6 +942,19 @@ export default function AdminDashboard() {
                           >
                             <Eye size={16} />
                           </button>
+                          <label
+                            className="cursor-pointer text-gray-400 hover:text-amber-300 transition-colors bg-gray-700 p-2 rounded-lg hover:bg-amber-500/10"
+                            title="Subir logo do quiosque"
+                          >
+                            <Upload size={16} className={logoUploadingVendorId === v.id ? "animate-pulse" : ""} />
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              className="hidden"
+                              disabled={logoUploadingVendorId === v.id}
+                              onChange={(event) => uploadVendorLogo(v, event)}
+                            />
+                          </label>
                           {v.subscription_status === "trial" && (
                             <button
                               onClick={() => migrateVendorToPaid(v)}
@@ -1198,6 +1384,144 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========== CATALOGO GLOBAL ========== */}
+        {activeTab === "catalog" && (
+          <div className="space-y-6">
+            <div className="max-w-4xl">
+              <h2 className="text-2xl font-display font-bold">Catalogo global de imagens</h2>
+              <p className="mt-2 text-sm font-bold leading-6 text-gray-400">
+                As imagens ficam no bucket catalogo-global, sao convertidas para WebP antes do envio e aparecem para todos os quiosques no cadastro de produtos.
+              </p>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+              <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6">
+                <h3 className="font-bold text-gray-200">Nova imagem global</h3>
+                <div className="mt-5 space-y-4">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-gray-400">Nome de referencia</span>
+                    <input
+                      value={catalogForm.name}
+                      onChange={event => setCatalogForm(prev => ({ ...prev, name: event.target.value }))}
+                      className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
+                      placeholder="Ex: Porcao de peixe"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-gray-400">Categoria</span>
+                    <select
+                      value={catalogForm.category}
+                      onChange={event => setCatalogForm(prev => ({ ...prev, category: event.target.value }))}
+                      className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
+                    >
+                      {CATALOG_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-gray-400">Tags de busca</span>
+                    <input
+                      value={catalogForm.tags}
+                      onChange={event => setCatalogForm(prev => ({ ...prev, tags: event.target.value }))}
+                      className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
+                      placeholder="bebidas, petiscos, pasteis, peixe, batata"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-gray-400">Descricao curta</span>
+                    <textarea
+                      value={catalogForm.description}
+                      onChange={event => setCatalogForm(prev => ({ ...prev, description: event.target.value }))}
+                      rows={3}
+                      className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
+                      placeholder="Referencia para o admin identificar a imagem."
+                    />
+                  </label>
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-3 text-sm font-black text-white hover:bg-amber-700">
+                    <Upload size={18} />
+                    {catalogSaving ? "Convertendo e enviando..." : "Selecionar imagem"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={catalogSaving}
+                      onChange={uploadCatalogImage}
+                    />
+                  </label>
+                  {catalogMessage && (
+                    <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm font-bold leading-5 text-amber-100">
+                      {catalogMessage}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-200">Imagens cadastradas</h3>
+                    <p className="text-sm font-bold text-gray-500">{catalogImages.length} imagens carregadas</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={catalogSearch}
+                      onChange={event => setCatalogSearch(event.target.value)}
+                      className="w-full rounded-xl border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white outline-none focus:border-amber-500 md:w-64"
+                      placeholder="Buscar por tag ou nome"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => loadCatalogImages(catalogSearch)}
+                      className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-black text-white hover:bg-gray-600"
+                    >
+                      Buscar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {catalogImages.map(image => (
+                    <div key={image.id} className="overflow-hidden rounded-2xl border border-gray-700 bg-gray-900">
+                      <div className="aspect-[4/3] bg-gray-950">
+                        <img src={image.image_url} alt={image.name} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="space-y-2 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-white">{image.name}</p>
+                            <p className="text-xs font-bold text-gray-500">{image.category}</p>
+                          </div>
+                          <span className={cn(
+                            "rounded-full px-2 py-1 text-[11px] font-black",
+                            image.active === false ? "bg-red-500/20 text-red-300" : "bg-green-500/20 text-green-300"
+                          )}>
+                            {image.active === false ? "Inativa" : "Ativa"}
+                          </span>
+                        </div>
+                        <p className="line-clamp-2 text-xs font-bold leading-5 text-gray-400">
+                          {(image.tags || []).join(", ") || image.description || "Sem tags"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => toggleCatalogImage(image)}
+                          className="w-full rounded-xl border border-gray-700 px-3 py-2 text-xs font-black text-gray-200 hover:bg-gray-800"
+                        >
+                          {image.active === false ? "Ativar imagem" : "Desativar imagem"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!catalogLoading && catalogImages.length === 0 && (
+                    <p className="text-sm font-bold text-gray-500">Nenhuma imagem encontrada.</p>
+                  )}
+                  {catalogLoading && (
+                    <p className="text-sm font-bold text-gray-500">Carregando catalogo...</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

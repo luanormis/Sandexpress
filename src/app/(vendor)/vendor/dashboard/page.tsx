@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
-  Search, Clock, Trash2, Pencil, X, Upload,
+  Search, Clock, Trash2, Pencil, X, Upload, ImageIcon,
   Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
   Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
@@ -475,7 +475,6 @@ export default function VendorDashboard() {
   const [teamMessage, setTeamMessage] = useState("");
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
-  const [themeUploading, setThemeUploading] = useState(false);
   const [themeMessage, setThemeMessage] = useState("");
   const knownOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -669,33 +668,6 @@ export default function VendorDashboard() {
       setThemeMessage("Erro de rede ao salvar personalizacao.");
     } finally {
       setThemeSaving(false);
-    }
-  };
-
-  const uploadThemeLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !vendorId) return;
-    setThemeUploading(true);
-    setThemeMessage("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(`/api/vendors/${vendorId}/theme/logo`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setThemeMessage(data.error || "Nao foi possivel enviar a logo.");
-        return;
-      }
-      setThemeForm(prev => ({ ...prev, logo_url: data.logo_url || prev.logo_url }));
-      setThemeMessage("Logo enviada e salva no quiosque.");
-    } catch {
-      setThemeMessage("Erro de rede ao enviar a logo.");
-    } finally {
-      setThemeUploading(false);
     }
   };
 
@@ -1892,27 +1864,12 @@ export default function VendorDashboard() {
                         <Upload className="text-[#3D1A0A]" size={30} />
                       )}
                     </div>
-                    <label className="min-w-0 flex-1 space-y-2">
+                    <div className="min-w-0 flex-1 space-y-2">
                       <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
-                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-[#E56000]">
-                        <Upload size={18} />
-                        {themeUploading ? "Enviando logo..." : "Subir logo do quiosque"}
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={uploadThemeLogo}
-                          disabled={themeUploading}
-                        />
-                      </label>
-                      <input
-                        value={themeForm.logo_url}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, logo_url: event.target.value }))}
-                        placeholder="/sandexpress-logo-fluid.png ou https://..."
-                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#ff6b00]"
-                      />
-                      <span className="block text-xs font-semibold text-gray-500">Tambem e possivel colar uma URL manualmente.</span>
-                    </label>
+                      <p className="rounded-xl border border-[#EFD5CA] bg-white px-4 py-3 text-sm font-bold leading-5 text-[#3D1A0A]">
+                        A logo e definida pelo admin geral. Neste painel o quiosque pode ajustar apenas as cores da experiencia do cliente.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -2899,7 +2856,7 @@ function ProductModal({
     sort_order: 99,
   });
   const [uploading, setUploading] = useState(false);
-  const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string }>>([]);
+  const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
   const isMenuMode = mode === "menu";
 
   useEffect(() => {
@@ -2907,7 +2864,12 @@ function ProductModal({
     let cancelled = false;
     async function loadDefaultImages() {
       try {
-        const res = await fetch(`/api/products/gallery?category=${encodeURIComponent(form.category)}&planType=free`);
+        const params = new URLSearchParams({
+          category: form.category,
+          q: form.name || form.category,
+          planType: "free",
+        });
+        const res = await fetch(`/api/products/gallery?${params.toString()}`);
         const data = await res.json().catch(() => null);
         if (!cancelled && res.ok) {
           setDefaultImages(data?.data?.images || []);
@@ -2920,7 +2882,7 @@ function ProductModal({
     return () => {
       cancelled = true;
     };
-  }, [form.category, isMenuMode]);
+  }, [form.category, form.name, isMenuMode]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2960,29 +2922,29 @@ function ProductModal({
           )}
           {!isMenuMode && (
             <>
-          {/* Image upload */}
+          {/* Global image catalog */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Foto do Produto</label>
-            <label className="cursor-pointer block">
-              <div className="w-full h-40 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center hover:border-[#FF6B00] transition-colors overflow-hidden">
+            <div className="block">
+              <div className="w-full h-40 border-2 border-gray-200 rounded-xl flex flex-col items-center justify-center overflow-hidden bg-gray-50">
                 {form.image_url ? (
                   <img src={form.image_url} alt="" className="w-full h-full object-cover" />
-                ) : uploading ? (
-                  <div className="w-8 h-8 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Upload size={24} className="text-gray-300 mb-2" />
-                    <span className="text-sm text-gray-400">Clique para enviar foto</span>
+                    <ImageIcon size={24} className="text-gray-300 mb-2" />
+                    <span className="px-4 text-center text-sm font-bold text-gray-400">Escolha uma imagem do catalogo global abaixo</span>
                   </>
                 )}
               </div>
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </label>
+            </div>
+            <p className="mt-2 text-xs font-bold leading-5 text-gray-500">
+              O catalogo global e administrado pelo SandExpress. Digite o nome do item para receber sugestoes por categoria e tags.
+            </p>
             {defaultImages.length > 0 && (
               <div className="mt-3">
-                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Imagens padrao</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {defaultImages.slice(0, 8).map((image) => (
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referencias do catalogo global</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {defaultImages.slice(0, 12).map((image) => (
                     <button
                       key={image.id}
                       type="button"
@@ -2998,6 +2960,11 @@ function ProductModal({
                   ))}
                 </div>
               </div>
+            )}
+            {defaultImages.length === 0 && (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+                Nenhuma imagem encontrada ainda. Tente uma categoria como bebidas, petiscos, pasteis, porcoes de peixe, batata ou calabresa.
+              </p>
             )}
           </div>
 

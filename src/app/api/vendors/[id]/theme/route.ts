@@ -178,7 +178,7 @@ export async function PATCH(
     const secondaryColor = normalizeColor(body.secondary_color);
     const buttonColor = normalizeColor(body.button_color);
     const buttonTextColor = normalizeColor(body.button_text_color);
-    const logoUrl = normalizeLogoUrl(body.logo_url);
+    const requestedLogoUrl = normalizeLogoUrl(body.logo_url);
     if (!primaryColor || !secondaryColor || !buttonColor || !buttonTextColor) {
       return NextResponse.json({ error: 'Informe cores validas no formato #RRGGBB.' }, { status: 400 });
     }
@@ -215,13 +215,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
     }
 
-    const themeUpdate = {
+    const colorUpdate = {
       primary_color: primaryColor,
       secondary_color: secondaryColor,
       button_color: buttonColor,
       button_text_color: buttonTextColor,
-      logo_url: logoUrl,
     };
+    const themeUpdate = session?.role === 'admin'
+      ? { ...colorUpdate, logo_url: requestedLogoUrl }
+      : colorUpdate;
 
     const { error: tenantError } = await (supabaseAdmin.from('tenants') as any)
       .update(themeUpdate)
@@ -266,9 +268,16 @@ export async function PATCH(
     }
     if (ratesError) throw ratesError;
 
+    const { data: savedVendor } = await supabaseAdmin
+      .from('vendors')
+      .select('logo_url')
+      .eq('id', id)
+      .single();
+
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
       ...themeUpdate,
+      logo_url: (savedVendor as any)?.logo_url || requestedLogoUrl,
       ...paymentFeeUpdate,
       ...payoutDays,
       cash_fee_rate: paymentSettings.cash.feeRate,
