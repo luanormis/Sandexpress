@@ -2032,39 +2032,42 @@ input[type="number"] {
   color: var(--customer-primary) !important;
 }
 
-/* Final report contrast guard: vendor reports must stay readable in bright outdoor use. */
+/* Final report contrast guard: vendor reports follow the dark kiosk surface while staying readable in bright outdoor use. */
 .vendor-sales-surface {
-  background-color: #fff3ec !important;
-  color: #2d1b14 !important;
+  background: linear-gradient(180deg, #341407 0%, #1f100b 100%) !important;
+  border-color: rgba(255, 107, 0, 0.38) !important;
+  color: #fff7ed !important;
 }
 
-.vendor-sales-surface :where(.bg-white) {
-  background-color: #fffaf6 !important;
-  color: #2d1b14 !important;
+.vendor-sales-surface :where(.bg-white, .bg-\[\#fffaf6\]) {
+  background-color: #351709 !important;
+  color: #fff7ed !important;
+  border-color: rgba(255, 138, 61, 0.42) !important;
+  box-shadow: 0 12px 30px rgba(18, 8, 4, 0.28) !important;
 }
 
-.vendor-sales-surface :where(.bg-gray-50, .bg-gray-100, .bg-blue-50, .bg-blue-100, .bg-green-50, .bg-green-100, .bg-purple-50, .bg-purple-100, .bg-orange-50, .bg-orange-100) {
-  background-color: #fff1e8 !important;
+.vendor-sales-surface :where(.bg-gray-50, .bg-gray-100, .bg-blue-50, .bg-blue-100, .bg-green-50, .bg-green-100, .bg-purple-50, .bg-purple-100, .bg-orange-50, .bg-orange-100, .bg-\[\#fff1e8\]) {
+  background-color: #48200f !important;
 }
 
 .vendor-sales-surface :where(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-zinc-900) {
-  color: #2d1b14 !important;
+  color: #fff7ed !important;
 }
 
 .vendor-sales-surface :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500, .text-orange-100, .text-green-100) {
-  color: #5a2d1d !important;
+  color: #f6d7c5 !important;
 }
 
 .vendor-sales-surface :where(.text-green-600, .text-green-700, .text-green-900, .text-blue-600, .text-blue-700, .text-blue-900, .text-purple-600, .text-purple-700, .text-purple-900) {
-  color: #2f4858 !important;
+  color: #9fd6e8 !important;
 }
 
 .vendor-sales-surface :where(.text-red-600, .text-red-700, .text-red-900) {
-  color: #8f1d1d !important;
+  color: #ffb4a8 !important;
 }
 
 .vendor-sales-surface :where(.text-\[\#FF6B00\], .text-orange-500, .text-orange-600, .text-amber-500) {
-  color: #a44100 !important;
+  color: #ffb17a !important;
 }
 
 .vendor-sales-surface :where(.text-white) {
@@ -2072,10 +2075,14 @@ input[type="number"] {
 }
 
 .vendor-sales-surface :where(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200, .border-zinc-200, .border-orange-200, .border-green-200) {
-  border-color: #e5c2ae !important;
+  border-color: rgba(255, 138, 61, 0.42) !important;
 }
 
 .vendor-sales-surface .sales-value-gradient {
-  color: #a44100 !important;
+  color: #ffb17a !important;
   background-image: none !important;
+}
+
+.vendor-sales-surface :where(h3, h4, strong) {
+  color: #fff7ed !important;
 }
