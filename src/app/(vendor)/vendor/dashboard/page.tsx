@@ -216,8 +216,6 @@ interface KioskTheme {
 
 type PaymentFeeType = "percent" | "fixed";
 
-const CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petiscos", "Sobremesas", "Combos", "Extras"];
-
 const DEFAULT_THEME: KioskTheme = {
   primary_color: "#ff6b00",
   secondary_color: "#451704",
@@ -1310,7 +1308,8 @@ export default function VendorDashboard() {
   // Filtered products
   const rootProductCategories = productCategories.filter(category => !category.parent_id && category.active !== false);
   const customCategoryNames = rootProductCategories.map(category => category.name);
-  const menuCategories = Array.from(new Set([...CATEGORIES, ...customCategoryNames]));
+  const productCategoryNames = products.map(product => product.category).filter(Boolean);
+  const menuCategories = Array.from(new Set([...customCategoryNames, ...productCategoryNames]));
   const filteredProducts = productFilter === "Todos" ? products : products.filter(p => p.category === productFilter);
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -2735,7 +2734,6 @@ export default function VendorDashboard() {
           vendorId={vendorId}
           mode={productModalMode}
           categories={productCategories}
-          fallbackCategories={menuCategories}
           onSave={saveProduct}
           onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductDraft(null); setProductModalMode("stock"); }}
         />
@@ -2984,7 +2982,6 @@ function ProductModal({
   vendorId,
   mode = "stock",
   categories,
-  fallbackCategories,
   onSave,
   onClose,
 }: {
@@ -2992,12 +2989,11 @@ function ProductModal({
   vendorId: string | null;
   mode?: "stock" | "menu";
   categories: ProductCategory[];
-  fallbackCategories: string[];
   onSave: (p: Product) => Promise<void> | void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<Product>(product || {
-    id: "", name: "", category: "Bebidas", price: 0, promotional_price: null,
+    id: "", name: "", category: "", price: 0, promotional_price: null,
     subcategory: "", option_group_name: "", option_values: [], menu_highlight: false,
     description: "", image_url: "", active: true, is_combo: false, stock_tracking_enabled: false,
     stock_quantity: null, physical_stock_quantity: 0, beach_stock_quantity: 0, blocked_by_stock: false,
@@ -3012,7 +3008,7 @@ function ProductModal({
   const subcategories = selectedRoot
     ? categories.filter(category => category.parent_id === selectedRoot.id && category.active !== false)
     : [];
-  const categoryNames = Array.from(new Set([...fallbackCategories, ...rootCategories.map(category => category.name)]));
+  const categoryNames = Array.from(new Set(rootCategories.map(category => category.name)));
   const normalizedOptionValues = optionText.split(",").map(item => item.trim()).filter(Boolean).slice(0, 30);
 
   useEffect(() => {
@@ -3174,12 +3170,16 @@ function ProductModal({
           {!isMenuMode && (
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
-              <select
-                value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
+              <input
+                value={form.category}
+                onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
+                list="product-root-categories"
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
-              >
-                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                placeholder="Digite ou escolha uma categoria real"
+              />
+              <datalist id="product-root-categories">
+                {categoryNames.map(c => <option key={c} value={c} />)}
+              </datalist>
             </div>
           )}
 

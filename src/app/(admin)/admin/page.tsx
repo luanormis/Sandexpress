@@ -94,8 +94,6 @@ const TABS = [
   { id: "danger", label: "Risco", icon: Trash2 },
 ];
 
-const CATALOG_CATEGORIES = ["Bebidas", "Alcoolicos", "Nao Alcoolicos", "Comidas", "Petiscos", "Pasteis", "Porcoes", "Sobremesas", "Combos"];
-
 const ANNUAL_PLAN_TYPES = new Set(["annual", "12months"]);
 
 function isAnnualPlan(planType: string | null) {
@@ -210,8 +208,8 @@ export default function AdminDashboard() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogForm, setCatalogForm] = useState({
     name: "",
-    category: "Bebidas",
-    tags: "bebidas, alimentos, pasteis, petiscos",
+    category: "",
+    tags: "",
     description: "",
   });
   const [logoUploadingVendorId, setLogoUploadingVendorId] = useState<string | null>(null);
@@ -1414,13 +1412,12 @@ export default function AdminDashboard() {
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-bold text-gray-400">Categoria</span>
-                    <select
+                    <input
                       value={catalogForm.category}
                       onChange={event => setCatalogForm(prev => ({ ...prev, category: event.target.value }))}
                       className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
-                    >
-                      {CATALOG_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                    </select>
+                      placeholder="Ex: bebidas, porcoes, pasteis"
+                    />
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-bold text-gray-400">Tags de busca</span>

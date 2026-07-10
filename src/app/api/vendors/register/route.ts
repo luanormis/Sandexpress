@@ -7,7 +7,6 @@ import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
 import { isRateLimited } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/vendor-password';
 import { getPlatformPlanSettings } from '@/lib/platform-plans';
-import { seedDefaultMenuForVendor } from '@/lib/default-menu-products';
 
 function safeText(value: unknown, maxLength = 120) {
   return String(value || '').trim().slice(0, maxLength);
@@ -176,12 +175,6 @@ export async function POST(req: NextRequest) {
       .from('tenant_features')
       .insert(buildTenantFeatureRows(tenant.id));
     if (featuresError && !['42P01', 'PGRST205'].includes(featuresError.code)) throw featuresError;
-
-    try {
-      await seedDefaultMenuForVendor(tenant.id, vendor.id);
-    } catch (menuError) {
-      console.error('Default menu seed error:', menuError);
-    }
 
     const confirmationEmail = buildVendorRegistrationConfirmationEmail({
       vendorName: vendor.name,

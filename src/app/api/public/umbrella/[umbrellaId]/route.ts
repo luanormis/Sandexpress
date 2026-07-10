@@ -67,25 +67,13 @@ export async function GET(
       .eq('id', umbrella.tenant_id)
       .single();
 
-    let { data: products, error: productsError } = await supabaseAdmin
+    const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select('id, name, category, subcategory, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock, option_group_name, option_values, menu_highlight, promotion_starts_at, promotion_ends_at')
       .eq('tenant_id', umbrella.tenant_id)
       .eq('vendor_id', umbrella.vendor_id)
       .eq('active', true)
       .order('sort_order', { ascending: true });
-
-    if (productsError && ['42703', 'PGRST204'].includes(productsError.code || '')) {
-      const fallback = await supabaseAdmin
-        .from('products')
-        .select('id, name, category, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock')
-        .eq('tenant_id', umbrella.tenant_id)
-        .eq('vendor_id', umbrella.vendor_id)
-        .eq('active', true)
-        .order('sort_order', { ascending: true });
-      products = fallback.data;
-      productsError = fallback.error;
-    }
 
     if (productsError) throw productsError;
 

@@ -61,7 +61,12 @@ function getClientIp(req: NextRequest) {
 }
 
 function isUploadPath(pathname: string) {
-  return pathname === '/api/products/upload' || /^\/api\/products\/[^/]+\/upload-image$/.test(pathname);
+  return (
+    pathname === '/api/admin/catalog-images' ||
+    pathname === '/api/products/upload' ||
+    /^\/api\/products\/[^/]+\/upload-image$/.test(pathname) ||
+    /^\/api\/vendors\/[^/]+\/theme\/logo$/.test(pathname)
+  );
 }
 
 function isAllowedOrigin(req: NextRequest) {
@@ -121,6 +126,11 @@ function validateRequestShape(req: NextRequest, pathname: string) {
     const contentType = req.headers.get('content-type') || '';
     if (contentLength > 0 && !contentType.includes('application/json')) {
       return NextResponse.json({ error: 'Content-Type invalido.' }, { status: 415 });
+    }
+  } else if (JSON_METHODS.has(req.method) && isUploadPath(pathname)) {
+    const contentType = req.headers.get('content-type') || '';
+    if (contentLength > 0 && !contentType.includes('multipart/form-data')) {
+      return NextResponse.json({ error: 'Content-Type invalido para upload.' }, { status: 415 });
     }
   }
 

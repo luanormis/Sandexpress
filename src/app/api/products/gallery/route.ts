@@ -34,21 +34,11 @@ export async function GET(request: NextRequest) {
     const planType = request.nextUrl.searchParams.get("planType") || "free";
     const requestedCategoryKey = category ? categoryKey(category) : null;
 
-    const buildQuery = () => {
-      let query = supabaseAdmin.from("product_images").select("*");
-      if (planType === "free") {
-        query = query.eq("plan_type", "free");
-      }
-      return query.order("category").order("name");
-    };
-
-    let activeQuery = buildQuery();
-    let { data, error } = await activeQuery.eq("active", true);
-    if (error && ["42703", "PGRST204"].includes(error.code || "")) {
-      const fallback = await buildQuery();
-      data = fallback.data;
-      error = fallback.error;
+    let query = supabaseAdmin.from("product_images").select("*").eq("active", true);
+    if (planType === "free") {
+      query = query.eq("plan_type", "free");
     }
+    const { data, error } = await query.order("category").order("name");
 
     if (error) {
       console.error("Product gallery query error:", error);
