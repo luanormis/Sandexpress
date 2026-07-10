@@ -446,6 +446,64 @@ export default function AdminDashboard() {
     setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
   };
 
+  const replaceCatalogImage = async (image: CatalogImage, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setCatalogSaving(true);
+    setCatalogMessage("");
+    try {
+      const webpFile = await convertImageToWebp(file);
+      const formData = new FormData();
+      formData.append("id", image.id);
+      formData.append("file", webpFile);
+      formData.append("name", image.name);
+      formData.append("category", image.category);
+      const res = await fetch("/api/admin/catalog-images", {
+        method: "PATCH",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCatalogMessage(data.error || "Nao foi possivel alterar a imagem.");
+        return;
+      }
+      setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
+      setCatalogMessage("Imagem alterada com sucesso.");
+    } catch (err) {
+      setCatalogMessage(err instanceof Error ? err.message : "Erro ao alterar imagem.");
+    } finally {
+      setCatalogSaving(false);
+    }
+  };
+
+  const deleteCatalogImage = async (image: CatalogImage) => {
+    const confirmed = confirm(`Excluir definitivamente a imagem "${image.name}" do catalogo global?`);
+    if (!confirmed) return;
+
+    setCatalogSaving(true);
+    setCatalogMessage("");
+    try {
+      const res = await fetch(`/api/admin/catalog-images?id=${encodeURIComponent(image.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCatalogMessage(data.error || "Nao foi possivel excluir a imagem.");
+        return;
+      }
+      setCatalogImages(prev => prev.filter((item) => item.id !== image.id));
+      setCatalogMessage("Imagem excluida do catalogo global.");
+    } catch {
+      setCatalogMessage("Erro de rede ao excluir imagem.");
+    } finally {
+      setCatalogSaving(false);
+    }
+  };
+
   const uploadVendorLogo = async (vendor: Vendor, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1509,6 +1567,28 @@ export default function AdminDashboard() {
                         >
                           {image.active === false ? "Ativar imagem" : "Desativar imagem"}
                         </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-500/40 px-3 py-2 text-xs font-black text-amber-100 hover:bg-amber-500/10">
+                            <Upload size={14} />
+                            Alterar
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              disabled={catalogSaving}
+                              onChange={(event) => replaceCatalogImage(image, event)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            disabled={catalogSaving}
+                            onClick={() => deleteCatalogImage(image)}
+                            className="flex items-center justify-center gap-2 rounded-xl border border-red-500/40 px-3 py-2 text-xs font-black text-red-200 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            Excluir
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

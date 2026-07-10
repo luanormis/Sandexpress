@@ -29,6 +29,34 @@ function normalizeTags(value: FormDataEntryValue | null, category: string, name:
   return Array.from(new Set([category.toLowerCase(), name.toLowerCase(), ...raw])).slice(0, 20);
 }
 
+async function uploadCatalogFile(file: File, category: string, name: string) {
+  if (file.type !== 'image/webp') {
+    return { error: 'Envie imagens em WEBP. O painel do admin converte automaticamente antes do upload.' };
+  }
+  const uploadError = validateImageUpload(file, { maxBytes: MAX_CATALOG_IMAGE_BYTES });
+  if (uploadError) return { error: uploadError };
+
+  const storagePath = `${slugify(category)}/${Date.now()}-${slugify(name)}.webp`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const { error: uploadErr } = await supabaseAdmin.storage
+    .from(CATALOG_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType: 'image/webp',
+      upsert: true,
+    });
+
+  if (uploadErr) throw uploadErr;
+
+  const { data: urlData } = supabaseAdmin.storage
+    .from(CATALOG_BUCKET)
+    .getPublicUrl(storagePath);
+
+  return {
+    storagePath,
+    publicUrl: urlData.publicUrl,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     if (!requireAdmin(req)) {
@@ -77,28 +105,8 @@ export async function POST(req: NextRequest) {
     if (!file || !name || !category) {
       return NextResponse.json({ error: 'Imagem, nome e categoria sao obrigatorios.' }, { status: 400 });
     }
-    if (file.type !== 'image/webp') {
-      return NextResponse.json({ error: 'Envie imagens em WEBP. O painel do admin converte automaticamente antes do upload.' }, { status: 400 });
-    }
-    const uploadError = validateImageUpload(file, { maxBytes: MAX_CATALOG_IMAGE_BYTES });
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError }, { status: 400 });
-    }
-
-    const storagePath = `${slugify(category)}/${Date.now()}-${slugify(name)}.webp`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadErr } = await supabaseAdmin.storage
-      .from(CATALOG_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: 'image/webp',
-        upsert: true,
-      });
-
-    if (uploadErr) throw uploadErr;
-
-    const { data: urlData } = supabaseAdmin.storage
-      .from(CATALOG_BUCKET)
-      .getPublicUrl(storagePath);
+    const uploaded = await uploadCatalogFile(file, category, name);
+    if ('error' in uploaded) return NextResponse.json({ error: uploaded.error }, { status: 400 });
 
     const { data, error } = await (supabaseAdmin.from('product_images') as any)
       .insert({
@@ -106,11 +114,11 @@ export async function POST(req: NextRequest) {
         title: name,
         name,
         description: description || null,
-        image_url: urlData.publicUrl,
+        image_url: uploaded.publicUrl,
         plan_type: planType,
         tags: normalizeTags(formData.get('tags'), category, name),
         source_bucket: CATALOG_BUCKET,
-        storage_path: storagePath,
+        storage_path: uploaded.storagePath,
         mime_type: 'image/webp',
         active: true,
       })
@@ -130,6 +138,51 @@ export async function PATCH(req: NextRequest) {
   try {
     if (!requireAdmin(req)) {
       return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
+    }
+
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const id = String(formData.get('id') || '').trim();
+      const file = formData.get('file') as File | null;
+      const name = String(formData.get('name') || '').trim().slice(0, 120);
+      const category = String(formData.get('category') || '').trim().slice(0, 80);
+      if (!id || !file || !name || !category) {
+        return NextResponse.json({ error: 'id, imagem, nome e categoria sao obrigatorios.' }, { status: 400 });
+      }
+
+      const { data: current, error: currentError } = await (supabaseAdmin.from('product_images') as any)
+        .select('id, storage_path')
+        .eq('id', id)
+        .single();
+      if (currentError || !current) {
+        return NextResponse.json({ error: 'Imagem nao encontrada.' }, { status: 404 });
+      }
+
+      const uploaded = await uploadCatalogFile(file, category, name);
+      if ('error' in uploaded) return NextResponse.json({ error: uploaded.error }, { status: 400 });
+
+      const { data, error } = await (supabaseAdmin.from('product_images') as any)
+        .update({
+          category,
+          title: name,
+          name,
+          image_url: uploaded.publicUrl,
+          source_bucket: CATALOG_BUCKET,
+          storage_path: uploaded.storagePath,
+          mime_type: 'image/webp',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (current.storage_path && current.storage_path !== uploaded.storagePath) {
+        await supabaseAdmin.storage.from(CATALOG_BUCKET).remove([current.storage_path]);
+      }
+
+      return NextResponse.json({ image: data });
     }
 
     const body = await req.json();
@@ -158,5 +211,39 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error('Admin catalog PATCH error:', err);
     return NextResponse.json({ error: 'Erro ao atualizar imagem global.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    if (!requireAdmin(req)) {
+      return NextResponse.json({ error: 'Acesso restrito ao admin.' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = String(searchParams.get('id') || '').trim();
+    if (!id) return NextResponse.json({ error: 'id obrigatorio.' }, { status: 400 });
+
+    const { data: current, error: currentError } = await (supabaseAdmin.from('product_images') as any)
+      .select('id, storage_path')
+      .eq('id', id)
+      .single();
+    if (currentError || !current) {
+      return NextResponse.json({ error: 'Imagem nao encontrada.' }, { status: 404 });
+    }
+
+    const { error } = await (supabaseAdmin.from('product_images') as any)
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+
+    if (current.storage_path) {
+      await supabaseAdmin.storage.from(CATALOG_BUCKET).remove([current.storage_path]);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('Admin catalog DELETE error:', err);
+    return NextResponse.json({ error: 'Erro ao excluir imagem global.' }, { status: 500 });
   }
 }
