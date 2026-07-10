@@ -26,7 +26,7 @@ export function isValidBrazilPhoneWithDdd(input: unknown) {
 export function normalizeBrazilPhoneWithDdd(input: unknown) {
   const digits = stripBrazilCountryCode(input);
   if (!isValidBrazilPhoneWithDdd(digits)) {
-    throw new Error('Informe um telefone valido com DDD. Exemplo: 1196041957.');
+    throw new Error('Informe um telefone válido com DDD. Exemplo: 1196041957.');
   }
   return digits;
 }

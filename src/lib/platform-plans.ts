@@ -38,7 +38,7 @@ export async function savePlatformPlanSettings(input: Partial<PlatformPlanSettin
     .upsert({
       key: PLAN_SETTINGS_KEY,
       value: next,
-      description: 'Planos comerciais atuais usados apenas como padrao para novos quiosques.',
+      description: 'Planos comerciais atuais usados apenas como padrão para novos quiosques.',
       updated_at: new Date().toISOString(),
     } as any, { onConflict: 'key' });
 

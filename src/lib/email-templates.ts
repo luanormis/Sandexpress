@@ -98,7 +98,7 @@ export function buildVendorRegistrationConfirmationEmail(input: VendorRegistrati
     `
       <p style="margin:0 0 14px">Ola${ownerLine}.</p>
       <p style="margin:0 0 14px">O quiosque <strong>${escapeHtml(input.vendorName)}</strong> foi cadastrado no SandExpress.</p>
-      <p style="margin:0 0 14px">Seu acesso ja esta liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.</p>
+      <p style="margin:0 0 14px">Seu acesso já está liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.</p>
       ${loginLine}
       ${trialLine}
     `
@@ -110,7 +110,7 @@ export function buildVendorRegistrationConfirmationEmail(input: VendorRegistrati
     input.ownerName ? `Responsavel: ${input.ownerName}` : '',
     input.login ? `Login do painel: ${input.login}` : '',
     input.trialEndsAt ? `Teste gratis ativo ate ${new Date(input.trialEndsAt).toLocaleDateString('pt-BR')}.` : '',
-    `Seu acesso ja esta liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.`,
+    `Seu acesso já está liberado. Use o login e a senha criados no cadastro para entrar no painel do quiosque.`,
   ].filter(Boolean).join('\n');
 
   return {

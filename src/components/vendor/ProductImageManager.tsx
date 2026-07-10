@@ -26,10 +26,10 @@ export function ProductImageManager({
       try {
         const response = await fetch(`/api/products/gallery?category=${encodeURIComponent(product.category)}&planType=free`);
         const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error || "Erro ao carregar imagens padrao.");
+        if (!response.ok) throw new Error(data?.error || "Erro ao carregar imagens padrão.");
         if (!cancelled) setDefaultImages((data?.data?.images || []) as ProductImage[]);
       } catch (err) {
-        console.error("Erro ao carregar imagens padrao:", err);
+        console.error("Erro ao carregar imagens padrão:", err);
         if (!cancelled) setDefaultImages([]);
       }
     }

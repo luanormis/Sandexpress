@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const comment = sanitizeComment(body?.comment);
 
     if (!UUID_RE.test(orderId) || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return NextResponse.json({ error: 'Avaliacao invalida.' }, { status: 400 });
+      return NextResponse.json({ error: 'Avaliação inválida.' }, { status: 400 });
     }
 
     const { data: order, error: orderError } = await supabaseAdmin
@@ -42,11 +42,11 @@ export async function POST(req: NextRequest) {
       order.customer_id !== session.customer_id ||
       (session.tenant_id && order.tenant_id !== session.tenant_id)
     ) {
-      return NextResponse.json({ error: 'Avaliacao nao autorizada para este pedido.' }, { status: 403 });
+      return NextResponse.json({ error: 'Avaliação não autorizada para este pedido.' }, { status: 403 });
     }
 
     if (!ALLOWED_ORDER_STATUSES.has(order.status)) {
-      return NextResponse.json({ error: 'Avaliacao disponivel apos pedir a conta.' }, { status: 409 });
+      return NextResponse.json({ error: 'Avaliação disponível após pedir a conta.' }, { status: 409 });
     }
 
     const { error: upsertError } = await supabaseAdmin
@@ -70,6 +70,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Satisfaction survey error:', err);
-    return NextResponse.json({ error: 'Nao foi possivel registrar a avaliacao.' }, { status: 500 });
+    return NextResponse.json({ error: 'Não foi possível registrar a avaliação.' }, { status: 500 });
   }
 }

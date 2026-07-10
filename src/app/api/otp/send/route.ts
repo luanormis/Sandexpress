@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Finalidade de OTP invalida.' }, { status: 400 });
     }
     if (body.vendor_id && !UUID_RE.test(String(body.vendor_id))) {
-      return NextResponse.json({ error: 'Quiosque invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Quiosque inválido.' }, { status: 400 });
     }
 
     const phoneE164 = normalizeBrazilPhoneE164(body.phone);
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         .eq('id', vendorId)
         .single();
       if (vendorError || !vendor || !vendor.is_active || vendor.subscription_status === 'blocked') {
-        return NextResponse.json({ error: 'Quiosque indisponivel para envio de codigo.' }, { status: 403 });
+        return NextResponse.json({ error: 'Quiosque indisponível para envio de código.' }, { status: 403 });
       }
       tenantId = vendor.tenant_id || null;
     }

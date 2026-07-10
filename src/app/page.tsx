@@ -38,7 +38,7 @@ export default function LandingPage() {
     e.preventDefault();
     const hasDocument = form.cpf.replace(/\D/g, "") || form.cnpj.replace(/\D/g, "");
     if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email || !form.beach_name || !form.city || !form.state || !hasDocument) {
-      setRegisterError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      setRegisterError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsável, praia, cidade e estado.");
       return;
     }
     if (!form.password || form.password.length < 8) {
@@ -46,11 +46,11 @@ export default function LandingPage() {
       return;
     }
     if (form.password !== form.password_confirm) {
-      setRegisterError("A senha e a confirmacao nao conferem.");
+      setRegisterError("A senha e a confirmação não conferem.");
       return;
     }
     if (!form.terms_accepted) {
-      setRegisterError("Marque que voce leu e concorda com os Termos de Uso para concluir o cadastro.");
+      setRegisterError("Marque que você leu e concorda com os Termos de Uso para concluir o cadastro.");
       return;
     }
     setLoading(true);
@@ -70,11 +70,11 @@ export default function LandingPage() {
         setRegSuccess(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setRegisterError(data.error || "Nao foi possivel finalizar o cadastro. Tente novamente.");
+        setRegisterError(data.error || "Não foi possível finalizar o cadastro. Tente novamente.");
       }
     } catch (err) {
       console.error(err);
-      setRegisterError("Falha de conexao ao criar cadastro. Confira a internet e tente novamente.");
+      setRegisterError("Falha de conexão ao criar cadastro. Confira a internet e tente novamente.");
     }
     setLoading(false);
   };
@@ -112,7 +112,7 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
              <button onClick={openModal} className="bg-[#FF6B00] text-white px-4 sm:px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-xs sm:text-sm whitespace-nowrap">
-                Cadastrar gratis
+                Cadastrar grátis
              </button>
              <button
                type="button"
@@ -137,7 +137,7 @@ export default function LandingPage() {
             </div>
             <nav className="flex flex-col gap-2 p-5 text-sm font-black text-[#f4d6c8]">
               <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Como funciona</a>
-              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Beneficios</a>
+              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Benefícios</a>
               <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Planos</a>
               <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Painel do quiosque</Link>
               <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Admin</Link>
@@ -163,22 +163,22 @@ export default function LandingPage() {
             Seu quiosque vendendo mais, sem esforço.
           </h2>
           <p className="mb-8 max-w-xl font-sans text-lg leading-relaxed text-[#ffe7dc] sm:text-xl">
-            Organize pedidos, controle seus guarda-sois e aumente seus lucros com um painel feito para funcionar bem mesmo em dia de sol forte.
+            Organize pedidos, controle seus guarda-sóis e aumente seus lucros com um painel feito para funcionar bem mesmo em dia de sol forte.
           </p>
           <p className="sr-only">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button onClick={openModal} className="bg-[#FF6B00] px-8 py-4 text-base font-black text-white shadow-xl transition-all hover:bg-[#E56000] hover:shadow-2xl active:scale-95 rounded-xl">
-              Cadastrar gratis
+              Cadastrar grátis
             </button>
             <a href="#planos" className="inline-flex items-center justify-center rounded-xl border-2 border-[#ff8a2b] px-8 py-4 text-base font-black text-[#fff8f6] hover:bg-[#ff8a2b] hover:text-[#2d1b14]">
               Ver planos
             </a>
           </div>
           <div className="mt-8 hidden gap-3 text-xs font-black text-[#ffe7dc] sm:grid sm:max-w-xl sm:grid-cols-3">
-            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">3 dias gratis</span>
-            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Ate 50 guarda-sois</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">3 dias grátis</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Até 50 guarda-sóis</span>
             <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Pedidos em tempo real</span>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function LandingPage() {
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar grátis</button>
               </div>
 
               {/* Mensal */}
@@ -285,7 +285,7 @@ export default function LandingPage() {
                    <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Relatórios completos</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#451704] text-white hover:bg-[#301107] transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#451704] text-white hover:bg-[#301107] transition-colors">Cadastrar grátis</button>
               </div>
 
               {/* Anual */}
@@ -299,7 +299,7 @@ export default function LandingPage() {
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
                  </ul>
-                 <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#d85a00] transition-colors">Cadastrar gratis</button>
+                 <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#d85a00] transition-colors">Cadastrar grátis</button>
               </div>
            </div>
         </div>
@@ -310,7 +310,7 @@ export default function LandingPage() {
         <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {planSettings.trial_days} dias grátis. Não precisa cartão de crédito.</p>
         <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
-           Cadastrar gratis
+           Cadastrar grátis
         </button>
       </section>
 
@@ -332,12 +332,12 @@ export default function LandingPage() {
                 {regCredentials && (
                   <div className="mb-6 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-left">
                     <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
-                    <p className="mt-2 text-sm text-gray-700">Usuario: <strong>{regCredentials.login}</strong></p>
-                    <p className="text-sm text-gray-700">Senha: <strong>a senha que voce acabou de criar</strong></p>
+                    <p className="mt-2 text-sm text-gray-700">Usuário: <strong>{regCredentials.login}</strong></p>
+                    <p className="text-sm text-gray-700">Senha: <strong>a senha que você acabou de criar</strong></p>
                     <p className="mt-3 text-sm text-gray-700">
                       {regCredentials.emailSent
                         ? "Enviamos um email confirmando o cadastro."
-                        : "Email de confirmacao nao enviado. Configure RESEND_API_KEY para disparos reais."}
+                        : "Email de confirmação não enviado. Configure RESEND_API_KEY para disparos reais."}
                     </p>
                   </div>
                 )}
@@ -382,7 +382,7 @@ export default function LandingPage() {
                       type="email" required
                       value={form.owner_email} onChange={e => setForm(p => ({ ...p, owner_email: e.target.value }))}
                       className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                      placeholder="voce@email.com"
+                      placeholder="você@email.com"
                     />
                   </div>
                   <div>
@@ -474,9 +474,9 @@ export default function LandingPage() {
                     <span>
                       Li e aceito os{" "}
                       <Link href="/termos-de-uso" target="_blank" className="text-[#FF6B00] underline underline-offset-2">
-                        Termos de Uso e a Politica de Privacidade do SandExpress
+                        Termos de Uso e a Política de Privacidade do SandExpress
                       </Link>
-                      , incluindo o registro do aceite com data e hora e o uso dos dados do cadastro para operacao, pedidos, relatorios e suporte.
+                      , incluindo o registro do aceite com data e hora e o uso dos dados do cadastro para operação, pedidos, relatórios e suporte.
                     </span>
                   </label>
                   {registerError && (

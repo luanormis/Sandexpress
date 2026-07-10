@@ -71,7 +71,7 @@ export default function DailyReportComponent() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Erro ao carregar relatorio');
+        setError(data.error || 'Erro ao carregar relatório');
         return;
       }
 
@@ -161,7 +161,7 @@ export default function DailyReportComponent() {
       <html>
         <head>
           <meta charset="UTF-8">
-          <title>Relatorio do Dia - ${selectedDate}</title>
+          <title>Relatório do Dia - ${selectedDate}</title>
           <style>
             * { box-sizing: border-box; }
             body { margin: 0; padding: 24px; color: #111111; background: #ffffff; font-family: Arial, sans-serif; }
@@ -183,9 +183,9 @@ export default function DailyReportComponent() {
         </head>
         <body>
           <header>
-            <h1>Relatorio de fechamento do dia</h1>
+            <h1>Relatório de fechamento do dia</h1>
             <p><strong>Data:</strong> ${formatDate(selectedDate)}</p>
-            <p>Use este relatorio para conferir vendas, estoque baixo e categorias que mais vendem.</p>
+            <p>Use este relatório para conferir vendas, estoque baixo e categorias que mais vendem.</p>
           </header>
 
           <section class="summary">
@@ -201,7 +201,7 @@ export default function DailyReportComponent() {
           <h2>Alertas de estoque</h2>
           <table><thead><tr><th>Produto</th><th>Categoria</th><th>Restante</th><th>Status</th></tr></thead><tbody>${lowStockRows || '<tr><td colspan="4">Nenhum produto com estoque baixo.</td></tr>'}</tbody></table>
 
-          <h2>Drinks, porcoes e categorias</h2>
+          <h2>Drinks, porções e categorias</h2>
           <table><thead><tr><th>Categoria</th><th>Itens vendidos</th><th>Faturamento</th></tr></thead><tbody>${categoryRows || '<tr><td colspan="3">Sem vendas por categoria.</td></tr>'}</tbody></table>
 
           <h2>Produtos mais vendidos</h2>
@@ -213,7 +213,7 @@ export default function DailyReportComponent() {
           <h2>Pedidos</h2>
           <table><thead><tr><th>Guarda-sol</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Hora</th></tr></thead><tbody>${orderRows || '<tr><td colspan="6">Sem pedidos pagos.</td></tr>'}</tbody></table>
 
-          <footer>Relatorio gerado em ${new Date().toLocaleString('pt-BR')}</footer>
+          <footer>Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
         </body>
       </html>
     `;
@@ -233,7 +233,7 @@ export default function DailyReportComponent() {
       <div className="rounded-2xl border border-[#e5c2ae] bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-[#a44100]">Relatorio simples</p>
+            <p className="text-xs font-black uppercase tracking-wide text-[#a44100]">Relatório simples</p>
             <h1 className="mt-1 text-2xl font-black text-[#2d1b14] sm:text-3xl">Fechamento do dia</h1>
             <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[#5a2d1d]">
               Veja em poucos blocos quanto entrou, quais produtos precisam de reposicao e quais categorias venderam melhor.
@@ -284,7 +284,7 @@ export default function DailyReportComponent() {
       {loading ? (
         <div className="flex items-center justify-center rounded-2xl border border-[#e5c2ae] bg-white p-12">
           <Loader className="mr-3 h-8 w-8 animate-spin text-[#a44100]" />
-          <span className="text-lg font-black text-[#2d1b14]">Gerando relatorio...</span>
+          <span className="text-lg font-black text-[#2d1b14]">Gerando relatório...</span>
         </div>
       ) : report ? (
         <>
@@ -320,7 +320,7 @@ export default function DailyReportComponent() {
               )}
             </ReportCard>
 
-            <ReportCard title="Drinks e porcoes" icon={<Award />}>
+            <ReportCard title="Drinks e porções" icon={<Award />}>
               <p className="mb-3 text-sm font-bold leading-6 text-[#5a2d1d]">
                 Hoje mostramos faturamento por categoria. Margem real precisa do cadastro de custo dos insumos.
               </p>
@@ -387,7 +387,7 @@ export default function DailyReportComponent() {
       ) : (
         <div className="rounded-2xl border border-[#e5c2ae] bg-white p-12 text-center">
           <BarChart3 className="mx-auto mb-4 h-16 w-16 text-[#a44100]" />
-          <p className="text-lg font-black text-[#5a2d1d]">Selecione uma data para ver o relatorio.</p>
+          <p className="text-lg font-black text-[#5a2d1d]">Selecione uma data para ver o relatório.</p>
         </div>
       )}
     </div>

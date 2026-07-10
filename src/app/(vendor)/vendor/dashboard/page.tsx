@@ -674,15 +674,15 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setThemeMessage(data.error || "Nao foi possivel salvar a personalizacao.");
+        setThemeMessage(data.error || "Não foi possível salvar a personalização.");
         return;
       }
       setThemeForm(buildThemeForm(data));
       setThemeMessage(activeTab === "payments"
         ? "Formas de pagamento salvas para este quiosque."
-        : "Personalizacao salva. O login do cliente e os QRs ja usam essas cores.");
+        : "Personalização salva. O login do cliente e os QRs já usam essas cores.");
     } catch {
-      setThemeMessage("Erro de rede ao salvar personalizacao.");
+      setThemeMessage("Erro de rede ao salvar personalização.");
     } finally {
       setThemeSaving(false);
     }
@@ -715,7 +715,7 @@ export default function VendorDashboard() {
     if (!vendorId) return;
     setTeamMessage("");
     if (teamForm.password !== teamForm.password_confirm) {
-      setTeamMessage("A senha e a confirmacao nao conferem.");
+      setTeamMessage("A senha e a confirmação não conferem.");
       return;
     }
     try {
@@ -726,14 +726,14 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setTeamMessage(data.error || "Nao foi possivel criar usuario.");
+        setTeamMessage(data.error || "Não foi possível criar usuário.");
         return;
       }
       setTeam(prev => [data, ...prev]);
       setTeamForm({ name: "", email: "", login: "", role: "seller", password: "", password_confirm: "" });
-      setTeamMessage("Usuario criado. Ele ja pode entrar no painel pelo login e senha definidos.");
+      setTeamMessage("Usuário criado. Ele já pode entrar no painel pelo login e senha definidos.");
     } catch {
-      setTeamMessage("Erro de rede ao criar usuario.");
+      setTeamMessage("Erro de rede ao criar usuário.");
     }
   };
 
@@ -752,7 +752,7 @@ export default function VendorDashboard() {
   const moveOrder = async (id: string, newStatus: string) => {
     const currentOrder = orders.find(order => order.id === id);
     if (currentOrder && isOrderEmpty(currentOrder) && ['preparing', 'delivering', 'completed', 'closing_requested'].includes(newStatus)) {
-      alert('Comanda vazia nao pode ir para preparo, entrega ou fechamento. Use "Liberar guarda-sol vazio".');
+      alert('Comanda vazia não pode ir para preparo, entrega ou fechamento. Use "Liberar guarda-sol vazio".');
       return;
     }
 
@@ -778,7 +778,7 @@ export default function VendorDashboard() {
   const closeBusinessDay = async () => {
     if (!vendorId) return;
     const today = new Date().toISOString().split("T")[0];
-    const confirmed = confirm("Fechar o dia agora? As vendas pagas de hoje serao consolidadas para relatorios.");
+    const confirmed = confirm("Fechar o dia agora? As vendas pagas de hoje serão consolidadas para relatórios.");
     if (!confirmed) return;
 
     setClosingDay(true);
@@ -826,7 +826,7 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/daily-report?vendor_id=${vendorId}&date=${today}`);
       const report = (await res.json()) as DailySalesReport;
       if (!res.ok) {
-        alert(report.error || "Nao foi possivel exportar as vendas do dia.");
+        alert(report.error || "Não foi possível exportar as vendas do dia.");
         return;
       }
 
@@ -918,7 +918,7 @@ export default function VendorDashboard() {
                 <h1>Vendas do dia</h1>
                 <p>${formatReportDate(today)}</p>
               </div>
-              <div class="brand">SandExpress<br />Relatorio operacional</div>
+              <div class="brand">SandExpress<br />Relatório operacional</div>
             </header>
             <section class="kpis">
               <div class="kpi"><span>Faturamento bruto</span><strong>${formatCurrency(Number(report.summary?.total_gross_revenue ?? report.summary?.total_revenue ?? 0))}</strong></div>
@@ -942,7 +942,7 @@ export default function VendorDashboard() {
               <thead><tr><th>Produto</th><th>Categoria</th><th>Restante</th><th>Status</th></tr></thead>
               <tbody>${stockRows || `<tr><td colspan="4">Nenhum produto com estoque baixo.</td></tr>`}</tbody>
             </table>
-            <h2>Drinks, porcoes e categorias</h2>
+            <h2>Drinks, porções e categorias</h2>
             <table>
               <thead><tr><th>Categoria</th><th>Itens vendidos</th><th>Faturamento</th></tr></thead>
               <tbody>${categoryRows || `<tr><td colspan="3">Sem vendas por categoria.</td></tr>`}</tbody>
@@ -957,7 +957,7 @@ export default function VendorDashboard() {
               <thead><tr><th>Guarda-sol</th><th>Cliente</th><th>Telefone</th><th>Itens</th><th>Pagamento</th><th>Bruto</th><th>Taxa</th><th>Liquido</th><th>Hora</th></tr></thead>
               <tbody>${orderRows || `<tr><td colspan="9">Nenhum pedido pago no dia.</td></tr>`}</tbody>
             </table>
-            <footer>Relatorio gerado pelo SandExpress.</footer>
+            <footer>Relatório gerado pelo SandExpress.</footer>
           </body>
         </html>
       `;
@@ -1062,7 +1062,7 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCategoryMessage(data.error || 'Nao foi possivel salvar categoria.');
+        setCategoryMessage(data.error || 'Não foi possível salvar categoria.');
         return;
       }
       setProductCategories(prev => [data, ...prev.filter(item => item.id !== data.id)]);
@@ -1150,7 +1150,7 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/qr?umbrella_id=${encodeURIComponent(umbrella.id)}&format=png`);
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Nao foi possivel gerar o QR Code.");
+        alert(data.error || "Não foi possível gerar o QR Code.");
         return;
       }
       setUmbrellas(prev => prev.map(u => u.id === umbrella.id ? {
@@ -1167,13 +1167,13 @@ export default function VendorDashboard() {
 
   const deleteUmbrella = async (umbrella: Umbrella) => {
     if (umbrella.is_occupied || umbrella.current_order_id) {
-      return alert('Nao e possivel excluir guarda-sol com conta aberta.');
+      return alert('Não e possível excluir guarda-sol com conta aberta.');
     }
 
     const confirmed = confirm(`Excluir definitivamente o guarda-sol ${umbrella.number}? Esta acao remove o QR gravado no banco.`);
     if (!confirmed) return;
 
-    const vendorPassword = prompt('Digite a senha do admin do quiosque para confirmar a exclusao');
+    const vendorPassword = prompt('Digite a senha do admin do quiosque para confirmar a exclusão');
     if (!vendorPassword) return;
 
     try {
@@ -1216,7 +1216,7 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Nao foi possivel confirmar o pagamento.');
+        alert(data.error || 'Não foi possível confirmar o pagamento.');
         return;
       }
       setOrders(prev => prev.filter(o => o.id !== order.id));
@@ -1242,7 +1242,7 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Nao foi possivel cancelar o item.');
+        alert(data.error || 'Não foi possível cancelar o item.');
         return;
       }
 
@@ -1285,7 +1285,7 @@ export default function VendorDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Nao foi possivel liberar o guarda-sol.');
+        alert(data.error || 'Não foi possível liberar o guarda-sol.');
         return;
       }
       setOrders(prev => prev.filter(item => item.id !== order.id));
@@ -1314,7 +1314,7 @@ export default function VendorDashboard() {
         body: JSON.stringify({ notes: cleanedNotes || null }),
       });
       if (!res.ok) {
-        alert("Nao foi possivel marcar o garcom como atendido.");
+        alert("Não foi possível marcar o garcom como atendido.");
         return;
       }
       const updated = { ...order, notes: cleanedNotes || undefined };
@@ -2020,7 +2020,7 @@ export default function VendorDashboard() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Cor do botao</span>
+                    <span className="text-sm font-black text-gray-700">Cor do botão</span>
                     <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                       <input
                         type="color"
@@ -2037,7 +2037,7 @@ export default function VendorDashboard() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Texto do botao</span>
+                    <span className="text-sm font-black text-gray-700">Texto do botão</span>
                     <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                       <input
                         type="color"
@@ -2098,7 +2098,7 @@ export default function VendorDashboard() {
                   className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
                   style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}
                 >
-                  <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalizacao"}
+                  <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalização"}
                 </button>
               </form>
 
@@ -2245,8 +2245,8 @@ export default function VendorDashboard() {
                   <div>
                     <h3 className="font-display font-bold text-gray-900 text-lg">Fechamento do Dia</h3>
                     <p className="text-sm text-gray-500 max-w-2xl">
-                      Relatorio simples para ver o que vendeu, quanto entrou, o que esta acabando e onde precisa agir.
-                      O PDF sai em preto e cinza para facilitar impressao e leitura.
+                      Relatório simples para ver o que vendeu, quanto entrou, o que está acabando e onde precisa agir.
+                      O PDF sai em preto e cinza para facilitar impressão e leitura.
                     </p>
                     {closingMessage && (
                       <p className={cn(
@@ -2344,7 +2344,7 @@ export default function VendorDashboard() {
                       <p className="sales-value-gradient text-3xl font-display font-bold">{reportData.kpis.unique_customers}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <p className="text-gray-400 text-sm font-bold mb-1">Satisfacao</p>
+                      <p className="text-gray-400 text-sm font-bold mb-1">Satisfação</p>
                       <p className="text-3xl font-display font-bold text-amber-500 flex items-center gap-2">
                         <Star size={24} fill="currentColor" />
                         {reportData.satisfaction?.average_rating || 0}
@@ -2360,7 +2360,7 @@ export default function VendorDashboard() {
                         Como ler rapido
                       </h4>
                       <p className="text-sm font-bold leading-6 text-[#5a2d1d]">
-                        Primeiro veja faturamento e pedidos. Depois confira estoque baixo. Por ultimo olhe produtos e categorias
+                        Primeiro veja faturamento e pedidos. Depois confira estoque baixo. Por último, olhe produtos e categorias
                         para saber o que comprar mais e o que vende melhor.
                       </p>
                     </div>
@@ -2390,14 +2390,14 @@ export default function VendorDashboard() {
                     <div className="rounded-2xl border border-[#e5c2ae] bg-white p-5 shadow-sm">
                       <h4 className="mb-3 flex items-center gap-2 text-base font-black text-[#2d1b14]">
                         <Award size={18} className="text-[#a44100]" />
-                        Drinks e porcoes
+                        Drinks e porções
                       </h4>
                       <p className="mb-3 text-sm font-bold leading-6 text-[#5a2d1d]">
                         Aqui aparece o faturamento por categoria. Margem real entra quando o custo dos insumos for cadastrado.
                       </p>
                       <div className="space-y-2">
                         {(reportData.category_performance || []).length === 0 ? (
-                          <p className="rounded-xl bg-[#fff1e8] p-3 text-sm font-bold text-[#5a2d1d]">Sem vendas pagas no periodo.</p>
+                          <p className="rounded-xl bg-[#fff1e8] p-3 text-sm font-bold text-[#5a2d1d]">Sem vendas pagas no período.</p>
                         ) : (reportData.category_performance || []).slice(0, 4).map((item) => (
                           <div key={item.category} className="rounded-xl bg-[#fff1e8] px-3 py-2">
                             <div className="flex items-center justify-between gap-3">
@@ -2416,7 +2416,7 @@ export default function VendorDashboard() {
                       <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CreditCard size={18} className="text-[#FF6B00]" /> Meios de recebimento</h4>
                       <div className="space-y-3">
                         {Object.entries(reportData.payment_methods || {}).length === 0 ? (
-                          <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhuma conta paga no periodo.</p>
+                          <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhuma conta paga no período.</p>
                         ) : Object.entries(reportData.payment_methods || {}).map(([method, data]) => (
                           <div key={method} className="rounded-xl border border-gray-100 p-4">
                             <div className="flex items-center justify-between gap-3">
@@ -2444,7 +2444,7 @@ export default function VendorDashboard() {
                   </div>
 
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Star size={18} className="text-[#FF6B00]" fill="currentColor" /> Pesquisa de Satisfacao</h4>
+                    <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Star size={18} className="text-[#FF6B00]" fill="currentColor" /> Pesquisa de Satisfação</h4>
                     <div className="space-y-3">
                       {[5, 4, 3, 2, 1].map((rating) => {
                         const count = reportData.satisfaction?.distribution?.[rating as 1 | 2 | 3 | 4 | 5] || 0;
@@ -2506,11 +2506,11 @@ export default function VendorDashboard() {
                               <div
                                 className="mx-auto h-44 w-44 rounded-full border-[10px] border-[#fff8f3] shadow-inner"
                                 style={{ background: `conic-gradient(${gradient})` }}
-                                aria-label="Grafico de pizza de vendas por horario"
+                                aria-label="Grafico de pizza de vendas por horário"
                               />
                               <div className="grid gap-2 text-sm">
                                 {slices.length === 0 ? (
-                                  <p className="rounded-xl bg-[#fff8f3] p-4 font-bold text-[#6B3A28]">Sem vendas no periodo.</p>
+                                  <p className="rounded-xl bg-[#fff8f3] p-4 font-bold text-[#6B3A28]">Sem vendas no período.</p>
                                 ) : slices.map((h, i) => (
                                   <div key={h.hour} className="flex items-center justify-between gap-3 rounded-xl bg-[#fff8f3] px-3 py-2">
                                     <span className="flex items-center gap-2 font-black text-[#2d1b14]">
@@ -2585,7 +2585,7 @@ export default function VendorDashboard() {
                     <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><CalendarCheck size={18} className="text-[#FF6B00]" /> Recebiveis por data</h4>
                     <div className="space-y-3">
                       {Object.entries(reportData.receivables_by_date || {}).length === 0 ? (
-                        <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhum recebivel no periodo.</p>
+                        <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-400">Nenhum recebível no período.</p>
                       ) : Object.entries(reportData.receivables_by_date || {}).map(([date, data]) => (
                         <div key={date} className="rounded-xl border border-gray-100 p-4">
                           <div className="flex items-center justify-between gap-3">
@@ -2694,7 +2694,7 @@ export default function VendorDashboard() {
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
               <form onSubmit={createTeamUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
                 <div>
-                  <h3 className="font-bold text-lg text-gray-900">Criar usuario do quiosque</h3>
+                  <h3 className="font-bold text-lg text-gray-900">Criar usuário do quiosque</h3>
                   <p className="mt-1 text-sm text-gray-500">Use para vendedores, operadores ou gerentes acessarem o painel.</p>
                 </div>
                 <input
@@ -2715,7 +2715,7 @@ export default function VendorDashboard() {
                 <input
                   type="text"
                   required
-                  placeholder="Login do usuario"
+                  placeholder="Login do usuário"
                   value={teamForm.login}
                   onChange={e => setTeamForm(p => ({ ...p, login: e.target.value.trim() }))}
                   className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
@@ -2751,12 +2751,12 @@ export default function VendorDashboard() {
                 </div>
                 {teamMessage && <p className="rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#3D1A0A]">{teamMessage}</p>}
                 <button type="submit" className="w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000]">
-                  Criar usuario
+                  Criar usuário
                 </button>
               </form>
 
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
-                <h3 className="font-bold text-lg text-gray-900 mb-4">Usuarios cadastrados</h3>
+                <h3 className="font-bold text-lg text-gray-900 mb-4">Usuários cadastrados</h3>
                 <div className="space-y-3">
                   {team.map(user => (
                     <div key={user.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4">
@@ -2770,7 +2770,7 @@ export default function VendorDashboard() {
                     </div>
                   ))}
                   {team.length === 0 && (
-                    <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhum usuario criado ainda.</p>
+                    <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhum usuário criado ainda.</p>
                   )}
                 </div>
               </div>
@@ -2912,7 +2912,7 @@ function OrderModal({
           </div>
           {emptyAccount && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm font-bold text-gray-600">
-              Esta comanda esta sem consumo. Para nao enviar para preparo ou fechamento, libere o guarda-sol vazio.
+              Esta comanda está sem consumo. Para não enviar para preparo ou fechamento, libere o guarda-sol vazio.
             </div>
           )}
           <div>
@@ -3175,17 +3175,17 @@ function ProductModal({
                 ) : (
                   <>
                     <ImageIcon size={24} className="text-gray-300 mb-2" />
-                    <span className="px-4 text-center text-sm font-bold text-gray-400">Escolha uma imagem do catalogo global abaixo</span>
+                    <span className="px-4 text-center text-sm font-bold text-gray-400">Escolha uma imagem do catálogo global abaixo</span>
                   </>
                 )}
               </div>
             </div>
             <p className="mt-2 text-xs font-bold leading-5 text-gray-500">
-              O catalogo global e administrado pelo SandExpress. Digite o nome do item para receber sugestoes por categoria e tags.
+              O catálogo global é administrado pelo SandExpress. Digite o nome do item para receber sugestões por categoria e tags.
             </p>
             {defaultImages.length > 0 && (
               <div className="mt-3">
-                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referencias do catalogo global</p>
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referências do catálogo global</p>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {defaultImages.slice(0, 12).map((image) => (
                     <button
@@ -3206,7 +3206,7 @@ function ProductModal({
             )}
             {defaultImages.length === 0 && (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
-                Nenhuma imagem encontrada ainda. Tente uma categoria como bebidas, petiscos, pasteis, porcoes de peixe, batata ou calabresa.
+                Nenhuma imagem encontrada ainda. Tente uma categoria como bebidas, petiscos, pastéis, porções de peixe, batata ou calabresa.
               </p>
             )}
           </div>
@@ -3454,7 +3454,7 @@ function ProductModal({
                 return;
               }
               if (!Number.isFinite(Number(form.price)) || Number(form.price) < 0) {
-                alert("Informe um preco valido.");
+                alert("Informe um preço válido.");
                 return;
               }
               if (hasOptions && normalizedOptionValues.length === 0) {

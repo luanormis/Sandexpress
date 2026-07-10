@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const serviceRequest = SERVICE_REQUESTS[request_type || 'waiter_call'] || SERVICE_REQUESTS.waiter_call;
 
     if (!vendor_id || !customer_id || !umbrella_id) {
-      return NextResponse.json({ error: 'vendor_id, customer_id e umbrella_id sao obrigatorios.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id, customer_id e umbrella_id são obrigatórios.' }, { status: 400 });
     }
 
     const session = getRequestSession(req);
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (closingErr) throw closingErr;
     if ((closingOrders || []).length > 0) {
       return NextResponse.json({
-        error: 'Conta ja solicitada. Para chamar atendente novamente, abra uma nova comanda.',
+        error: 'Conta já solicitada. Para chamar atendente novamente, abra uma nova comanda.',
       }, { status: 409 });
     }
 
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (umbrellaErr || !umbrella) {
-      return NextResponse.json({ error: 'Guarda-sol invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Guarda-sol inválido.' }, { status: 400 });
     }
     if (!umbrella.active) {
       return NextResponse.json({ error: 'Guarda-sol inativo.' }, { status: 400 });

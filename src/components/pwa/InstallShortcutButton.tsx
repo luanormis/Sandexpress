@@ -35,7 +35,7 @@ export function InstallShortcutButton({ context, className }: InstallShortcutBut
     return {
       title: "Instalar atalho deste guarda-sol",
       button: "Instalar atalho",
-      help: "No iPhone, toque em Compartilhar e escolha Adicionar a Tela de Inicio. No Android, use Instalar ou Adicionar a tela inicial para voltar a este cardapio.",
+      help: "No iPhone, toque em Compartilhar e escolha Adicionar à Tela de Início. No Android, use Instalar ou Adicionar à tela inicial para voltar a este cardápio.",
     };
   }, [context]);
 

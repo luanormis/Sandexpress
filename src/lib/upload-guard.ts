@@ -5,10 +5,10 @@ export function validateImageUpload(file: File, options: { maxBytes?: number } =
   const maxBytes = options.maxBytes || MAX_UPLOAD_BYTES;
 
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    return 'Formato invalido. Use JPG, PNG ou WEBP.';
+    return 'Formato inválido. Use JPG, PNG ou WEBP.';
   }
   if (file.size <= 0) {
-    return 'Arquivo invalido.';
+    return 'Arquivo inválido.';
   }
   if (file.size > maxBytes) {
     const maxMb = Math.max(1, Math.round(maxBytes / 1024 / 1024));

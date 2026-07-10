@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const { name, phone, vendor_id, umbrella_id, party_size } = await req.json();
 
     if (!name || !phone || !vendor_id) {
-      return NextResponse.json({ error: 'name, phone e vendor_id sao obrigatorios.' }, { status: 400 });
+      return NextResponse.json({ error: 'name, phone e vendor_id são obrigatórios.' }, { status: 400 });
     }
     if (!await vendorFeatureEnabled(vendor_id, 'login')) {
       return NextResponse.json(featureDisabledResponse('login'), { status: 403 });
@@ -95,10 +95,10 @@ export async function POST(req: NextRequest) {
     try {
       cleanPhone = normalizeBrazilPhoneWithDdd(phone);
     } catch {
-      return NextResponse.json({ error: 'Informe um telefone valido com DDD. Exemplo: 1196041957.' }, { status: 400 });
+      return NextResponse.json({ error: 'Informe um telefone válido com DDD. Exemplo: 1196041957.' }, { status: 400 });
     }
     if (String(name).trim().length < 2) {
-      return NextResponse.json({ error: 'Informe nome completo valido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Informe nome completo válido.' }, { status: 400 });
     }
 
     let tenantId: string | null = null;

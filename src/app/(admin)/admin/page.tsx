@@ -88,7 +88,7 @@ const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "vendors", label: "Quiosques", icon: Store },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
-  { id: "catalog", label: "Catalogo", icon: ImageIcon },
+  { id: "catalog", label: "Catálogo", icon: ImageIcon },
   { id: "plans", label: "Planos", icon: DollarSign },
   { id: "new", label: "Novo Quiosque", icon: Plus },
   { id: "danger", label: "Risco", icon: Trash2 },
@@ -127,7 +127,7 @@ function getVendorBillingSummary(vendor: Vendor) {
   if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") {
     return vendor.trial_ends_at
       ? `Teste ate ${new Date(vendor.trial_ends_at).toLocaleDateString("pt-BR")}`
-      : "Teste gratis";
+      : "Teste grátis";
   }
   if (isAnnualPlan(vendor.plan_type)) {
     const remaining = getRemainingAnnualInstallments(vendor);
@@ -161,7 +161,7 @@ function convertImageToWebp(file: File, quality = 0.82): Promise<File> {
       canvas.toBlob((blob) => {
         URL.revokeObjectURL(objectUrl);
         if (!blob) {
-          reject(new Error("Nao foi possivel converter a imagem para WebP."));
+          reject(new Error("Não foi possível converter a imagem para WebP."));
           return;
         }
         resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp" }));
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
     setIsAuthenticated(false);
     sessionStorage.removeItem("admin_token");
     setAdminPassword("");
-    setAuthError("Sessao expirada. Entre novamente para carregar os dados.");
+    setAuthError("Sessão expirada. Entre novamente para carregar os dados.");
   };
 
   useEffect(() => {
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
         return;
       }
       if (!res.ok) {
-        setAdminDataError(data.error || "Nao foi possivel carregar quiosques.");
+        setAdminDataError(data.error || "Não foi possível carregar quiosques.");
         return;
       }
       setVendors(Array.isArray(data) ? data : []);
@@ -327,7 +327,7 @@ export default function AdminDashboard() {
         return;
       }
       if (!res.ok) {
-        setAdminDataError(data.error || "Nao foi possivel carregar analytics.");
+        setAdminDataError(data.error || "Não foi possível carregar analytics.");
         return;
       }
       setPlatformReport(data);
@@ -359,7 +359,7 @@ export default function AdminDashboard() {
         return;
       }
       if (!res.ok) {
-        setPlanMessage(data.error || "Nao foi possivel carregar valores dos planos.");
+        setPlanMessage(data.error || "Não foi possível carregar valores dos planos.");
         return;
       }
       applyPlanSettings(data);
@@ -380,12 +380,12 @@ export default function AdminDashboard() {
         return;
       }
       if (!res.ok) {
-        setCatalogMessage(data.error || "Nao foi possivel carregar o catalogo.");
+        setCatalogMessage(data.error || "Não foi possível carregar o catálogo.");
         return;
       }
       setCatalogImages(Array.isArray(data.images) ? data.images : []);
     } catch {
-      setCatalogMessage("Erro de rede ao carregar catalogo.");
+      setCatalogMessage("Erro de rede ao carregar catálogo.");
     } finally {
       setCatalogLoading(false);
     }
@@ -417,11 +417,11 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCatalogMessage(data.error || "Nao foi possivel salvar imagem global.");
+        setCatalogMessage(data.error || "Não foi possível salvar imagem global.");
         return;
       }
       setCatalogImages(prev => [data.image, ...prev.filter((image) => image.id !== data.image?.id)]);
-      setCatalogMessage("Imagem convertida para WebP e adicionada ao catalogo global.");
+      setCatalogMessage("Imagem convertida para WebP e adicionada ao catálogo global.");
     } catch (err) {
       setCatalogMessage(err instanceof Error ? err.message : "Erro ao converter imagem.");
     } finally {
@@ -440,7 +440,7 @@ export default function AdminDashboard() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setCatalogMessage(data.error || "Nao foi possivel atualizar imagem.");
+      setCatalogMessage(data.error || "Não foi possível atualizar imagem.");
       return;
     }
     setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCatalogMessage(data.error || "Nao foi possivel alterar a imagem.");
+        setCatalogMessage(data.error || "Não foi possível alterar a imagem.");
         return;
       }
       setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
@@ -480,7 +480,7 @@ export default function AdminDashboard() {
   };
 
   const deleteCatalogImage = async (image: CatalogImage) => {
-    const confirmed = confirm(`Excluir definitivamente a imagem "${image.name}" do catalogo global?`);
+    const confirmed = confirm(`Excluir definitivamente a imagem "${image.name}" do catálogo global?`);
     if (!confirmed) return;
 
     setCatalogSaving(true);
@@ -492,11 +492,11 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCatalogMessage(data.error || "Nao foi possivel excluir a imagem.");
+        setCatalogMessage(data.error || "Não foi possível excluir a imagem.");
         return;
       }
       setCatalogImages(prev => prev.filter((item) => item.id !== image.id));
-      setCatalogMessage("Imagem excluida do catalogo global.");
+      setCatalogMessage("Imagem excluída do catálogo global.");
     } catch {
       setCatalogMessage("Erro de rede ao excluir imagem.");
     } finally {
@@ -519,7 +519,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || "Nao foi possivel subir a logo.");
+        alert(data.error || "Não foi possível subir a logo.");
         return;
       }
       setVendors(prev => prev.map((item) => item.id === vendor.id ? { ...item, logo_url: data.logo_url } : item));
@@ -547,11 +547,11 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setPlanMessage(data.error || "Nao foi possivel salvar valores dos planos.");
+        setPlanMessage(data.error || "Não foi possível salvar valores dos planos.");
         return;
       }
       applyPlanSettings(data);
-      setPlanMessage("Valores salvos. Eles serao usados somente nos proximos quiosques cadastrados.");
+      setPlanMessage("Valores salvos. Eles serão usados somente nos proximos quiosques cadastrados.");
     } catch {
       setPlanMessage("Erro de rede ao salvar valores dos planos.");
     } finally {
@@ -570,7 +570,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || "Nao foi possivel atualizar o quiosque.");
+        alert(data.error || "Não foi possível atualizar o quiosque.");
         return;
       }
       setVendors(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
@@ -616,7 +616,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setDangerMessage(data.error || "Nao foi possivel apagar dados de clientes.");
+        setDangerMessage(data.error || "Não foi possível apagar dados de clientes.");
         return;
       }
       setDangerMessage(`${data.deleted_customers} clientes e ${data.deleted_orders} pedidos apagados.`);
@@ -648,7 +648,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setDangerMessage(data.error || "Nao foi possivel apagar o quiosque.");
+        setDangerMessage(data.error || "Não foi possível apagar o quiosque.");
         return;
       }
       setDangerMessage(`Quiosque apagado. ${data.deleted_storage_files || 0} arquivos removidos do Storage.`);
@@ -667,7 +667,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     const hasDocument = regForm.cpf.replace(/\D/g, "") || regForm.cnpj.replace(/\D/g, "");
     if (!regForm.name || !regForm.owner_name || !regForm.owner_phone || !regForm.owner_email || !regForm.beach_name || !regForm.city || !regForm.state || !hasDocument) {
-      setRegError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      setRegError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsável, praia, cidade e estado.");
       return;
     }
     if (!regForm.password || regForm.password.length < 8) {
@@ -675,11 +675,11 @@ export default function AdminDashboard() {
       return;
     }
     if (regForm.password !== regForm.password_confirm) {
-      setRegError("A senha e a confirmacao nao conferem.");
+      setRegError("A senha e a confirmação não conferem.");
       return;
     }
     if (!regForm.terms_accepted) {
-      setRegError("Confirme que o responsavel leu e concordou com os Termos de Uso.");
+      setRegError("Confirme que o responsável leu e concordou com os Termos de Uso.");
       return;
     }
 
@@ -718,11 +718,11 @@ export default function AdminDashboard() {
         setRegForm({ name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false });
       } else {
         const data = await res.json().catch(() => ({}));
-        setRegError(data.error || "Nao foi possivel cadastrar o quiosque.");
+        setRegError(data.error || "Não foi possível cadastrar o quiosque.");
       }
     } catch (err) {
       console.error("Register error:", err);
-      setRegError("Falha de conexao ao cadastrar o quiosque.");
+      setRegError("Falha de conexão ao cadastrar o quiosque.");
     }
   };
 
@@ -1194,7 +1194,7 @@ export default function AdminDashboard() {
                 <p className="text-3xl font-display font-bold text-amber-400">{String(platformReport!.peak_hour.hour).padStart(2, "0")}h</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
-                <p className="text-gray-400 font-bold text-sm mb-2">Satisfacao</p>
+                <p className="text-gray-400 font-bold text-sm mb-2">Satisfação</p>
                 <p className="text-3xl font-display font-bold text-amber-400 flex items-center gap-2">
                   <Star size={24} fill="currentColor" />
                   {platformReport!.satisfaction_average || 0}
@@ -1209,7 +1209,7 @@ export default function AdminDashboard() {
                   <p className="text-xs font-black uppercase tracking-wide text-amber-400">Dados agregados e anonimos</p>
                   <h3 className="mt-1 font-display text-2xl font-bold text-white">Inteligencia de marcas na praia</h3>
                   <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-gray-300">
-                    Estes relatorios usam apenas vendas agregadas. Nao exibem nome, telefone ou pedido individual de cliente.
+                    Estes relatórios usam apenas vendas agregadas. Não exibem nome, telefone ou pedido individual de cliente.
                   </p>
                 </div>
                 <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
@@ -1246,11 +1246,11 @@ export default function AdminDashboard() {
                 <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5">
                   <h4 className="mb-4 flex items-center gap-2 font-bold text-gray-200">
                     <DollarSign size={18} className="text-amber-400" />
-                    Elasticidade de preco no litoral
+                    Elasticidade de preço no litoral
                   </h4>
                   <div className="space-y-3">
                     {(platformReport!.beer_price_elasticity || []).length === 0 ? (
-                      <p className="text-sm font-bold text-gray-500">Sem pontos de preco de cerveja neste filtro.</p>
+                      <p className="text-sm font-bold text-gray-500">Sem pontos de preço de cerveja neste filtro.</p>
                     ) : (platformReport!.beer_price_elasticity || []).slice(0, 6).map((item) => (
                       <div key={`${item.brand}-${item.product}-${item.avg_price}`} className="rounded-xl border border-gray-700 bg-gray-800 p-3">
                         <div className="flex items-center justify-between gap-3">
@@ -1307,7 +1307,7 @@ export default function AdminDashboard() {
                 </h4>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {(platformReport!.ddd_brand_preferences || []).length === 0 ? (
-                    <p className="text-sm font-bold text-gray-500">Sem DDD suficiente para comparar preferencias.</p>
+                    <p className="text-sm font-bold text-gray-500">Sem DDD suficiente para comparar preferências.</p>
                   ) : (platformReport!.ddd_brand_preferences || []).slice(0, 9).map((row) => (
                     <div key={`${row.ddd}-${row.brand}`} className="rounded-xl border border-gray-700 bg-gray-800 p-3">
                       <div className="flex items-center justify-between gap-3">
@@ -1399,7 +1399,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
-              <h3 className="font-bold text-gray-300 mb-4">Satisfacao por quiosque</h3>
+              <h3 className="font-bold text-gray-300 mb-4">Satisfação por quiosque</h3>
               <div className="grid lg:grid-cols-2 gap-4">
                 {platformReport!.satisfaction_by_vendor.map((vendor, i) => (
                   <div key={`${vendor.name}-${vendor.city}-${i}`} className="bg-gray-900 border border-gray-700 rounded-xl p-4">
@@ -1451,7 +1451,7 @@ export default function AdminDashboard() {
             <div className="max-w-4xl">
               <h2 className="text-2xl font-display font-bold">Catalogo global de imagens</h2>
               <p className="mt-2 text-sm font-bold leading-6 text-gray-400">
-                As imagens ficam no bucket catalogo-global, sao convertidas para WebP antes do envio e aparecem para todos os quiosques no cadastro de produtos.
+                As imagens ficam no bucket catalogo-global, são convertidas para WebP antes do envio e aparecem para todos os quiosques no cadastro de produtos.
               </p>
             </div>
 
@@ -1487,7 +1487,7 @@ export default function AdminDashboard() {
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-sm font-bold text-gray-400">Descricao curta</span>
+                    <span className="mb-1 block text-sm font-bold text-gray-400">Descrição curta</span>
                     <textarea
                       value={catalogForm.description}
                       onChange={event => setCatalogForm(prev => ({ ...prev, description: event.target.value }))}
@@ -1596,7 +1596,7 @@ export default function AdminDashboard() {
                     <p className="text-sm font-bold text-gray-500">Nenhuma imagem encontrada.</p>
                   )}
                   {catalogLoading && (
-                    <p className="text-sm font-bold text-gray-500">Carregando catalogo...</p>
+                    <p className="text-sm font-bold text-gray-500">Carregando catálogo...</p>
                   )}
                 </div>
               </div>
@@ -1610,7 +1610,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="text-2xl font-display font-bold">Valores dos Planos</h2>
               <p className="text-gray-400 mt-1">
-                Estes valores viram o padrao dos proximos quiosques cadastrados. Quiosques ja cadastrados mantem o valor contratado.
+                Estes valores viram o padrão dos próximos quiosques cadastrados. Quiosques já cadastrados mantêm o valor contratado.
               </p>
             </div>
 
@@ -1656,7 +1656,7 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-400 mb-1">Limite de guarda-sois para novos quiosques</label>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Limite de guarda-sóis para novos quiosques</label>
                   <input
                     value={planForm.max_umbrellas}
                     onChange={e => setPlanForm(p => ({ ...p, max_umbrellas: e.target.value.replace(/\D/g, "") }))}
@@ -1840,9 +1840,9 @@ export default function AdminDashboard() {
                       className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
                     />
                     <span>
-                      O responsavel leu e aceitou os{" "}
+                      O responsável leu e aceitou os{" "}
                       <Link href="/termos-de-uso" target="_blank" className="text-blue-400 underline underline-offset-2">
-                        Termos de Uso e a Politica de Privacidade do SandExpress
+                        Termos de Uso e a Política de Privacidade do SandExpress
                       </Link>
                       , com registro do aceite em data e hora.
                     </span>
@@ -1927,7 +1927,7 @@ export default function AdminDashboard() {
               <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6 space-y-4">
                 <h3 className="text-lg font-display font-bold text-white">Apagar quiosque completo</h3>
                 <p className="text-sm text-gray-400">
-                  Apaga o tenant/quiosque e todos os dados vinculados por cascata, incluindo clientes, pedidos, produtos, guarda-sois e arquivos do Storage.
+                  Apaga o tenant/quiosque e todos os dados vinculados por cascata, incluindo clientes, pedidos, produtos, guarda-sóis e arquivos do Storage.
                 </p>
                 <input
                   type="text"

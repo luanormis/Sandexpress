@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Informe o codigo e o telefone validado pelo WhatsApp.' }, { status: 400 });
     }
     if ((challenge_id && !/^[0-9a-f-]{36}$/i.test(String(challenge_id))) || !/^\d{6}$/.test(String(code))) {
-      return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Código inválido.' }, { status: 400 });
     }
 
     await cleanupOtpChallenges();
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const challenge = (Array.isArray(rows) ? rows[0] : rows) as OtpChallengeRow | null;
 
     if (error || !challenge) {
-      return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Código inválido.' }, { status: 400 });
     }
 
     if (challenge.status !== 'pending' || new Date(challenge.expires_at).getTime() < Date.now()) {
@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
         .update({ status: 'expired' })
         .eq('id', challenge.id)
         .eq('status', 'pending');
-      return NextResponse.json({ error: 'Codigo expirado.' }, { status: 400 });
+      return NextResponse.json({ error: 'Código expirado.' }, { status: 400 });
     }
 
     if (Number(challenge.attempts || 0) >= 5) {
       await supabaseAdmin.from('otp_challenges').update({ status: 'blocked' }).eq('id', challenge.id);
-      return NextResponse.json({ error: 'Codigo bloqueado por tentativas.' }, { status: 429 });
+      return NextResponse.json({ error: 'Código bloqueado por tentativas.' }, { status: 429 });
     }
 
     const isValid = verifyOtpHash(String(code), challenge.code_hash, getOtpPepper());
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         .from('otp_challenges')
         .update({ attempts: Number(challenge.attempts || 0) + 1 })
         .eq('id', challenge.id);
-      return NextResponse.json({ error: 'Codigo invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Código inválido.' }, { status: 400 });
     }
 
     await supabaseAdmin

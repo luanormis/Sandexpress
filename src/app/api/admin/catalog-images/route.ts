@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ images: data || [] });
   } catch (err) {
     console.error('Admin catalog GET error:', err);
-    return NextResponse.json({ error: 'Erro ao carregar catalogo global.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao carregar catálogo global.' }, { status: 500 });
   }
 }
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     const planType = formData.get('plan_type') === 'plus' ? 'plus' : 'free';
 
     if (!file || !name || !category) {
-      return NextResponse.json({ error: 'Imagem, nome e categoria sao obrigatorios.' }, { status: 400 });
+      return NextResponse.json({ error: 'Imagem, nome e categoria são obrigatórios.' }, { status: 400 });
     }
     const uploaded = await uploadCatalogFile(file, category, name);
     if ('error' in uploaded) return NextResponse.json({ error: uploaded.error }, { status: 400 });
@@ -148,7 +148,7 @@ export async function PATCH(req: NextRequest) {
       const name = String(formData.get('name') || '').trim().slice(0, 120);
       const category = String(formData.get('category') || '').trim().slice(0, 80);
       if (!id || !file || !name || !category) {
-        return NextResponse.json({ error: 'id, imagem, nome e categoria sao obrigatorios.' }, { status: 400 });
+        return NextResponse.json({ error: 'id, imagem, nome e categoria são obrigatórios.' }, { status: 400 });
       }
 
       const { data: current, error: currentError } = await (supabaseAdmin.from('product_images') as any)

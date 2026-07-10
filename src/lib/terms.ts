@@ -1,9 +1,9 @@
 import crypto from "crypto";
 
 export const TERMS_VERSION = "2026-06-24";
-export const TERMS_DOCUMENT_TITLE = "Termos de Uso e Politica de Privacidade do SandExpress";
+export const TERMS_DOCUMENT_TITLE = "Termos de Uso e Política de Privacidade do SandExpress";
 export const TERMS_CONSENT_TEXT =
-  "Li e aceito os Termos de Uso e a Politica de Privacidade do SandExpress, incluindo o registro eletronico do aceite e o tratamento de dados pessoais para cadastro, autenticacao, pedidos, atendimento, relatorios, cobrancas, seguranca, suporte e cumprimento de obrigacoes legais.";
+  "Li e aceito os Termos de Uso e a Política de Privacidade do SandExpress, incluindo o registro eletrônico do aceite e o tratamento de dados pessoais para cadastro, autenticação, pedidos, atendimento, relatórios, cobranças, segurança, suporte e cumprimento de obrigações legais.";
 export const TERMS_DOCUMENT_HASH = crypto
   .createHash("sha256")
   .update(`${TERMS_VERSION}:${TERMS_DOCUMENT_TITLE}:${TERMS_CONSENT_TEXT}`)
@@ -32,7 +32,7 @@ export function buildTermsAcceptanceSnapshot({ vendorId, tenantId, body, ip, use
       document_title: TERMS_DOCUMENT_TITLE,
       document_hash_sha256: TERMS_DOCUMENT_HASH,
       software: "SandExpress",
-      legal_basis: "Aceite eletronico dos Termos de Uso e da Politica de Privacidade",
+      legal_basis: "Aceite eletrônico dos Termos de Uso e da Política de Privacidade",
       responsible: {
         name: String(body.owner_name || "").trim(),
         phone: String(body.owner_phone || "").trim(),

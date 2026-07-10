@@ -17,7 +17,7 @@ export function normalizeBrazilPhoneE164(input: string) {
   const digits = String(input || '').replace(/\D/g, '');
   const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
   if (!/^55\d{10,11}$/.test(withCountry)) {
-    throw new Error('Telefone invalido para envio de OTP.');
+    throw new Error('Telefone inválido para envio de OTP.');
   }
   return `+${withCountry}`;
 }

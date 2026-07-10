@@ -56,7 +56,7 @@ function productErrorResponse(error: any) {
 
   if (error?.code === '23503') {
     return NextResponse.json({
-      error: 'Produto sem vendor/tenant valido. Faca login novamente no painel do quiosque e tente salvar outra vez.',
+      error: 'Produto sem vendor/tenant válido. Faça login novamente no painel do quiosque e tente salvar outra vez.',
       code: error.code,
     }, { status: 400 });
   }
@@ -113,18 +113,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (!body.vendor_id || !body.name || body.price === undefined) {
-      return NextResponse.json({ error: 'vendor_id, name e price sao obrigatorios.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id, name e price são obrigatórios.' }, { status: 400 });
     }
     const price = normalizeMoney(body.price);
     let promotionalPrice: number | null = null;
     if (body.promotional_price !== null && body.promotional_price !== undefined && body.promotional_price !== '') {
       promotionalPrice = normalizeMoney(body.promotional_price);
       if (promotionalPrice === null) {
-        return NextResponse.json({ error: 'Preco promocional invalido.' }, { status: 400 });
+        return NextResponse.json({ error: 'Preço promocional inválido.' }, { status: 400 });
       }
     }
     if (price === null) {
-      return NextResponse.json({ error: 'Preco invalido.' }, { status: 400 });
+      return NextResponse.json({ error: 'Preço inválido.' }, { status: 400 });
     }
 
     const session = getRequestSession(req);

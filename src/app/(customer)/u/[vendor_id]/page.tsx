@@ -182,7 +182,7 @@ export default function CustomerApp() {
   );
   const featureEnabled = (key: string) => features[key] !== false;
 
-  function resetExpiredCustomerSession(message = "Sua sessao expirou. Abra a comanda novamente para enviar pedidos.") {
+  function resetExpiredCustomerSession(message = "Sua sessão expirou. Abra a comanda novamente para enviar pedidos.") {
     sessionStorage.removeItem(`sandexpress_user_${umbrellaId}`);
     setCustomerId("");
     setCurrentOrderId("");
@@ -193,7 +193,7 @@ export default function CustomerApp() {
     setStep("login");
   }
 
-  function endCustomerSession(message = "Conta enviada ao quiosque. Para abrir outra comanda, faca login novamente.") {
+  function endCustomerSession(message = "Conta enviada ao quiosque. Para abrir outra comanda, faça login novamente.") {
     sessionStorage.removeItem(`sandexpress_user_${umbrellaId}`);
     setCustomerId("");
     setCurrentOrderId("");
@@ -247,7 +247,7 @@ export default function CustomerApp() {
     async function loadQrData() {
       try {
         if (!routeVendorId) {
-          setError("QR antigo invalido. Gere um novo QR Code no painel do quiosque.");
+          setError("QR antigo inválido. Gere um novo QR Code no painel do quiosque.");
           return;
         }
         const isUuidVendorRoute = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(routeVendorId);
@@ -255,7 +255,7 @@ export default function CustomerApp() {
         const res = await fetch(`/api/public/umbrella/${umbrellaId}${vendorQuery}`);
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error || "Erro ao carregar cardapio.");
+          setError(data.error || "Erro ao carregar cardápio.");
           return;
         }
         setUmbrella(data.umbrella);
@@ -272,7 +272,7 @@ export default function CustomerApp() {
           loadCustomerOrders(parsed.customer_id || "", data.vendor?.id || routeVendorId);
         }
       } catch {
-        setError("Erro de rede ao carregar o cardapio.");
+        setError("Erro de rede ao carregar o cardápio.");
       }
     }
 
@@ -351,7 +351,7 @@ export default function CustomerApp() {
       return;
     }
     if (!isValidBrazilPhoneWithDdd(phone)) {
-      setError("Informe um telefone valido com DDD. Exemplo: 1196041957.");
+      setError("Informe um telefone válido com DDD. Exemplo: 1196041957.");
       return;
     }
     const normalizedPhone = normalizeBrazilPhoneWithDdd(phone);
@@ -396,17 +396,17 @@ export default function CustomerApp() {
   async function sendCustomerOtp() {
     if (!vendor) return;
     if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 10) {
-      setError("Informe nome e celular validos antes de validar.");
+      setError("Informe nome e celular válidos antes de validar.");
       return;
     }
     setError("");
-    setOtpMessage("Envie pelo WhatsApp a frase: obter codigo de validação para o sandexpress. Depois digite o codigo recebido aqui.");
+    setOtpMessage("Envie pelo WhatsApp a frase: obter código de validação para o sandexpress. Depois digite o código recebido aqui.");
     setOtpVerified(false);
   }
 
   async function verifyCustomerOtp() {
     if (otpCode.replace(/\D/g, "").length !== 6) {
-      setError("Informe o codigo de 6 digitos.");
+      setError("Informe o código de 6 dígitos.");
       return;
     }
     setLoading(true);
@@ -426,14 +426,14 @@ export default function CustomerApp() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Codigo invalido.");
+        setError(data.error || "Código inválido.");
         return;
       }
       setOtpVerified(true);
       setOtpChallengeId(data.challenge_id || otpChallengeId);
       setOtpMessage("WhatsApp validado.");
     } catch {
-      setError("Erro de rede ao validar codigo.");
+      setError("Erro de rede ao validar código.");
     } finally {
       setLoading(false);
     }
@@ -474,7 +474,7 @@ export default function CustomerApp() {
         .filter((item) => item.option)
         .map((item) => `${item.product.name}: ${item.option}`)
         .join("; ");
-      const orderNotes = [notes.trim(), optionNotes ? `Opcoes escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
+      const orderNotes = [notes.trim(), optionNotes ? `Opções escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
       const res = await fetch("/api/orders", {
         method: "POST",
         credentials: "include",
@@ -489,7 +489,7 @@ export default function CustomerApp() {
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
-        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para enviar o pedido.");
+        resetExpiredCustomerSession(data.error || "Sessão expirada. Abra a comanda novamente para enviar o pedido.");
         return;
       }
       if (!res.ok) {
@@ -524,7 +524,7 @@ export default function CustomerApp() {
   async function requestCloseAccount() {
     if (!vendor) return;
     if (openTotal <= 0) {
-      setError("Ainda nao ha valor em aberto para pedir a conta.");
+      setError("Ainda não há valor em aberto para pedir a conta.");
       setStep("orders");
       return;
     }
@@ -554,14 +554,14 @@ export default function CustomerApp() {
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
-        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para pedir a conta.");
+        resetExpiredCustomerSession(data.error || "Sessão expirada. Abra a comanda novamente para pedir a conta.");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Nao ha conta aberta para fechar.");
+        setError(data.error || "Não há conta aberta para fechar.");
         return;
       }
-      endCustomerSession(data.message || "Conta enviada ao quiosque. Para abrir outra comanda, faca login novamente.");
+      endCustomerSession(data.message || "Conta enviada ao quiosque. Para abrir outra comanda, faça login novamente.");
     } finally {
       setLoading(false);
     }
@@ -581,11 +581,11 @@ export default function CustomerApp() {
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
-        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para avaliar.");
+        resetExpiredCustomerSession(data.error || "Sessão expirada. Abra a comanda novamente para avaliar.");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Nao foi possivel enviar sua avaliacao.");
+        setError(data.error || "Não foi possível enviar sua avaliação.");
         return;
       }
       setSatisfactionSent(true);
@@ -600,7 +600,7 @@ export default function CustomerApp() {
       return;
     }
     if (!featureEnabled(requestType)) {
-      setError("Este modulo esta desativado para este quiosque.");
+      setError("Este módulo está desativado para este quiosque.");
       return;
     }
     setLoading(true);
@@ -614,11 +614,11 @@ export default function CustomerApp() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401 || res.status === 403) {
-        resetExpiredCustomerSession(data.error || "Sessao expirada. Abra a comanda novamente para solicitar atendimento.");
+        resetExpiredCustomerSession(data.error || "Sessão expirada. Abra a comanda novamente para solicitar atendimento.");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Nao foi possivel solicitar atendimento.");
+        setError(data.error || "Não foi possível solicitar atendimento.");
         return;
       }
       setWaiterCalled(true);
@@ -794,11 +794,11 @@ export default function CustomerApp() {
                     <h2 className="customer-product-name">{product.name}</h2>
                     <p className="customer-product-description">{product.description || product.subcategory || product.category}</p>
                     {highlighted && (
-                      <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promocao"}</span>
+                      <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>
                     )}
                     {options.length > 0 && (
-                      <div className="customer-option-group" aria-label={product.option_group_name || "Opcoes"}>
-                        <p>{product.option_group_name || "Escolha uma opcao"}</p>
+                      <div className="customer-option-group" aria-label={product.option_group_name || "Opções"}>
+                        <p>{product.option_group_name || "Escolha uma opção"}</p>
                         <div>
                           {options.map((option) => (
                             <button
@@ -891,7 +891,7 @@ export default function CustomerApp() {
                     <div className="customer-bill-summary">
                       {appliedPromotions.map((promotion, index) => (
                         <small key={promotion.promocao_id || index}>
-                          {promotion.titulo || "Promocao aplicada"}: -{formatCurrency(Number(promotion.desconto || 0))}
+                          {promotion.titulo || "Promoção aplicada"}: -{formatCurrency(Number(promotion.desconto || 0))}
                         </small>
                       ))}
                     </div>
@@ -936,7 +936,7 @@ export default function CustomerApp() {
                       </button>
                     ))}
                   </div>
-                  <p className="customer-small">Toque em uma estrela para enviar sua avaliacao.</p>
+                  <p className="customer-small">Toque em uma estrela para enviar sua avaliação.</p>
                 </>
               )}
             </div>
@@ -991,7 +991,7 @@ export default function CustomerApp() {
                     type="button"
                     onClick={() => setSplitPeople((value) => Math.max(1, value - 1))}
                     className="customer-stepper__button"
-                    aria-label="Diminuir pessoas para divisao"
+                    aria-label="Diminuir pessoas para divisão"
                   >
                     -
                   </button>
@@ -1000,13 +1000,13 @@ export default function CustomerApp() {
                     inputMode="numeric"
                     onChange={(event) => setSplitPeople(Math.max(1, Math.min(50, Number(event.target.value.replace(/\D/g, "")) || 1)))}
                     className="customer-stepper__input"
-                    aria-label="Quantidade de pessoas para divisao"
+                    aria-label="Quantidade de pessoas para divisão"
                   />
                   <button
                     type="button"
                     onClick={() => setSplitPeople((value) => Math.min(50, value + 1))}
                     className="customer-stepper__button"
-                    aria-label="Aumentar pessoas para divisao"
+                    aria-label="Aumentar pessoas para divisão"
                   >
                     +
                   </button>
@@ -1046,10 +1046,10 @@ export default function CustomerApp() {
         </section>
       )}
 
-      <nav className="customer-tabbar" aria-label="Navegacao do pedido">
+      <nav className="customer-tabbar" aria-label="Navegação do pedido">
         <button onClick={() => setStep("menu")} className={`customer-tab${step === "menu" ? " is-active" : ""}`}>
           <Home size="1.5rem" />
-          Cardapio
+          Cardápio
         </button>
         <button onClick={() => setStep("cart")} className={`customer-tab${step === "cart" ? " is-active" : ""}`}>
           <ShoppingCart size="1.5rem" />

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { vendor_id, name, email, login, role, password, password_confirm } = body;
     if (!vendor_id || !name || !login || !password || !password_confirm) {
-      return NextResponse.json({ error: 'vendor_id, nome, login, senha e confirmacao sao obrigatorios.' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id, nome, login, senha e confirmação são obrigatórios.' }, { status: 400 });
     }
     if (password !== password_confirm) {
       return NextResponse.json({ error: 'A senha e a confirmacao nao conferem.' }, { status: 400 });
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'Este login de usuario ja existe.' }, { status: 409 });
+        return NextResponse.json({ error: 'Este login de usuário já existe.' }, { status: 409 });
       }
       throw error;
     }

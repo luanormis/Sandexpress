@@ -14,8 +14,8 @@ function safeText(value: unknown, maxLength = 120) {
 
 /**
  * POST /api/vendors/register
- * Cria um tenant isolado, o vendor e o cardapio padrao.
- * Os guarda-sois sao criados depois pelo proprio quiosque no painel.
+ * Cria um tenant isolado, o vendor e o cardápio padrão.
+ * Os guarda-sóis são criados depois pelo próprio quiosque no painel.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     if (!body.name || !body.owner_name || !body.owner_phone || !body.owner_email || !body.city || !body.state || !body.beach_name) {
       return NextResponse.json({
-        error: 'Nome do quiosque, responsavel, telefone, email, praia, cidade e estado sao obrigatorios.',
+        error: 'Nome do quiosque, responsável, telefone, email, praia, cidade e estado são obrigatórios.',
       }, { status: 400 });
     }
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Informe CPF ou CNPJ para o cadastro do quiosque.' }, { status: 400 });
     }
     if (body.terms_accepted !== true) {
-      return NextResponse.json({ error: 'E necessario aceitar os Termos de Uso e a Politica de Privacidade para concluir o cadastro.' }, { status: 400 });
+      return NextResponse.json({ error: 'E necessário aceitar os Termos de Uso e a Política de Privacidade para concluir o cadastro.' }, { status: 400 });
     }
 
     const duplicateFilters = [
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Crie a senha e confirme a senha do quiosque.' }, { status: 400 });
     }
     if (initialPassword !== passwordConfirm) {
-      return NextResponse.json({ error: 'A senha e a confirmacao de senha nao conferem.' }, { status: 400 });
+      return NextResponse.json({ error: 'A senha e a confirmação de senha não conferem.' }, { status: 400 });
     }
     if (initialPassword.length < 8) {
       return NextResponse.json({ error: 'A senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
     return NextResponse.json({
-      error: 'Erro ao gravar no Supabase. Confirme que o banco foi criado com infra/sql-iniciar-novo-projeto.sql e que as variaveis do Vercel apontam para esse projeto.',
+      error: 'Erro ao gravar no Supabase. Confirme que o banco foi criado com infra/sql-iniciar-novo-projeto.sql e que as variáveis do Vercel apontam para esse projeto.',
     }, { status: 500 });
   }
 }

@@ -113,7 +113,7 @@ export default function OpeningDayStockControl({
 
   const saveStock = async (mode: 'open' | 'close' | 'set_physical') => {
     if (!vendorId) {
-      setError('Quiosque nao identificado. Faca login novamente.');
+      setError('Quiosque não identificado. Faça login novamente.');
       return;
     }
     setSaving(true);
@@ -199,7 +199,7 @@ export default function OpeningDayStockControl({
           </div>
           <div className="rounded-xl border border-[#FFDBCB] bg-[#EFD5CA] p-4">
             <p className="text-xs font-black uppercase text-[#FF6B00]">Estoque praia</p>
-            <p className="mt-1 text-sm font-bold text-[#3D1A0A]">Quantidade disponivel para venda no cardapio do cliente.</p>
+            <p className="mt-1 text-sm font-bold text-[#3D1A0A]">Quantidade disponível para venda no cardápio do cliente.</p>
           </div>
         </div>
       </div>
