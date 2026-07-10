@@ -1643,38 +1643,52 @@ export default function VendorDashboard() {
                     <h3 className="font-bold text-lg">Cardapio do cliente</h3>
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingProduct(null);
-                      setProductDraft({
-                        id: "",
-                        name: "",
-                        category: "Combos",
-                        subcategory: "Promocoes",
-                        price: 0,
-                        promotional_price: null,
-                        description: "",
-                        image_url: "",
-                        active: true,
-                        is_combo: true,
-                        menu_highlight: true,
-                        option_group_name: "",
-                        option_values: [],
-                        stock_tracking_enabled: false,
-                        stock_quantity: null,
-                        physical_stock_quantity: 0,
-                        beach_stock_quantity: 0,
-                        blocked_by_stock: false,
-                        sort_order: -10,
-                      });
-                      setProductModalMode("stock");
-                      setShowProductModal(true);
-                    }}
-                    className="rounded-xl bg-[#FF6B00] px-4 py-2 text-sm font-black text-white hover:bg-[#e56000]"
-                  >
-                    Montar combo / promocao
-                  </button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingProduct(null);
+                        setProductDraft(null);
+                        setProductModalMode("stock");
+                        setShowProductModal(true);
+                      }}
+                      className="rounded-xl bg-[#FF6B00] px-4 py-2 text-sm font-black text-white hover:bg-[#e56000]"
+                    >
+                      Criar produto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingProduct(null);
+                        setProductDraft({
+                          id: "",
+                          name: "",
+                          category: "Combos",
+                          subcategory: "Promocoes",
+                          price: 0,
+                          promotional_price: null,
+                          description: "",
+                          image_url: "",
+                          active: true,
+                          is_combo: true,
+                          menu_highlight: true,
+                          option_group_name: "",
+                          option_values: [],
+                          stock_tracking_enabled: false,
+                          stock_quantity: null,
+                          physical_stock_quantity: 0,
+                          beach_stock_quantity: 0,
+                          blocked_by_stock: false,
+                          sort_order: -10,
+                        });
+                        setProductModalMode("stock");
+                        setShowProductModal(true);
+                      }}
+                      className="rounded-xl border border-[#FF6B00] bg-white px-4 py-2 text-sm font-black text-[#d45700] hover:bg-orange-50"
+                    >
+                      Montar combo / promocao
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mb-6 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
@@ -2734,6 +2748,7 @@ export default function VendorDashboard() {
           vendorId={vendorId}
           mode={productModalMode}
           categories={productCategories}
+          existingCategoryNames={menuCategories}
           onSave={saveProduct}
           onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductDraft(null); setProductModalMode("stock"); }}
         />
@@ -2982,6 +2997,7 @@ function ProductModal({
   vendorId,
   mode = "stock",
   categories,
+  existingCategoryNames,
   onSave,
   onClose,
 }: {
@@ -2989,6 +3005,7 @@ function ProductModal({
   vendorId: string | null;
   mode?: "stock" | "menu";
   categories: ProductCategory[];
+  existingCategoryNames: string[];
   onSave: (p: Product) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -2999,7 +3016,11 @@ function ProductModal({
     stock_quantity: null, physical_stock_quantity: 0, beach_stock_quantity: 0, blocked_by_stock: false,
     sort_order: 99,
   });
-  const [optionText, setOptionText] = useState(() => Array.isArray(product?.option_values) ? product.option_values.join(", ") : "");
+  const [hasOptions, setHasOptions] = useState(() => Boolean(product?.option_group_name || product?.option_values?.length));
+  const [optionRows, setOptionRows] = useState<string[]>(() => {
+    const values = Array.isArray(product?.option_values) ? product.option_values.filter(Boolean) : [];
+    return values.length > 0 ? values : [""];
+  });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
   const isMenuMode = mode === "menu";
@@ -3008,8 +3029,17 @@ function ProductModal({
   const subcategories = selectedRoot
     ? categories.filter(category => category.parent_id === selectedRoot.id && category.active !== false)
     : [];
-  const categoryNames = Array.from(new Set(rootCategories.map(category => category.name)));
-  const normalizedOptionValues = optionText.split(",").map(item => item.trim()).filter(Boolean).slice(0, 30);
+  const categoryNames = Array.from(new Set([...existingCategoryNames, ...rootCategories.map(category => category.name)].filter(Boolean)));
+  const normalizedOptionValues = optionRows.map(item => item.trim()).filter(Boolean).slice(0, 30);
+
+  const updateOptionRow = (index: number, value: string) => {
+    setOptionRows(prev => prev.map((item, currentIndex) => currentIndex === index ? value : item));
+  };
+
+  const addOptionRow = () => setOptionRows(prev => [...prev, ""]);
+  const removeOptionRow = (index: number) => {
+    setOptionRows(prev => prev.length <= 1 ? [""] : prev.filter((_, currentIndex) => currentIndex !== index));
+  };
 
   useEffect(() => {
     if (isMenuMode) return;
@@ -3198,24 +3228,63 @@ function ProductModal({
                   {subcategories.map(category => <option key={category.id} value={category.name} />)}
                 </datalist>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nome das opcoes</label>
-                <input
-                  value={form.option_group_name || ""}
-                  onChange={e => setForm(prev => ({ ...prev, option_group_name: e.target.value }))}
-                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                  placeholder="Ex: Sabor, Fruta, Refrigerante"
-                />
-              </div>
               <div className="sm:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-1">Opcoes separadas por virgula</label>
-                <input
-                  value={optionText}
-                  onChange={e => setOptionText(e.target.value)}
-                  className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                  placeholder="Ex: Limao, Abacaxi, Maracuja"
-                />
-                <p className="mt-1 text-xs font-bold text-gray-500">No cardapio o cliente escolhe uma opcao antes de adicionar ao carrinho.</p>
+                <label className="flex items-center gap-2 rounded-xl border-2 border-orange-100 bg-orange-50/70 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasOptions}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setHasOptions(checked);
+                      if (checked && optionRows.length === 0) setOptionRows([""]);
+                    }}
+                    className="w-5 h-5 accent-[#FF6B00]"
+                  />
+                  <span className="text-sm font-black text-[#5a2d1d]">Este produto tem sabores/opcoes para o cliente escolher</span>
+                </label>
+                {hasOptions && (
+                  <div className="mt-3 space-y-3 rounded-xl border border-orange-100 bg-white p-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Nome do grupo</label>
+                      <input
+                        value={form.option_group_name || ""}
+                        onChange={e => setForm(prev => ({ ...prev, option_group_name: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Ex: Sabor, Fruta, Refrigerante"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-bold text-gray-700">Linhas de opcao</label>
+                        <button
+                          type="button"
+                          onClick={addOptionRow}
+                          className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-black text-white hover:bg-[#e56000]"
+                        >
+                          + Adicionar opcao
+                        </button>
+                      </div>
+                      {optionRows.map((value, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            value={value}
+                            onChange={e => updateOptionRow(index, e.target.value)}
+                            className="min-w-0 flex-1 border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                            placeholder={index === 0 ? "Ex: Limao" : "Nova opcao"}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeOptionRow(index)}
+                            className="shrink-0 rounded-xl border border-red-200 px-3 py-2 text-sm font-black text-red-700 hover:bg-red-50"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs font-bold text-gray-500">Cada linha vira uma escolha no cardapio do cliente antes de adicionar ao carrinho.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3314,13 +3383,30 @@ function ProductModal({
           </button>
           <button
             onClick={() => {
-              if (form.name && form.price) {
-                onSave({
-                  ...form,
-                  option_values: normalizedOptionValues,
-                  menu_highlight: Boolean(form.menu_highlight || form.is_combo || form.promotional_price),
-                });
+              if (!form.name.trim()) {
+                alert("Informe o nome do produto.");
+                return;
               }
+              if (!form.category.trim()) {
+                alert("Informe ou escolha uma categoria.");
+                return;
+              }
+              if (!Number.isFinite(Number(form.price)) || Number(form.price) < 0) {
+                alert("Informe um preco valido.");
+                return;
+              }
+              if (hasOptions && normalizedOptionValues.length === 0) {
+                alert("Adicione pelo menos uma linha de sabor/opcao ou desmarque sabores/opcoes.");
+                return;
+              }
+              onSave({
+                ...form,
+                category: form.category.trim(),
+                subcategory: form.subcategory?.trim() || null,
+                option_group_name: hasOptions ? (form.option_group_name?.trim() || "Opcao") : "",
+                option_values: hasOptions ? normalizedOptionValues : [],
+                menu_highlight: Boolean(form.menu_highlight || form.is_combo || form.promotional_price),
+              });
             }}
             className="flex-1 py-3 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] active:scale-95 transition-all"
           >
