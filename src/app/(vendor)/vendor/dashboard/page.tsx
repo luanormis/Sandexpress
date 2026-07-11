@@ -1718,26 +1718,13 @@ export default function VendorDashboard() {
                 <div className="mb-6 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                     <div className="min-w-0 flex-1">
-                      <label className="mb-1 block text-xs font-black uppercase text-[#8a3e22]">Categoria ou subcategoria</label>
+                      <label className="mb-1 block text-xs font-black uppercase text-[#8a3e22]">Categoria do menu superior</label>
                       <input
                         value={categoryForm.name}
-                        onChange={(event) => setCategoryForm(prev => ({ ...prev, name: event.target.value }))}
+                        onChange={(event) => setCategoryForm(prev => ({ ...prev, name: event.target.value, parent_id: "" }))}
                         className="w-full rounded-xl border border-orange-200 bg-white px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#ff6b00]"
-                        placeholder="Ex: Drinks, Refrigerantes, Sabores de caipirinha"
+                        placeholder="Ex: Bebidas, Petiscos, Porções"
                       />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <label className="mb-1 block text-xs font-black uppercase text-[#8a3e22]">Dentro de</label>
-                      <select
-                        value={categoryForm.parent_id}
-                        onChange={(event) => setCategoryForm(prev => ({ ...prev, parent_id: event.target.value }))}
-                        className="w-full rounded-xl border border-orange-200 bg-white px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#ff6b00]"
-                      >
-                        <option value="">Categoria principal</option>
-                        {rootProductCategories.map(category => (
-                          <option key={category.id} value={category.id}>{category.name}</option>
-                        ))}
-                      </select>
                     </div>
                     <button
                       type="button"
@@ -1748,7 +1735,7 @@ export default function VendorDashboard() {
                     </button>
                   </div>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#5a2d1d]">
-                    Use categorias para montar o menu superior, como Bebidas, Petiscos e Porções. Use subcategorias para separar itens como Caipirinha de pinga.
+                    Use esta área apenas para criar ou excluir o menu superior, como Bebidas, Petiscos e Porções. As subcategorias são escolhidas dentro da janela Criar produto.
                   </p>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {rootProductCategories.map(category => {
@@ -1878,6 +1865,13 @@ export default function VendorDashboard() {
                                 title="Alterar preço, promoção e combo"
                               >
                                 <Pencil size={16} />
+                              </button>
+                              <button
+                                onClick={() => deleteProduct(p.id)}
+                                className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700 transition-colors"
+                                title="Excluir item do cardápio"
+                              >
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -2810,6 +2804,7 @@ export default function VendorDashboard() {
           mode={productModalMode}
           categories={productCategories}
           existingCategoryNames={menuCategories}
+          onCategoryCreated={(category) => setProductCategories(prev => [category, ...prev.filter(item => item.id !== category.id)])}
           onSave={saveProduct}
           onClose={() => { setShowProductModal(false); setEditingProduct(null); setProductDraft(null); setProductModalMode("stock"); }}
         />
@@ -2870,6 +2865,7 @@ function OrderModal({
   const serviceRequest = getServiceRequest(order);
   const emptyAccount = isOrderEmpty(order);
   const visibleItems = getVisibleConsumptionItems(order, Boolean(order.active_request));
+  const visibleOrderNotes = getVisibleOrderNotes(order.notes);
   const next = emptyAccount ? null : order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
@@ -2945,6 +2941,12 @@ function OrderModal({
                 </div>
               ))}
             </div>
+            {visibleOrderNotes && (
+              <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
+                <p className="mb-1 text-xs font-black uppercase tracking-wide text-amber-700">Observação do cliente</p>
+                <p className="whitespace-pre-line font-black leading-6">{visibleOrderNotes}</p>
+              </div>
+            )}
           </div>
           {order.requests && order.requests.length > 0 && (
             <div>
@@ -2965,11 +2967,6 @@ function OrderModal({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-          {getVisibleOrderNotes(order.notes) && (
-            <div className="whitespace-pre-line rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">
-              {getVisibleOrderNotes(order.notes)}
             </div>
           )}
         </div>
@@ -3059,6 +3056,7 @@ function ProductModal({
   mode = "stock",
   categories,
   existingCategoryNames,
+  onCategoryCreated,
   onSave,
   onClose,
 }: {
@@ -3067,6 +3065,7 @@ function ProductModal({
   mode?: "stock" | "menu";
   categories: ProductCategory[];
   existingCategoryNames: string[];
+  onCategoryCreated?: (category: ProductCategory) => void;
   onSave: (p: Product) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -3084,6 +3083,8 @@ function ProductModal({
   });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [subcategoryMessage, setSubcategoryMessage] = useState("");
   const isMenuMode = mode === "menu";
   const rootCategories = categories.filter(category => !category.parent_id && category.active !== false);
   const selectedRoot = rootCategories.find(category => category.name === form.category);
@@ -3100,6 +3101,36 @@ function ProductModal({
   const addOptionRow = () => setOptionRows(prev => [...prev, ""]);
   const removeOptionRow = (index: number) => {
     setOptionRows(prev => prev.length <= 1 ? [""] : prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const createSubcategory = async () => {
+    if (!vendorId || !selectedRoot?.id || !newSubcategoryName.trim()) {
+      setSubcategoryMessage("Escolha uma categoria principal e informe o nome da subcategoria.");
+      return;
+    }
+    setSubcategoryMessage("");
+    try {
+      const res = await fetch('/api/product-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          name: newSubcategoryName,
+          parent_id: selectedRoot.id,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubcategoryMessage(data.error || "Não foi possível criar a subcategoria.");
+        return;
+      }
+      onCategoryCreated?.(data);
+      setForm(prev => ({ ...prev, subcategory: data.name }));
+      setNewSubcategoryName("");
+      setSubcategoryMessage("Subcategoria criada e selecionada.");
+    } catch {
+      setSubcategoryMessage("Erro de rede ao criar subcategoria.");
+    }
   };
 
   useEffect(() => {
@@ -3263,7 +3294,11 @@ function ProductModal({
               <label className="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
               <select
                 value={form.category}
-                onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
+                onChange={e => {
+                  setForm(prev => ({ ...prev, category: e.target.value, subcategory: "" }));
+                  setNewSubcategoryName("");
+                  setSubcategoryMessage("");
+                }}
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none bg-white"
               >
                 <option value="">Selecione uma categoria cadastrada</option>
@@ -3289,6 +3324,27 @@ function ProductModal({
                   <option value="">Sem subcategoria</option>
                   {subcategories.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
                 </select>
+                <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50/70 p-3">
+                  <p className="mb-2 text-xs font-black uppercase text-[#8a3e22]">Criar subcategoria nesta categoria</p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={newSubcategoryName}
+                      onChange={e => setNewSubcategoryName(e.target.value)}
+                      disabled={!selectedRoot}
+                      className="min-w-0 flex-1 border-2 border-orange-100 rounded-xl p-3 text-sm font-bold focus:border-[#FF6B00] outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                      placeholder={selectedRoot ? "Ex: Limão, Abacaxi, Guaraná" : "Escolha a categoria principal primeiro"}
+                    />
+                    <button
+                      type="button"
+                      onClick={createSubcategory}
+                      disabled={!selectedRoot || !newSubcategoryName.trim()}
+                      className="rounded-xl bg-[#FF6B00] px-4 py-3 text-sm font-black text-white hover:bg-[#e56000] disabled:cursor-not-allowed disabled:bg-gray-300"
+                    >
+                      Criar
+                    </button>
+                  </div>
+                  {subcategoryMessage && <p className="mt-2 text-xs font-black text-[#8a3e22]">{subcategoryMessage}</p>}
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <label className="flex items-center gap-2 rounded-xl border-2 border-orange-100 bg-orange-50/70 p-3 cursor-pointer">
