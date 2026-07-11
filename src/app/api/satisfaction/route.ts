@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = getRequestSession(req);
     if (!session || session.role !== 'customer' || !session.customer_id || !session.vendor_id) {
-      return NextResponse.json({ error: 'Sessao de cliente obrigatoria.' }, { status: 401 });
+      return NextResponse.json({ error: 'Sessão de cliente obrigatória.' }, { status: 401 });
     }
 
     const body = await req.json().catch(() => null);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderError || !order) {
-      return NextResponse.json({ error: 'Pedido nao encontrado.' }, { status: 404 });
+      return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 });
     }
 
     if (

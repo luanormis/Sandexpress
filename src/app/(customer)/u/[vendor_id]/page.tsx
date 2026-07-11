@@ -561,7 +561,26 @@ export default function CustomerApp() {
         setError(data.error || "Não há conta aberta para fechar.");
         return;
       }
-      endCustomerSession(data.message || "Conta enviada ao quiosque. Para abrir outra comanda, faça login novamente.");
+      const responseOrder = Array.isArray(data.order) ? data.order[0] : data.order;
+      const orderIdForSurvey =
+        responseOrder?.id ||
+        data.order_id ||
+        currentOrderId ||
+        orders.find((order) => order.status !== "closing_requested")?.id ||
+        orders[0]?.id ||
+        "";
+
+      if (orderIdForSurvey) {
+        setSatisfactionOrderId(orderIdForSurvey);
+        setSatisfactionRating(0);
+        setSatisfactionSent(false);
+        setCurrentOrderId(orderIdForSurvey);
+        setOrders((prev) => prev.map((order) => order.id === orderIdForSurvey ? { ...order, status: "closing_requested" } : order));
+      }
+
+      setPartialAmount("");
+      setError(data.message || "Conta enviada ao quiosque. Vote no que achou da experiência antes de sair.");
+      setStep("orders");
     } finally {
       setLoading(false);
     }
@@ -904,7 +923,7 @@ export default function CustomerApp() {
               </div>
             </div>
           )}
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observacoes do pedido" aria-label="Observacoes do pedido" rows={3} className="customer-textarea" />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observações do pedido" aria-label="Observações do pedido" rows={3} className="customer-textarea" />
           <button onClick={createOrder} disabled={loading || cart.length === 0} className="customer-primary-button">Enviar pedido</button>
         </section>
       )}
@@ -915,14 +934,16 @@ export default function CustomerApp() {
             <div className="customer-satisfaction-card">
               {satisfactionSent ? (
                 <>
-                  <p className="customer-satisfaction-eyebrow">Avaliacao enviada</p>
+                  <p className="customer-satisfaction-eyebrow">Avaliação enviada</p>
                   <h2>Obrigado pelo retorno.</h2>
+                  <p className="customer-small">Sua opinião ajuda o quiosque a melhorar o atendimento na praia.</p>
                 </>
               ) : (
                 <>
                   <p className="customer-satisfaction-eyebrow">Pedido de conta enviado</p>
-                  <h2>Como foi sua experiencia?</h2>
-                  <div className="customer-stars" aria-label="Avaliar experiencia de 1 a 5 estrelas">
+                  <h2>Vote no que achou da experiência</h2>
+                  <p className="customer-small">Antes de sair, toque em uma estrela para avaliar seu atendimento.</p>
+                  <div className="customer-stars" aria-label="Avaliar experiência de 1 a 5 estrelas">
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <button
                         key={rating}
@@ -953,7 +974,7 @@ export default function CustomerApp() {
                 checked={serviceFeeEnabled}
                 onChange={(event) => setServiceFeeEnabled(event.target.checked)}
               />
-              <span>Incluir 10% do garcom</span>
+              <span>Incluir 10% do garçom</span>
               <strong>{formatCurrency(serviceFeeAmount)}</strong>
             </label>
             <div className="customer-bill-total">

@@ -44,21 +44,21 @@ export async function POST(req: NextRequest) {
 
     if (!vendor_id || (!umbrella_id && !customer_phone)) {
       return NextResponse.json(
-        { error: 'vendor_id e (umbrella_id ou customer_phone) sao obrigatorios' },
+        { error: 'vendor_id e (umbrella_id ou customer_phone) são obrigatórios' },
         { status: 400 }
       );
     }
 
     const session = getRequestSession(req);
     if (!session) {
-      return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
     }
     if (session.role === 'vendor' || session.role === 'admin') {
       if (!canAccessVendor(session, vendor_id)) {
-        return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+        return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
       }
     } else if (session.role === 'customer' && session.vendor_id !== vendor_id) {
-      return NextResponse.json({ error: 'Sessao de cliente invalida para este quiosque.' }, { status: 403 });
+      return NextResponse.json({ error: 'Sessão de cliente inválida para este quiosque.' }, { status: 403 });
     }
     if (!await vendorFeatureEnabled(vendor_id, 'cashier')) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       const itemCount = Array.isArray((openOrder as any)?.order_items) ? (openOrder as any).order_items.length : 0;
       if (openOrder && (Number((openOrder as any).total || 0) <= 0 || itemCount === 0)) {
         return NextResponse.json({
-          error: 'Comanda vazia nao pode ir para fechamento. Use "Liberar guarda-sol vazio".',
+          error: 'Comanda vazia não pode ir para fechamento. Use "Liberar guarda-sol vazio".',
         }, { status: 409 });
       }
     }
@@ -93,9 +93,9 @@ export async function POST(req: NextRequest) {
       requestNotes = [
         notes || 'Fechamento solicitado pelo cliente',
         '--- Resumo solicitado pelo cliente ---',
-        `10% do garcom: ${service_fee_enabled === false ? 'dispensado' : formatMoney(serviceFeeAmount)}`,
+        `10% do garçom: ${service_fee_enabled === false ? 'dispensado' : formatMoney(serviceFeeAmount)}`,
         split_mode === 'split'
-          ? `Divisao: ${splitPeople} pessoas`
+          ? `Divisão: ${splitPeople} pessoas`
           : split_mode === 'custom'
             ? `Pagamento parcial solicitado: ${formatMoney(paymentAmount)}`
             : 'Pagamento integral solicitado',
@@ -144,16 +144,16 @@ export async function GET(req: NextRequest) {
     const customer_phone = searchParams.get('customer_phone');
 
     if (!vendor_id) {
-      return NextResponse.json({ error: 'vendor_id obrigatorio' }, { status: 400 });
+      return NextResponse.json({ error: 'vendor_id obrigatório' }, { status: 400 });
     }
 
     if (!umbrella_id && !customer_phone) {
-      return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatorio' }, { status: 400 });
+      return NextResponse.json({ error: 'umbrella_id ou customer_phone obrigatório' }, { status: 400 });
     }
 
     const session = getRequestSession(req);
     if (!canAccessVendor(session, vendor_id)) {
-      return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
+      return NextResponse.json({ error: 'Não autorizado para este vendor.' }, { status: 403 });
     }
     if (!await vendorFeatureEnabled(vendor_id, 'cashier')) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
