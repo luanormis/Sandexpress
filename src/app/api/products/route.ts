@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { normalizeProductStockForWrite } from '@/lib/product-stock';
+import { normalizeRenderableProductImageUrl } from '@/lib/product-image-url';
 
 function normalizeMoney(value: unknown) {
   const numeric = Number(value);
@@ -101,7 +102,10 @@ export async function GET(req: NextRequest) {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json(data || []);
+    return NextResponse.json((data || []).map((product: any) => ({
+      ...product,
+      image_url: normalizeRenderableProductImageUrl(product.image_url),
+    })));
   } catch (err) {
     console.error('Products GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -172,7 +176,10 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({
+      ...data,
+      image_url: normalizeRenderableProductImageUrl((data as any)?.image_url),
+    }, { status: 201 });
   } catch (err) {
     return productErrorResponse(err);
   }

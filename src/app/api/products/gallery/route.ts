@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { categoryKey } from "@/lib/default-product-images";
+import { catalogImageProxyUrl } from "@/lib/product-image-url";
 
 function galleryResponse(images: any[]) {
+  const renderableImages = images.map((image) => ({
+    ...image,
+    image_url: catalogImageProxyUrl(image),
+  }));
   const groupedByCategory = images.reduce(
     (acc: Record<string, any[]>, image: any) => {
       if (!acc[image.category]) {
         acc[image.category] = [];
       }
-      acc[image.category].push(image);
+      acc[image.category].push({
+        ...image,
+        image_url: catalogImageProxyUrl(image),
+      });
       return acc;
     },
     {}
@@ -18,9 +26,9 @@ function galleryResponse(images: any[]) {
     {
       success: true,
       data: {
-        images,
+        images: renderableImages,
         byCategory: groupedByCategory,
-        total: images.length,
+        total: renderableImages.length,
       },
     },
     { status: 200 }

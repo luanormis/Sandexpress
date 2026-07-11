@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateImageUpload } from '@/lib/upload-guard';
+import { catalogImageProxyUrl } from '@/lib/product-image-url';
 
 const CATALOG_BUCKET = 'catalogo-global';
 const MAX_CATALOG_IMAGE_BYTES = 2 * 1024 * 1024;
+
+function withRenderableImageUrl<T extends { id?: string | null; storage_path?: string | null; image_url?: string | null }>(image: T) {
+  return {
+    ...image,
+    image_url: catalogImageProxyUrl(image),
+  };
+}
 
 function requireAdmin(req: NextRequest) {
   const session = getRequestSession(req);
@@ -82,7 +90,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query.limit(200);
     if (error) throw error;
 
-    return NextResponse.json({ images: data || [] });
+    return NextResponse.json({ images: (data || []).map(withRenderableImageUrl) });
   } catch (err) {
     console.error('Admin catalog GET error:', err);
     return NextResponse.json({ error: 'Erro ao carregar catálogo global.' }, { status: 500 });
@@ -127,7 +135,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ image: data }, { status: 201 });
+    return NextResponse.json({ image: withRenderableImageUrl(data) }, { status: 201 });
   } catch (err) {
     console.error('Admin catalog POST error:', err);
     return NextResponse.json({ error: 'Erro ao salvar imagem global.' }, { status: 500 });
@@ -182,7 +190,7 @@ export async function PATCH(req: NextRequest) {
         await supabaseAdmin.storage.from(CATALOG_BUCKET).remove([current.storage_path]);
       }
 
-      return NextResponse.json({ image: data });
+      return NextResponse.json({ image: withRenderableImageUrl(data) });
     }
 
     const body = await req.json();
@@ -207,7 +215,7 @@ export async function PATCH(req: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ image: data });
+    return NextResponse.json({ image: withRenderableImageUrl(data) });
   } catch (err) {
     console.error('Admin catalog PATCH error:', err);
     return NextResponse.json({ error: 'Erro ao atualizar imagem global.' }, { status: 500 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, getTenantFeatureMap } from '@/lib/features';
 import { isProductVisibleToCustomer } from '@/lib/public-product-visibility';
+import { normalizeRenderableProductImageUrl } from '@/lib/product-image-url';
 
 /**
  * GET /api/public/umbrella/[umbrellaId]?vendor_id=xxx
@@ -77,7 +78,12 @@ export async function GET(
 
     if (productsError) throw productsError;
 
-    const visible = ((products || []) as any[]).filter(isProductVisibleToCustomer);
+    const visible = ((products || []) as any[])
+      .filter(isProductVisibleToCustomer)
+      .map((product) => ({
+        ...product,
+        image_url: normalizeRenderableProductImageUrl(product.image_url),
+      }));
 
     return NextResponse.json({
       umbrella: {

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
 import { normalizeProductStockForWrite } from '@/lib/product-stock';
+import { normalizeRenderableProductImageUrl } from '@/lib/product-image-url';
 
 const ALLOWED_PRODUCT_FIELDS = new Set([
   'name',
@@ -120,7 +121,10 @@ export async function PATCH(
       .single();
 
     if (result?.error) throw result.error;
-    return NextResponse.json(result.data);
+    return NextResponse.json({
+      ...result.data,
+      image_url: normalizeRenderableProductImageUrl(result.data?.image_url),
+    });
   } catch (err) {
     return productWriteErrorResponse(err);
   }

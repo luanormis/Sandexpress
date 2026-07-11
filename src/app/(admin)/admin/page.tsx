@@ -175,6 +175,15 @@ function convertImageToWebp(file: File, quality = 0.82): Promise<File> {
   });
 }
 
+function fileNameToCatalogName(fileName: string) {
+  return fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase("pt-BR"));
+}
+
 // =========================================================
 // MAIN COMPONENT
 // =========================================================
@@ -392,36 +401,51 @@ export default function AdminDashboard() {
   };
 
   const uploadCatalogImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!file) return;
-    if (!catalogForm.name.trim() || !catalogForm.category.trim()) {
-      setCatalogMessage("Informe nome e categoria antes de subir a imagem.");
+    if (files.length === 0) return;
+    if (files.length === 1 && !catalogForm.name.trim()) {
+      setCatalogMessage("Informe o nome ou selecione várias imagens para usar o nome do arquivo.");
+      return;
+    }
+    if (!catalogForm.category.trim()) {
+      setCatalogMessage("Informe a categoria antes de subir a imagem.");
       return;
     }
     setCatalogSaving(true);
     setCatalogMessage("");
     try {
-      const webpFile = await convertImageToWebp(file);
-      const formData = new FormData();
-      formData.append("file", webpFile);
-      formData.append("name", catalogForm.name);
-      formData.append("category", catalogForm.category);
-      formData.append("tags", catalogForm.tags);
-      formData.append("description", catalogForm.description);
-      formData.append("plan_type", "free");
-      const res = await fetch("/api/admin/catalog-images", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setCatalogMessage(data.error || "Não foi possível salvar imagem global.");
-        return;
+      const uploadedImages: CatalogImage[] = [];
+      for (const file of files) {
+        const catalogName = files.length === 1 && catalogForm.name.trim()
+          ? catalogForm.name.trim()
+          : fileNameToCatalogName(file.name);
+        const webpFile = await convertImageToWebp(file);
+        const formData = new FormData();
+        formData.append("file", webpFile);
+        formData.append("name", catalogName);
+        formData.append("category", catalogForm.category);
+        formData.append("tags", catalogForm.tags);
+        formData.append("description", catalogForm.description || `Imagem criada a partir do arquivo ${file.name}.`);
+        formData.append("plan_type", "free");
+        const res = await fetch("/api/admin/catalog-images", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCatalogMessage(data.error || `Não foi possível salvar ${file.name}.`);
+          return;
+        }
+        if (data.image) uploadedImages.push(data.image);
       }
-      setCatalogImages(prev => [data.image, ...prev.filter((image) => image.id !== data.image?.id)]);
-      setCatalogMessage("Imagem convertida para WebP e adicionada ao catálogo global.");
+      setCatalogImages(prev => [...uploadedImages, ...prev.filter((image) => !uploadedImages.some((uploaded) => uploaded.id === image.id))]);
+      setCatalogMessage(
+        uploadedImages.length === 1
+          ? "Imagem convertida para WebP e adicionada ao catálogo global."
+          : `${uploadedImages.length} imagens convertidas para WebP e adicionadas ao catálogo global.`
+      );
     } catch (err) {
       setCatalogMessage(err instanceof Error ? err.message : "Erro ao converter imagem.");
     } finally {
@@ -1465,8 +1489,11 @@ export default function AdminDashboard() {
                       value={catalogForm.name}
                       onChange={event => setCatalogForm(prev => ({ ...prev, name: event.target.value }))}
                       className="w-full rounded-xl border border-gray-600 bg-gray-700 p-3 text-white outline-none focus:border-amber-500"
-                      placeholder="Ex: Porcao de peixe"
+                      placeholder="Opcional no lote. Ex: Porção de peixe"
                     />
+                    <span className="mt-1 block text-xs font-bold text-gray-500">
+                      No upload em lote, deixe em branco para usar o nome de cada arquivo.
+                    </span>
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-bold text-gray-400">Categoria</span>
@@ -1502,11 +1529,15 @@ export default function AdminDashboard() {
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
+                      multiple
                       className="hidden"
                       disabled={catalogSaving}
                       onChange={uploadCatalogImage}
                     />
                   </label>
+                  <p className="text-xs font-bold leading-5 text-gray-500">
+                    Para subir em lote: preencha Categoria e Tags, clique em Selecionar imagem e marque várias imagens. O sistema converte para WebP, grava no bucket catalogo-global e usa o nome do arquivo como referência.
+                  </p>
                   {catalogMessage && (
                     <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm font-bold leading-5 text-amber-100">
                       {catalogMessage}
