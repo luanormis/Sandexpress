@@ -3,6 +3,59 @@ import { isSupabaseUrlConfigured } from '@/lib/supabase-env';
 import { buildReadinessReport, getBlockingReadinessIssues } from '@/lib/readiness';
 import { REQUIRED_SCHEMA_CHECKS } from '@/lib/readiness-schema';
 
+type SchemaCheck = {
+  table: string;
+  ok: boolean;
+  code: string | null;
+  error: string | null;
+};
+
+const SCHEMA_CACHE_TTL_MS = 30_000;
+let schemaCache: { expiresAt: number; checks: SchemaCheck[] } | null = null;
+let schemaCheckInFlight: Promise<SchemaCheck[]> | null = null;
+
+async function runSchemaChecks(): Promise<SchemaCheck[]> {
+  if (schemaCache && schemaCache.expiresAt > Date.now()) return schemaCache.checks;
+  if (schemaCheckInFlight) return schemaCheckInFlight;
+
+  schemaCheckInFlight = (async () => {
+    const { supabaseAdmin } = await import('@/lib/supabase-admin');
+    const grouped = new Map<string, string[]>();
+    for (const { table, column } of REQUIRED_SCHEMA_CHECKS) {
+      const columns = grouped.get(table) || [];
+      if (!columns.includes(column)) columns.push(column);
+      grouped.set(table, columns);
+    }
+
+    const tableResults = new Map<string, { code: string | null; error: string | null }>();
+    await Promise.all([...grouped.entries()].map(async ([table, columns]) => {
+      const { error } = await supabaseAdmin.from(table).select(columns.join(',')).limit(1);
+      tableResults.set(table, {
+        code: error?.code || null,
+        error: error?.message || null,
+      });
+    }));
+
+    const checks = REQUIRED_SCHEMA_CHECKS.map(({ table }) => {
+      const result = tableResults.get(table);
+      return {
+        table,
+        ok: !result?.error,
+        code: result?.code || null,
+        error: result?.error || null,
+      };
+    });
+    schemaCache = { expiresAt: Date.now() + SCHEMA_CACHE_TTL_MS, checks };
+    return checks;
+  })();
+
+  try {
+    return await schemaCheckInFlight;
+  } finally {
+    schemaCheckInFlight = null;
+  }
+}
+
 /**
  * GET /api/health
  * Endpoint de health check para Cloud Run e monitoramento.
@@ -30,18 +83,7 @@ export async function GET() {
   }
 
   try {
-    const { supabaseAdmin } = await import('@/lib/supabase-admin');
-    const checks = await Promise.all(
-      REQUIRED_SCHEMA_CHECKS.map(async ({ table, column }) => {
-        const { error } = await supabaseAdmin.from(table).select(column).limit(1);
-        return {
-          table,
-          ok: !error,
-          code: error?.code || null,
-          error: error?.message || null,
-        };
-      })
-    );
+    const checks = await runSchemaChecks();
     const missingSchema = checks.some((check) => ['42P01', 'PGRST205', '42703'].includes(check.code || ''));
     if (missingSchema) {
       return NextResponse.json(

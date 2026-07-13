@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createSessionToken(
-      { role: 'vendor', vendor_id: user.vendor_id, tenant_id: user.tenant_id },
+      { role: 'vendor', vendor_id: user.vendor_id, tenant_id: user.tenant_id, user_id: user.id },
       12 * 60 * 60
     );
     const response = NextResponse.json({

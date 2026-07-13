@@ -208,6 +208,44 @@ export async function GET(req: NextRequest) {
       .sort(([a], [b]) => Number(a.replace('h', '')) - Number(b.replace('h', '')))
       .map(([hour, orders]) => ({ hour, orders }));
 
+    const [{ data: staffUsers }, { data: attributionEvents }, { data: commissionEvents }] = await Promise.all([
+      supabaseAdmin.from('vendor_users').select('id, name, role').eq('vendor_id', vendor_id).eq('active', true),
+      supabaseAdmin.from('analytics_events').select('metadata, created_at').eq('vendor_id', vendor_id).eq('event_type', 'staff_order_attribution').gte('created_at', startDate.toISOString()).order('created_at', { ascending: false }),
+      supabaseAdmin.from('analytics_events').select('metadata, created_at').eq('vendor_id', vendor_id).eq('event_type', 'staff_commission_config').order('created_at', { ascending: false }),
+    ]);
+    const staffNameById = new Map<string, string>((staffUsers || []).map((user: any) => [String(user.id), String(user.name || 'Equipe')] as [string, string]));
+    const commissionByUser = new Map<string, any>();
+    (commissionEvents || []).forEach((event: any) => {
+      const userId = String(event.metadata?.user_id || '');
+      if (userId && !commissionByUser.has(userId)) commissionByUser.set(userId, event.metadata);
+    });
+    const staffByOrder = new Map<string, string>();
+    (attributionEvents || []).forEach((event: any) => {
+      const orderId = String(event.metadata?.order_id || '');
+      const userId = String(event.metadata?.user_id || '');
+      if (orderId && userId && !staffByOrder.has(orderId)) staffByOrder.set(orderId, userId);
+    });
+    const staffPerformanceMap = new Map<string, { user_id: string; name: string; orders: number; revenue: number; commission_type: string; commission_value: number; commission_due: number }>();
+    paidOrders.forEach((order) => {
+      const userId = staffByOrder.get(String(order.id));
+      if (!userId) return;
+      const config = commissionByUser.get(userId) || {};
+      const current = staffPerformanceMap.get(userId) || { user_id: userId, name: staffNameById.get(userId) || 'Equipe', orders: 0, revenue: 0, commission_type: config.commission_type || 'none', commission_value: Number(config.commission_value || 0), commission_due: 0 };
+      current.orders += 1;
+      current.revenue += Number(order.total || 0);
+      staffPerformanceMap.set(userId, current);
+    });
+    const staff_performance = Array.from(staffPerformanceMap.values()).map((staff) => ({
+      ...staff,
+      revenue: Math.round(staff.revenue * 100) / 100,
+      commission_due: Math.round((staff.commission_type === 'percent' ? staff.revenue * staff.commission_value / 100 : staff.commission_type === 'fixed' ? staff.orders * staff.commission_value : 0) * 100) / 100,
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    const soldNames = new Set(Array.from(topProductsMap.keys()));
+    const least_sold = Array.from(topProductsMap.values()).sort((a, b) => a.quantity - b.quantity).slice(0, 5);
+    const highest_revenue_products = Array.from(topProductsMap.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    const stagnant_products = productRows.filter((product) => product.active && !soldNames.has(product.name)).map((product) => ({ name: product.name, category: product.category })).slice(0, 10);
+
     const payment_methods = paidOrders.reduce((acc, order) => {
       const method = order.payment_method || 'cash';
       if (!acc[method]) acc[method] = { count: 0, gross: 0, fees: 0, net: 0, total: 0 };
@@ -296,6 +334,8 @@ export async function GET(req: NextRequest) {
       low_stock_alerts,
       top_customers,
       hourly_sales,
+      staff_performance,
+      product_insights: { least_sold, highest_revenue_products, stagnant_products },
       payment_methods,
       receivables,
       receivables_by_date: receivablesByDate,

@@ -18,7 +18,9 @@ export interface Vendor {
   is_active: boolean
   subscription_status: 'trial' | 'active' | 'overdue' | 'blocked'
   max_umbrellas: number
-  plan_type?: 'trial' | 'monthly' | 'annual' | '12months'
+  plan_type?: 'trial' | 'quarterly' | 'semester' | 'annual' | 'monthly' | '12months'
+  plan_quarterly_price?: number | null
+  plan_semester_price?: number | null
   created_at?: string
   tenant_id?: string
 }
@@ -60,6 +62,9 @@ export interface Product {
   description?: string | null
   price: number
   promotional_price?: number | null
+  cost_price?: number | null
+  gross_margin_amount?: number | null
+  gross_margin_percent?: number | null
   image_url?: string | null
   is_default_image: boolean // Imagem padrão vs exclusiva (premium)
   image_plan_type?: 'free' | 'plus' // Qual plano permite esta imagem

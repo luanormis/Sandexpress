@@ -8,17 +8,22 @@ type DefaultMenuProduct = {
   price: number;
   imageKey: string;
   sort_order: number;
+  cost_price: number | null;
 };
 
 const DEFAULT_MENU: DefaultMenuProduct[] = [
-  { name: 'Heineken 350 ml', category: 'Alcoolicos', description: 'Cerveja gelada pronta para servir.', price: 12, imageKey: 'default-beer-can', sort_order: 10 },
-  { name: 'Cerveja long neck', category: 'Alcoolicos', description: 'Long neck gelada.', price: 14, imageKey: 'default-beer-long-neck', sort_order: 11 },
-  { name: 'Caipirinha', category: 'Alcoolicos', description: 'Drink classico com limao e gelo.', price: 24, imageKey: 'default-tropical-drink', sort_order: 20 },
-  { name: 'Refrigerante lata', category: 'Bebidas', description: 'Refrigerante gelado.', price: 8, imageKey: 'default-soda', sort_order: 30 },
-  { name: 'Suco natural', category: 'Nao Alcoolicos', description: 'Suco natural de frutas.', price: 12, imageKey: 'default-juice', sort_order: 40 },
-  { name: 'Batata frita', category: 'Petiscos', description: 'Porcao crocante para compartilhar.', price: 32, imageKey: 'default-fries', sort_order: 50 },
-  { name: 'Porcao de camarao', category: 'Petiscos', description: 'Porcao de camarao para praia.', price: 58, imageKey: 'default-shrimp', sort_order: 60 },
-  { name: 'Hamburguer artesanal', category: 'Comidas', description: 'Hamburguer completo.', price: 34, imageKey: 'default-burger', sort_order: 70 },
+  { name: 'Heineken 350 ml', category: 'Bebidas alcoolicas', description: 'Cerveja gelada pronta para servir.', price: 12, cost_price: 5.5, imageKey: 'default-beer-can', sort_order: 10 },
+  { name: 'Cerveja long neck', category: 'Bebidas alcoolicas', description: 'Long neck gelada.', price: 14, cost_price: 6.5, imageKey: 'default-beer-long-neck', sort_order: 11 },
+  { name: 'Caipirinha', category: 'Bebidas alcoolicas', description: 'Drink classico com limao e gelo.', price: 24, cost_price: 7, imageKey: 'default-tropical-drink', sort_order: 20 },
+  { name: 'Refrigerante lata', category: 'Bebidas', description: 'Refrigerante gelado.', price: 8, cost_price: 3.2, imageKey: 'default-soda', sort_order: 30 },
+  { name: 'Suco natural', category: 'Bebidas nao alcoolicas', description: 'Suco natural de frutas.', price: 12, cost_price: 3.5, imageKey: 'default-juice', sort_order: 40 },
+  { name: 'Agua mineral', category: 'Bebidas nao alcoolicas', description: 'Agua mineral gelada.', price: 6, cost_price: null, imageKey: 'default-soda', sort_order: 41 },
+  { name: 'Batata frita', category: 'Porcoes e petiscos', description: 'Porcao crocante para compartilhar.', price: 32, cost_price: 10, imageKey: 'default-fries', sort_order: 50 },
+  { name: 'Porcao de camarao', category: 'Porcoes e petiscos', description: 'Porcao de camarao para praia.', price: 58, cost_price: 24, imageKey: 'default-shrimp', sort_order: 60 },
+  { name: 'Isca de peixe', category: 'Porcoes e petiscos', description: 'Iscas de peixe empanadas.', price: 48, cost_price: null, imageKey: 'default-shrimp', sort_order: 61 },
+  { name: 'Mandioca frita', category: 'Porcoes e petiscos', description: 'Porcao de mandioca crocante.', price: 30, cost_price: null, imageKey: 'default-fries', sort_order: 62 },
+  { name: 'Hamburguer artesanal', category: 'Alimentos', description: 'Hamburguer completo.', price: 34, cost_price: 13, imageKey: 'default-burger', sort_order: 70 },
+  { name: 'Pastel de queijo', category: 'Alimentos', description: 'Pastel servido na hora.', price: 14, cost_price: null, imageKey: 'default-fries', sort_order: 71 },
 ];
 
 function imageUrlFor(key: string) {
@@ -38,6 +43,14 @@ function buildCompatibleDefaultMenuRows(tenantId: string, vendorId: string) {
   }));
 }
 
+function removeCostPriceField<T extends Record<string, unknown>>(rows: T[]) {
+  return rows.map((row) => {
+    const next = { ...row };
+    delete next.cost_price;
+    return next;
+  });
+}
+
 export function buildDefaultMenuRows(tenantId: string, vendorId: string) {
   return DEFAULT_MENU.map((item) => ({
     tenant_id: tenantId,
@@ -46,6 +59,7 @@ export function buildDefaultMenuRows(tenantId: string, vendorId: string) {
     category: item.category,
     description: item.description,
     price: item.price,
+    cost_price: item.cost_price,
     promotional_price: null,
     image_url: imageUrlFor(item.imageKey),
     is_default_image: true,
@@ -75,7 +89,7 @@ export async function seedDefaultMenuForVendor(tenantId: string, vendorId: strin
   if (error && ['42703', 'PGRST204'].includes(error.code || '')) {
     console.warn('Default menu seed retrying with compatible product fields because the database schema is older:', error.message);
     const retryRows = isMissingProductStockColumnError(error)
-      ? rows.map((row) => removeProductStockFields(row))
+      ? removeCostPriceField(rows.map((row) => removeProductStockFields(row)))
       : buildCompatibleDefaultMenuRows(tenantId, vendorId);
     const retry = await supabaseAdmin.from('products').insert(retryRows as any);
     error = retry.error;

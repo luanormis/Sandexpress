@@ -21,7 +21,22 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const { data: commissionEvents } = await supabaseAdmin
+      .from('analytics_events')
+      .select('metadata, created_at')
+      .eq('vendor_id', vendorId)
+      .eq('event_type', 'staff_commission_config')
+      .order('created_at', { ascending: false });
+    const commissionByUser = new Map<string, any>();
+    (commissionEvents || []).forEach((event: any) => {
+      const userId = String(event.metadata?.user_id || '');
+      if (userId && !commissionByUser.has(userId)) commissionByUser.set(userId, event.metadata);
+    });
+    return NextResponse.json((data || []).map((user: any) => ({
+      ...user,
+      commission_type: commissionByUser.get(user.id)?.commission_type || 'none',
+      commission_value: Number(commissionByUser.get(user.id)?.commission_value || 0),
+    })));
   } catch (err) {
     console.error('Vendor users GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -79,7 +94,19 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json(data, { status: 201 });
+    const commissionType = ['percent', 'fixed'].includes(body.commission_type) ? body.commission_type : 'none';
+    const commissionValue = Math.max(0, Number(body.commission_value || 0));
+    if (commissionType !== 'none') {
+      await supabaseAdmin.from('analytics_events').insert({
+        tenant_id: vendor.tenant_id,
+        vendor_id,
+        event_type: 'staff_commission_config',
+        metadata: { user_id: data.id, commission_type: commissionType, commission_value: commissionValue },
+        payload: { staff_name: data.name, role: data.role },
+      } as any);
+    }
+
+    return NextResponse.json({ ...data, commission_type: commissionType, commission_value: commissionValue }, { status: 201 });
   } catch (err) {
     console.error('Vendor users POST error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

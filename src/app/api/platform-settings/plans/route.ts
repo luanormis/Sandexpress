@@ -27,7 +27,8 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const settings = await savePlatformPlanSettings({
       trial_days: body.trial_days,
-      monthly_price: body.monthly_price,
+      quarterly_price: body.quarterly_price ?? body.monthly_price,
+      semester_price: body.semester_price,
       annual_monthly_price: body.annual_monthly_price,
       max_umbrellas: body.max_umbrellas,
     });

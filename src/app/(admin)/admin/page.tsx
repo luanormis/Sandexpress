@@ -28,6 +28,8 @@ interface Vendor {
   trial_ends_at: string | null;
   plan_expires_at: string | null;
   plan_monthly_price?: number | null;
+  plan_quarterly_price?: number | null;
+  plan_semester_price?: number | null;
   plan_annual_monthly_price?: number | null;
   is_active: boolean;
   max_umbrellas: number;
@@ -102,7 +104,9 @@ function isAnnualPlan(planType: string | null) {
 
 function getVendorPlanLabel(vendor: Vendor) {
   if (isAnnualPlan(vendor.plan_type)) return "Anual";
-  if (vendor.plan_type === "monthly") return "Mensal";
+  if (vendor.plan_type === "quarterly") return "Trimestral";
+  if (vendor.plan_type === "semester") return "Semestral";
+  if (vendor.plan_type === "monthly") return "Trimestral";
   if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") return "Teste";
   return vendor.plan_type || "Sem plano";
 }
@@ -111,7 +115,9 @@ function getVendorMonthlyAmount(vendor: Vendor) {
   if (vendor.plan_type === "trial" || vendor.subscription_status === "trial") return 0;
   return isAnnualPlan(vendor.plan_type)
     ? Number(vendor.plan_annual_monthly_price ?? PLAN_PRICES.annualMonthly)
-    : Number(vendor.plan_monthly_price ?? PLAN_PRICES.monthly);
+    : vendor.plan_type === "semester"
+      ? Number(vendor.plan_semester_price ?? PLAN_PRICES.semester)
+      : Number(vendor.plan_quarterly_price ?? vendor.plan_monthly_price ?? PLAN_PRICES.quarterly);
 }
 
 function getRemainingAnnualInstallments(vendor: Vendor) {
@@ -134,7 +140,7 @@ function getVendorBillingSummary(vendor: Vendor) {
     const suffix = remaining === 1 ? "parcela restante" : "parcelas restantes";
     return `${remaining ?? 12} ${suffix}`;
   }
-  return "Cobranca mensal";
+  return vendor.plan_type === "semester" ? "Cobranca semestral" : "Cobranca trimestral";
 }
 
 function convertImageToWebp(file: File, quality = 0.82): Promise<File> {
@@ -203,7 +209,8 @@ export default function AdminDashboard() {
   const [dangerLoading, setDangerLoading] = useState<"customers" | "kiosk" | null>(null);
   const [planSettings, setPlanSettings] = useState<PlatformPlanSettings>(DEFAULT_PLATFORM_PLAN_SETTINGS);
   const [planForm, setPlanForm] = useState({
-    monthly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.monthly_price),
+    quarterly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.quarterly_price),
+    semester_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.semester_price),
     annual_monthly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.annual_monthly_price),
     trial_days: String(DEFAULT_PLATFORM_PLAN_SETTINGS.trial_days),
     max_umbrellas: String(DEFAULT_PLATFORM_PLAN_SETTINGS.max_umbrellas),
@@ -352,7 +359,8 @@ export default function AdminDashboard() {
   const applyPlanSettings = (settings: PlatformPlanSettings) => {
     setPlanSettings(settings);
     setPlanForm({
-      monthly_price: String(settings.monthly_price),
+      quarterly_price: String(settings.quarterly_price),
+      semester_price: String(settings.semester_price),
       annual_monthly_price: String(settings.annual_monthly_price),
       trial_days: String(settings.trial_days),
       max_umbrellas: String(settings.max_umbrellas),
@@ -563,7 +571,8 @@ export default function AdminDashboard() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          monthly_price: planForm.monthly_price,
+          quarterly_price: planForm.quarterly_price,
+          semester_price: planForm.semester_price,
           annual_monthly_price: planForm.annual_monthly_price,
           trial_days: planForm.trial_days,
           max_umbrellas: planForm.max_umbrellas,
@@ -732,7 +741,9 @@ export default function AdminDashboard() {
           plan_type: "trial",
           trial_ends_at: new Date(Date.now() + planSettings.trial_days * 86400000).toISOString(),
           plan_expires_at: null,
-          plan_monthly_price: planSettings.monthly_price,
+          plan_monthly_price: planSettings.quarterly_price,
+          plan_quarterly_price: planSettings.quarterly_price,
+          plan_semester_price: planSettings.semester_price,
           plan_annual_monthly_price: planSettings.annual_monthly_price,
           is_active: true,
           max_umbrellas: planSettings.max_umbrellas,
@@ -1646,17 +1657,30 @@ export default function AdminDashboard() {
             </div>
 
             <form onSubmit={savePlanSettings} className="bg-gray-800 rounded-2xl border border-gray-700 p-6 space-y-5">
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-400 mb-1">Plano mensal</label>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Plano trimestral</label>
                   <div className="flex items-center rounded-xl border border-gray-600 bg-gray-700 px-3">
                     <span className="text-gray-400 font-bold">R$</span>
                     <input
-                      value={planForm.monthly_price}
-                      onChange={e => setPlanForm(p => ({ ...p, monthly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
+                      value={planForm.quarterly_price}
+                      onChange={e => setPlanForm(p => ({ ...p, quarterly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
                       inputMode="decimal"
                       className="w-full bg-transparent p-3 text-white outline-none"
                       placeholder="499,99"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Plano semestral</label>
+                  <div className="flex items-center rounded-xl border border-gray-600 bg-gray-700 px-3">
+                    <span className="text-gray-400 font-bold">R$</span>
+                    <input
+                      value={planForm.semester_price}
+                      onChange={e => setPlanForm(p => ({ ...p, semester_price: e.target.value.replace(/[^\d,.]/g, "") }))}
+                      inputMode="decimal"
+                      className="w-full bg-transparent p-3 text-white outline-none"
+                      placeholder="399,99"
                     />
                   </div>
                 </div>
@@ -1700,8 +1724,12 @@ export default function AdminDashboard() {
 
               <div className="grid sm:grid-cols-2 gap-4 rounded-xl border border-gray-700 bg-gray-900/70 p-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Mensal atual</p>
-                  <p className="text-2xl font-display font-bold text-green-400">{formatPlanPriceLabel(planSettings.monthly_price)}</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Trimestral atual</p>
+                  <p className="text-2xl font-display font-bold text-green-400">{formatPlanPriceLabel(planSettings.quarterly_price)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Semestral atual</p>
+                  <p className="text-2xl font-display font-bold text-amber-400">{formatPlanPriceLabel(planSettings.semester_price)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Anual atual por mes</p>

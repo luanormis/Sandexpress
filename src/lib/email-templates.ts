@@ -13,6 +13,20 @@ type VendorRegistrationConfirmationEmailInput = VendorEmailInput & {
   trialEndsAt?: string | null;
 };
 
+type NewVendorAlertEmailInput = VendorEmailInput & {
+  ownerPhone: string;
+  ownerEmail: string;
+  cpf?: string | null;
+  cnpj?: string | null;
+  beachName: string;
+  city: string;
+  state: string;
+  address?: string | null;
+  planType?: string | null;
+  trialEndsAt?: string | null;
+  registeredAt?: string | null;
+};
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -117,5 +131,49 @@ export function buildVendorRegistrationConfirmationEmail(input: VendorRegistrati
     subject: 'Cadastro recebido no SandExpress',
     html,
     text,
+  };
+}
+
+export function buildNewVendorAlertEmail(input: NewVendorAlertEmailInput) {
+  const rows = [
+    ['Quiosque', input.vendorName],
+    ['Responsavel', input.ownerName || 'Nao informado'],
+    ['Telefone', input.ownerPhone],
+    ['Email', input.ownerEmail],
+    ['CPF', input.cpf || 'Nao informado'],
+    ['CNPJ', input.cnpj || 'Nao informado'],
+    ['Praia', input.beachName],
+    ['Cidade/UF', `${input.city} / ${input.state}`],
+    ['Endereco', input.address || 'Nao informado'],
+    ['Login', input.login || 'Nao informado'],
+    ['Plano', input.planType || 'trial'],
+    ['Fim do teste', input.trialEndsAt ? new Date(input.trialEndsAt).toLocaleDateString('pt-BR') : 'Nao informado'],
+    ['Cadastrado em', input.registeredAt ? new Date(input.registeredAt).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR')],
+  ];
+  const htmlRows = rows.map(([label, value]) => `
+    <tr>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0d5c8;color:#82533f;font-weight:700;vertical-align:top">${escapeHtml(label)}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0d5c8;color:#261812;word-break:break-word">${escapeHtml(value)}</td>
+    </tr>
+  `).join('');
+
+  return {
+    subject: `Novo potencial cliente: ${input.vendorName}`,
+    html: shell(
+      'Voce tem um novo potencial cliente',
+      `
+        <p style="margin:0 0 16px">Um novo quiosque acabou de concluir o cadastro no SandExpress.</p>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #f0d5c8;border-radius:10px;overflow:hidden;font-size:14px">
+          <tbody>${htmlRows}</tbody>
+        </table>
+      `
+    ),
+    text: [
+      'Voce tem um novo potencial cliente',
+      '',
+      'Um novo quiosque acabou de concluir o cadastro no SandExpress.',
+      '',
+      ...rows.map(([label, value]) => `${label}: ${value}`),
+    ].join('\n'),
   };
 }

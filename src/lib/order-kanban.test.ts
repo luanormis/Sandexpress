@@ -49,4 +49,15 @@ describe('order kanban mapper', () => {
       order_items: [],
     })).toBe(false);
   });
+
+  it('shows an empty received account so the kiosk can add items manually', () => {
+    expect(shouldShowOrderInKanban({
+      id: 'account-2',
+      status: 'received',
+      paid: false,
+      total: 0,
+      customer_order_requests: [],
+      order_items: [],
+    })).toBe(true);
+  });
 });

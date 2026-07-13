@@ -15,10 +15,12 @@ export async function getPlatformPlanSettings(): Promise<PlatformPlanSettings> {
     throw error;
   }
 
-  const value = (data?.value || {}) as Partial<PlatformPlanSettings>;
+  const value = (data?.value || {}) as Partial<PlatformPlanSettings> & { monthly_price?: number };
+  const legacyQuarterly = value.quarterly_price ?? value.monthly_price;
   return {
     trial_days: Math.max(0, Math.floor(Number(value.trial_days ?? DEFAULT_PLATFORM_PLAN_SETTINGS.trial_days))),
-    monthly_price: toPlanMoney(value.monthly_price, DEFAULT_PLATFORM_PLAN_SETTINGS.monthly_price),
+    quarterly_price: toPlanMoney(legacyQuarterly, DEFAULT_PLATFORM_PLAN_SETTINGS.quarterly_price),
+    semester_price: toPlanMoney(value.semester_price, DEFAULT_PLATFORM_PLAN_SETTINGS.semester_price),
     annual_monthly_price: toPlanMoney(value.annual_monthly_price, DEFAULT_PLATFORM_PLAN_SETTINGS.annual_monthly_price),
     max_umbrellas: Math.max(1, Math.min(50, Math.floor(Number(value.max_umbrellas ?? DEFAULT_PLATFORM_PLAN_SETTINGS.max_umbrellas)))),
   };
@@ -28,7 +30,8 @@ export async function savePlatformPlanSettings(input: Partial<PlatformPlanSettin
   const current = await getPlatformPlanSettings();
   const next: PlatformPlanSettings = {
     trial_days: Math.max(0, Math.floor(Number(input.trial_days ?? current.trial_days))),
-    monthly_price: toPlanMoney(input.monthly_price, current.monthly_price),
+    quarterly_price: toPlanMoney(input.quarterly_price ?? (input as any).monthly_price, current.quarterly_price),
+    semester_price: toPlanMoney(input.semester_price, current.semester_price),
     annual_monthly_price: toPlanMoney(input.annual_monthly_price, current.annual_monthly_price),
     max_umbrellas: Math.max(1, Math.min(50, Math.floor(Number(input.max_umbrellas ?? current.max_umbrellas)))),
   };

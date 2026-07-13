@@ -13,7 +13,7 @@ describe('otp helpers', () => {
   });
 
   it('rejects invalid phone numbers', () => {
-    expect(() => normalizeBrazilPhoneE164('123')).toThrow('Telefone invalido');
+    expect(() => normalizeBrazilPhoneE164('123')).toThrow('Telefone inválido para envio de OTP.');
   });
 
   it('generates a six digit numeric code', () => {

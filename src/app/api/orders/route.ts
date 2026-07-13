@@ -154,12 +154,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (session.role === 'customer') {
-      await touchKioskSession({
+      void touchKioskSession({
         vendorId: vendor_id,
         customerId: customer_id,
         umbrellaId: umbrella_id,
         userAgent: req.headers.get('user-agent'),
-      });
+      }).catch((error) => console.warn('Kiosk session touch deferred:', error));
     }
 
     const { data: order, error: orderErr } = await supabaseAdmin.rpc('create_customer_order', {
@@ -173,6 +173,21 @@ export async function POST(req: NextRequest) {
     if (orderErr) {
       const message = orderErr.message || 'Erro ao criar pedido.';
       return NextResponse.json({ error: message }, { status: orderRpcStatus(message) });
+    }
+
+    const createdOrderId = order && typeof order === 'object' ? String((order as any).id || (order as any).order_id || '') : '';
+    if (session.user_id && createdOrderId) {
+      void supabaseAdmin.from('analytics_events').insert({
+        tenant_id: session.tenant_id || null,
+        vendor_id,
+        customer_id,
+        umbrella_id,
+        event_type: 'staff_order_attribution',
+        metadata: { user_id: session.user_id, order_id: createdOrderId },
+        payload: { item_count: normalizedItems.reduce((sum, item) => sum + item.quantity, 0) },
+      } as any).then((result: any) => {
+        if (result.error) console.warn('Staff order attribution failed:', result.error.message);
+      });
     }
 
     return NextResponse.json({

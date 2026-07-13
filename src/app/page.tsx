@@ -155,15 +155,15 @@ export default function LandingPage() {
             Sistema de pedidos para quiosques de praia
           </p>
           <h1 className="mb-6 font-display text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl md:text-7xl">
-            Mais agilidade.<br />
-            Mais vendas.<br />
-            <span className="text-[#ff7a18]">Mais praia.</span>
+            Mais controle.<br />
+            Mais lucro.<br />
+            <span className="text-[#ff7a18]">Mais eficiência.</span>
           </h1>
           <h2 className="sr-only">
-            Seu quiosque vendendo mais, sem esforço.
+            Tudo o que seu quiosque precisa para vender mais todos os dias.
           </h2>
           <p className="mb-8 max-w-xl font-sans text-lg leading-relaxed text-[#ffe7dc] sm:text-xl">
-            Organize pedidos, controle seus guarda-sóis e aumente seus lucros com um painel feito para funcionar bem mesmo em dia de sol forte.
+            Organize pedidos, acompanhe suas vendas em tempo real, evite perdas e agilize o atendimento. Tudo o que seu quiosque precisa para vender mais todos os dias.
           </p>
           <p className="sr-only">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
@@ -261,7 +261,7 @@ export default function LandingPage() {
            <h2 className="text-4xl font-display font-bold text-[#FFF8F6] mb-4">Escolha seu ponto de partida</h2>
            <p className="text-xl text-[#f4d6c8] mb-16">Comece com {planSettings.trial_days} dias grátis. Todos os planos incluem até {planSettings.max_umbrellas} guarda-sóis.</p>
            
-           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
+           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-6xl mx-auto text-left">
               {/* Trial */}
               <div className="landing-plan-card p-7 sm:p-8 rounded-[40px]">
                  <h3 className="text-2xl font-bold mb-2 text-[#fff8f6]">Trial</h3>
@@ -275,11 +275,11 @@ export default function LandingPage() {
                  <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar grátis</button>
               </div>
 
-              {/* Mensal */}
+              {/* Trimestral */}
               <div className="landing-plan-card landing-plan-card--featured p-7 sm:p-8 rounded-[40px]">
-                 <h3 className="text-2xl font-bold mb-2">Mensal</h3>
+                 <h3 className="text-2xl font-bold mb-2">Trimestral</h3>
                  <p className="mb-6 font-black">Ideal para testar a temporada</p>
-                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-white">{formatPlanPriceLabel(planSettings.monthly_price)}</span><span className="landing-price-unit text-[#201411]">/mês</span></div>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-white">{formatPlanPriceLabel(planSettings.quarterly_price)}</span><span className="landing-price-unit text-[#201411]">/Mês</span></div>
                  <ul className="space-y-3 mb-8">
                    <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
                    <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Pedidos ilimitados</li>
@@ -288,12 +288,25 @@ export default function LandingPage() {
                  <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#451704] text-white hover:bg-[#301107] transition-colors">Cadastrar grátis</button>
               </div>
 
+              {/* Semestral */}
+              <div className="landing-plan-card p-7 sm:p-8 rounded-[40px]">
+                 <h3 className="text-2xl font-bold mb-2 text-[#fff8f6]">Semestral</h3>
+                 <p className="text-[#f4d6c8] mb-6 font-semibold">Para garantir sua temporada</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#FF6B00]">{formatPlanPriceLabel(planSettings.semester_price)}</span><span className="landing-price-unit text-[#fff8f6]">/Mês</span></div>
+                 <ul className="space-y-3 mb-8">
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Relatórios completos</li>
+                 </ul>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar grátis</button>
+              </div>
+
               {/* Anual */}
               <div className="landing-plan-card landing-plan-card--dark p-7 sm:p-8 rounded-[40px] text-[#fff8f6] relative scale-105">
                  <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
                  <h3 className="text-2xl font-bold mb-2">Anual</h3>
                  <p className="text-[#ff9b50] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
-                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#fff8f6]">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="landing-price-unit text-[#fff8f6]">/mês</span></div>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#fff8f6]">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="landing-price-unit text-[#fff8f6]">/Mês</span></div>
                  <ul className="space-y-3 mb-8">
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Até {planSettings.max_umbrellas} guarda-sóis</li>
                    <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>

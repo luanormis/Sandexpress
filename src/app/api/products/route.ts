@@ -102,10 +102,16 @@ export async function GET(req: NextRequest) {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json((data || []).map((product: any) => ({
-      ...product,
-      image_url: normalizeRenderableProductImageUrl(product.image_url),
-    })));
+    return NextResponse.json((data || []).map((product: any) => {
+      const price = Number(product.price);
+      const cost = product.cost_price === null || product.cost_price === undefined ? null : Number(product.cost_price);
+      return {
+        ...product,
+        image_url: normalizeRenderableProductImageUrl(product.image_url),
+        gross_margin_amount: cost === null ? null : Number((price - cost).toFixed(2)),
+        gross_margin_percent: cost === null || price <= 0 ? null : Number((((price - cost) / price) * 100).toFixed(2)),
+      };
+    }));
   } catch (err) {
     console.error('Products GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -120,6 +126,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'vendor_id, name e price são obrigatórios.' }, { status: 400 });
     }
     const price = normalizeMoney(body.price);
+    const costPrice = body.cost_price === null || body.cost_price === undefined || body.cost_price === ''
+      ? null
+      : normalizeMoney(body.cost_price);
+    if (body.cost_price !== null && body.cost_price !== undefined && body.cost_price !== '' && costPrice === null) {
+      return NextResponse.json({ error: 'Custo de insumo inválido.' }, { status: 400 });
+    }
     let promotionalPrice: number | null = null;
     if (body.promotional_price !== null && body.promotional_price !== undefined && body.promotional_price !== '') {
       promotionalPrice = normalizeMoney(body.promotional_price);
@@ -154,6 +166,7 @@ export async function POST(req: NextRequest) {
       name: String(body.name || '').trim().slice(0, 160),
       description: body.description ? String(body.description).trim().slice(0, 500) : null,
       price,
+      cost_price: costPrice,
       promotional_price: promotionalPrice,
       category: String(body.category || 'Geral').trim().slice(0, 80),
       subcategory: normalizeText(body.subcategory, 80),
@@ -179,6 +192,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...data,
       image_url: normalizeRenderableProductImageUrl((data as any)?.image_url),
+      gross_margin_amount: data.cost_price === null ? null : Number((Number(data.price) - Number(data.cost_price)).toFixed(2)),
+      gross_margin_percent: data.cost_price === null || Number(data.price) <= 0
+        ? null
+        : Number((((Number(data.price) - Number(data.cost_price)) / Number(data.price)) * 100).toFixed(2)),
     }, { status: 201 });
   } catch (err) {
     return productErrorResponse(err);

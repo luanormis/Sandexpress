@@ -13,6 +13,8 @@ type VendorRow = {
   subscription_status: string | null;
   plan_type: string | null;
   plan_monthly_price: number | null;
+  plan_quarterly_price: number | null;
+  plan_semester_price: number | null;
   plan_annual_monthly_price: number | null;
   is_active: boolean | null;
 };
@@ -28,13 +30,16 @@ type SatisfactionVendorSummary = {
 function getVendorPlanAmount(vendor: {
   plan_type: string | null;
   plan_monthly_price: number | null;
+  plan_quarterly_price: number | null;
+  plan_semester_price: number | null;
   plan_annual_monthly_price: number | null;
 }) {
   if (vendor.plan_type === 'trial') return 0;
   if (vendor.plan_type === 'annual' || vendor.plan_type === '12months') {
     return Number(vendor.plan_annual_monthly_price ?? 299.99);
   }
-  return Number(vendor.plan_monthly_price ?? 499.99);
+  if (vendor.plan_type === 'semester') return Number(vendor.plan_semester_price ?? 399.99);
+  return Number(vendor.plan_quarterly_price ?? vendor.plan_monthly_price ?? 499.99);
 }
 
 function includesFilter(value: string | null | undefined, filter: string) {
@@ -106,7 +111,7 @@ export async function GET(req: NextRequest) {
 
     const { data: vendors, error: vendorsError } = await supabaseAdmin
       .from('vendors')
-      .select('id, name, address, beach_name, city, state, subscription_status, plan_type, plan_monthly_price, plan_annual_monthly_price, is_active');
+      .select('id, name, address, beach_name, city, state, subscription_status, plan_type, plan_monthly_price, plan_quarterly_price, plan_semester_price, plan_annual_monthly_price, is_active');
 
     if (vendorsError) throw vendorsError;
 

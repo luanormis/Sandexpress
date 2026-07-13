@@ -1,0 +1,152 @@
+{
+  "run_id": "codex-load-20260711222316-e27de2",
+  "generated_at": "2026-07-11T22:23:51.240Z",
+  "target": {
+    "registered_kiosks": 50,
+    "active_kiosks": 25,
+    "umbrellas_per_kiosk": 10,
+    "orders_per_umbrella": 10
+  },
+  "seeded": {
+    "tenants": 50,
+    "vendors": 50,
+    "umbrellas": 500,
+    "products": 400,
+    "customers": 250
+  },
+  "metrics": [
+    {
+      "name": "2.500 pedidos / concorrência 250",
+      "requests": 2500,
+      "success": 2500,
+      "failed": 0,
+      "duration_ms": 30506.09,
+      "throughput_rps": 81.95,
+      "latency_ms": {
+        "p50": 2388.16,
+        "p95": 7929.54,
+        "p99": 8756.82,
+        "max": 8966.89
+      },
+      "statuses": {
+        "201": 2500
+      }
+    }
+  ],
+  "integrity": {
+    "expected_order_requests": 2500,
+    "successful_order_requests": 2500,
+    "persisted_open_orders": 250,
+    "persisted_order_items": 1000,
+    "orders_with_total_100": 250,
+    "duplicate_open_accounts": 0,
+    "negative_totals": 0
+  },
+  "image_upload": {
+    "status": 200,
+    "body": {
+      "url": "https://yntsqyohnqtkpihwwgxq.supabase.co/storage/v1/object/public/product-images/77128b4e-020a-43ba-9608-11efff3ca53a/1783808629224.png"
+    }
+  },
+  "registration_email_menu": {
+    "status": 201,
+    "body": {
+      "id": "f6115cdd-5d52-460b-b668-cb78c0b61b24",
+      "tenant_id": "7c340514-620d-48cd-a4a3-7811c22c3524",
+      "beach_id": "3e47bad6-b130-47dd-80fa-8ccb7517a0c1",
+      "name": "codex-load-20260711222316-e27de2-cadastro-api",
+      "cnpj": "71783808630125",
+      "cpf": null,
+      "document_login": "codex-load-20260711222316-e27de2-api",
+      "address": "codex-load-20260711222316-e27de2",
+      "city": "Load Test",
+      "state": "SP",
+      "beach_name": "codex-load-20260711222316-e27de2",
+      "owner_name": "Codex Cadastro Teste",
+      "owner_phone": "11999999999",
+      "owner_email": "delivered@resend.dev",
+      "logo_url": "/sandexpress-logo-fluid.png",
+      "primary_color": "#ff6b00",
+      "secondary_color": "#82533f",
+      "button_color": "#ff6b00",
+      "button_text_color": "#ffffff",
+      "password_hash": "a7958144ed113f863dcdc116b643b438:27b1ddc354b0c7d728ef3387309368635ba54cf195b478f06908f6beb90c3859dace187e828aead9e360f1e3fca44c81254d7863ae812197eec7bae9af22c8c5",
+      "password_needs_reset": false,
+      "password_reset_token": null,
+      "password_reset_expires_at": null,
+      "owner_email_verified": true,
+      "owner_email_verified_at": null,
+      "owner_email_verification_token": null,
+      "owner_email_verification_expires_at": null,
+      "subscription_status": "trial",
+      "trial_ends_at": "2026-07-14T22:23:50.38+00:00",
+      "plan_type": "trial",
+      "plan_expires_at": null,
+      "max_umbrellas": 50,
+      "pix_enabled": false,
+      "pix_key": null,
+      "pix_account_name": null,
+      "debit_card_fee_rate": 0,
+      "credit_card_fee_rate": 0,
+      "pix_fee_rate": 0,
+      "is_active": true,
+      "created_at": "2026-07-11T22:23:50.707247+00:00",
+      "updated_at": "2026-07-11T22:23:50.707247+00:00",
+      "plan_monthly_price": 499.99,
+      "plan_annual_monthly_price": 299.99,
+      "email_confirmation": {
+        "sent": true,
+        "reason": null
+      },
+      "default_menu": {
+        "inserted": 8
+      },
+      "message": "Quiosque criado com senha definida pelo vendor."
+    }
+  },
+  "cleanup": {
+    "storage": {
+      "data": [
+        {
+          "name": "77128b4e-020a-43ba-9608-11efff3ca53a/1783808629224.png",
+          "bucket_id": "product-images",
+          "owner": "",
+          "owner_id": "",
+          "version": "a6e77425-302b-4989-845d-e135088658a2",
+          "id": "e8bb9c9f-c522-45bc-bf00-d5988ab32219",
+          "updated_at": "2026-07-11T22:23:49.928Z",
+          "created_at": "2026-07-11T22:23:49.928Z",
+          "last_accessed_at": "2026-07-11T22:23:49.928Z",
+          "metadata": {
+            "eTag": "\"e44e7ecfec99356632c13cd3eaa3e250\"",
+            "size": 68,
+            "mimetype": "image/png",
+            "cacheControl": "max-age=3600",
+            "lastModified": "2026-07-11T22:23:50.000Z",
+            "contentLength": 68,
+            "httpStatusCode": 200
+          },
+          "user_metadata": {}
+        }
+      ],
+      "error": null
+    },
+    "tenants": {
+      "success": true,
+      "error": null,
+      "data": null,
+      "count": null,
+      "status": 204,
+      "statusText": "No Content"
+    },
+    "remaining": {
+      "tenants": 0,
+      "vendors": 0,
+      "umbrellas": 0,
+      "customers": 0,
+      "products": 0,
+      "orders": 0,
+      "order_items": 0
+    }
+  }
+}

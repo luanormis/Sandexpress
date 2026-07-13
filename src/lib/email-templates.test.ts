@@ -1,4 +1,4 @@
-import { buildPasswordResetEmail, buildVendorRegistrationConfirmationEmail } from './email-templates';
+import { buildNewVendorAlertEmail, buildPasswordResetEmail, buildVendorRegistrationConfirmationEmail } from './email-templates';
 
 describe('email templates brand logo', () => {
   const previousPublicUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -34,5 +34,26 @@ describe('email templates brand logo', () => {
     });
 
     expect(email.html).toContain('https://app.sandexpress.com.br/sandexpress-logo-fluid.png');
+  });
+
+  it('builds the new vendor alert with registration data and without a password', () => {
+    const email = buildNewVendorAlertEmail({
+      vendorName: 'Quiosque do Sol',
+      ownerName: 'Maria Silva',
+      ownerPhone: '11999999999',
+      ownerEmail: 'maria@example.com',
+      cpf: '12345678901',
+      beachName: 'Praia Grande',
+      city: 'Santos',
+      state: 'SP',
+      login: '11999999999',
+      planType: 'trial',
+    });
+
+    expect(email.subject).toContain('Novo potencial cliente');
+    expect(email.html).toContain('Voce tem um novo potencial cliente');
+    expect(email.text).toContain('Quiosque: Quiosque do Sol');
+    expect(email.text).toContain('Email: maria@example.com');
+    expect(email.text.toLowerCase()).not.toContain('senha');
   });
 });

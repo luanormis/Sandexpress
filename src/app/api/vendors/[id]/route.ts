@@ -51,6 +51,8 @@ const SAFE_VENDOR_SELECT = [
   'plan_type',
   'plan_expires_at',
   'plan_monthly_price',
+  'plan_quarterly_price',
+  'plan_semester_price',
   'plan_annual_monthly_price',
   'trial_ends_at',
   'max_umbrellas',

@@ -58,6 +58,7 @@ interface OrderRequest {
 }
 interface Order {
   id: string;
+  customer_id: string;
   umbrella_id: string;
   umbrella: number;
   customer: string;
@@ -140,6 +141,12 @@ interface ReportData {
   low_stock_alerts?: { name: string; category: string; quantity: number; blocked: boolean }[];
   top_customers: { name: string; phone: string; visits: number; total_spent: number }[];
   hourly_sales: { hour: string; orders: number }[];
+  staff_performance?: Array<{ user_id: string; name: string; orders: number; revenue: number; commission_type: string; commission_value: number; commission_due: number }>;
+  product_insights?: {
+    least_sold: Array<{ name: string; quantity: number; revenue: number }>;
+    highest_revenue_products: Array<{ name: string; quantity: number; revenue: number }>;
+    stagnant_products: Array<{ name: string; category: string }>;
+  };
   payment_methods?: Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
   receivables?: Array<{
     id: string;
@@ -179,6 +186,8 @@ interface VendorUser {
   role: string;
   active: boolean;
   created_at: string;
+  commission_type?: "none" | "percent" | "fixed";
+  commission_value?: number;
 }
 
 interface KioskTheme {
@@ -212,6 +221,22 @@ interface KioskTheme {
   pix_active?: boolean;
   pix_api_enabled?: boolean;
   tenant_id?: string;
+}
+
+interface CashControl {
+  status: "open" | "closed";
+  opened_at: string;
+  opening_cash: number;
+  expected_cash?: number;
+  counted_cash?: number;
+  difference?: number;
+  difference_reason?: string;
+  notes?: string;
+}
+
+interface ManagementIntelligence {
+  forecast: { day: string; movement_percent: number; expected_orders: number; expected_revenue: number; sample_days: number; suggestion: string };
+  today: { revenue: number; orders: number; customers: number };
 }
 
 type PaymentFeeType = "percent" | "fixed";
@@ -471,6 +496,9 @@ export default function VendorDashboard() {
   const [umbrellas, setUmbrellas] = useState<Umbrella[]>([]);
   const [showAddUmbrella, setShowAddUmbrella] = useState(false);
   const [newUmbrellaNumber, setNewUmbrellaNumber] = useState("");
+  const [manualAccountUmbrella, setManualAccountUmbrella] = useState<Umbrella | null>(null);
+  const [manualOrderingOrder, setManualOrderingOrder] = useState<Order | null>(null);
+  const [showStockAdjustment, setShowStockAdjustment] = useState(false);
 
   // --- Reports State ---
   const [reportPeriod, setReportPeriod] = useState("month");
@@ -479,6 +507,12 @@ export default function VendorDashboard() {
   const [reportLoading, setReportLoading] = useState(false);
   const [closingDay, setClosingDay] = useState(false);
   const [closingMessage, setClosingMessage] = useState("");
+  const [cashControl, setCashControl] = useState<CashControl | null>(null);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [todayCashSales, setTodayCashSales] = useState(0);
+  const [managementIntelligence, setManagementIntelligence] = useState<ManagementIntelligence | null>(null);
+  const [assistantAnswer, setAssistantAnswer] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
 
   // --- Customers State ---
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -486,7 +520,7 @@ export default function VendorDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [team, setTeam] = useState<VendorUser[]>([]);
   const [teamForm, setTeamForm] = useState({
-    name: "", email: "", login: "", role: "seller", password: "", password_confirm: "",
+    name: "", email: "", login: "", role: "seller", password: "", password_confirm: "", commission_type: "none", commission_value: "",
   });
   const [teamMessage, setTeamMessage] = useState("");
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
@@ -579,10 +613,12 @@ export default function VendorDashboard() {
         knownOrderStatusesRef.current = nextStatusMap;
         setOrders(data);
         setNewOrderCount(data.filter((o: Order) => o.status === 'received').length);
+        return data as Order[];
       }
     } catch (err) {
       console.error('Failed to load orders:', err);
     }
+    return [] as Order[];
   };
 
   const loadProducts = async (vid: string) => {
@@ -730,7 +766,7 @@ export default function VendorDashboard() {
         return;
       }
       setTeam(prev => [data, ...prev]);
-      setTeamForm({ name: "", email: "", login: "", role: "seller", password: "", password_confirm: "" });
+      setTeamForm({ name: "", email: "", login: "", role: "seller", password: "", password_confirm: "", commission_type: "none", commission_value: "" });
       setTeamMessage("Usuário criado. Ele já pode entrar no painel pelo login e senha definidos.");
     } catch {
       setTeamMessage("Erro de rede ao criar usuário.");
@@ -745,6 +781,18 @@ export default function VendorDashboard() {
         .then(r => r.json())
         .then(d => { setReportData(d); setReportLoading(false); })
         .catch(() => setReportLoading(false));
+      const today = new Date().toISOString().split("T")[0];
+      fetch(`/api/daily-report?vendor_id=${vendorId}&date=${today}`)
+        .then(r => r.json())
+        .then(d => {
+          setCashControl(d.cash_control || null);
+          setTodayCashSales(Number(d.summary?.payment_methods?.cash?.total || 0));
+        })
+        .catch(() => undefined);
+      fetch(`/api/management-assistant?vendor_id=${vendorId}`)
+        .then(r => r.json())
+        .then(d => { if (!d.error) setManagementIntelligence(d); })
+        .catch(() => undefined);
     }
   }, [activeTab, reportPeriod, vendorId]);
 
@@ -775,35 +823,47 @@ export default function VendorDashboard() {
     }
   };
 
-  const closeBusinessDay = async () => {
+  const submitCashControl = async (values: { opening_cash?: number; counted_cash?: number; difference_reason?: string; notes?: string }) => {
     if (!vendorId) return;
     const today = new Date().toISOString().split("T")[0];
-    const confirmed = confirm("Fechar o dia agora? As vendas pagas de hoje serão consolidadas para relatórios.");
-    if (!confirmed) return;
-
     setClosingDay(true);
     setClosingMessage("");
     try {
       const res = await fetch("/api/daily-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendorId, date: today }),
+        body: JSON.stringify({ vendor_id: vendorId, date: today, action: cashControl?.status === "open" ? "close" : "open", ...values }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setClosingMessage(data.error || "Erro ao fechar o dia.");
-        return;
+        throw new Error(data.error || "Erro ao atualizar o caixa.");
       }
-      setClosingMessage(`${data.message} Pedidos: ${data.report?.summary?.total_orders || 0} - Total: ${formatCurrency(Number(data.report?.summary?.total_revenue || 0))}`);
+      setCashControl(data.cash_control || null);
+      setShowCashModal(false);
+      setClosingMessage(data.closed ? `${data.message} Diferença: ${formatCurrency(Number(data.cash_control?.difference || 0))}` : data.message);
       fetch(`/api/reports?vendor_id=${vendorId}&period=${reportPeriod}`)
         .then(r => r.json())
         .then(d => setReportData(d))
         .catch(() => undefined);
     } catch (err) {
-      console.error("Close business day error:", err);
-      setClosingMessage("Erro de rede ao fechar o dia.");
+      console.error("Cash control error:", err);
+      throw err;
     } finally {
       setClosingDay(false);
+    }
+  };
+
+  const askManagementAssistant = async (question: string) => {
+    if (!vendorId) return;
+    setAssistantLoading(true);
+    try {
+      const res = await fetch('/api/management-assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, question }) });
+      const data = await res.json();
+      setAssistantAnswer(res.ok ? data.answer : data.error || 'Não foi possível responder.');
+    } catch {
+      setAssistantAnswer('Sem conexão para consultar os dados agora.');
+    } finally {
+      setAssistantLoading(false);
     }
   };
 
@@ -1096,6 +1156,64 @@ export default function VendorDashboard() {
   };
 
   // Umbrella management
+  const registerStockAdjustment = async (values: { product_id: string; quantity: number; reason: string; location: string; note: string }) => {
+    if (!vendorId) throw new Error("Quiosque não identificado.");
+    const res = await fetch('/api/stock-adjustments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_id: vendorId, ...values }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Não foi possível registrar a baixa.');
+    await loadProducts(vendorId);
+    setShowStockAdjustment(false);
+  };
+
+  const openManualAccount = async (umbrella: Umbrella, name: string, phone: string) => {
+    if (!vendorId) throw new Error('Quiosque nao identificado.');
+    const res = await fetch('/api/vendor/manual-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_id: vendorId, umbrella_id: umbrella.id, name, phone }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Nao foi possivel abrir a comanda.');
+
+    const refreshedOrders = await loadOrders(vendorId);
+    await loadUmbrellas(vendorId);
+    const openedOrder = refreshedOrders.find(order => order.id === data.order_id);
+    setManualAccountUmbrella(null);
+    if (openedOrder) setSelectedOrder(openedOrder);
+  };
+
+  const launchManualItems = async (order: Order, cart: Record<string, number>, notes: string) => {
+    if (!vendorId) throw new Error('Quiosque nao identificado.');
+    const items = Object.entries(cart)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([product_id, quantity]) => ({ product_id, quantity }));
+    if (items.length === 0) throw new Error('Selecione pelo menos um item.');
+
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vendor_id: vendorId,
+        customer_id: order.customer_id,
+        umbrella_id: order.umbrella_id,
+        items,
+        notes: notes.trim() || 'Pedido lancado manualmente pelo quiosque',
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Nao foi possivel lancar os itens.');
+
+    const refreshedOrders = await loadOrders(vendorId);
+    await loadUmbrellas(vendorId);
+    setManualOrderingOrder(null);
+    const refreshed = refreshedOrders.find(item => item.id === order.id);
+    setSelectedOrder(refreshed || null);
+  };
+
   const addUmbrella = async () => {
     const num = parseInt(newUmbrellaNumber);
     if (!vendorId) {
@@ -1372,7 +1490,7 @@ export default function VendorDashboard() {
                 key={order.id}
                 onClick={() => setSelectedOrder(order)}
                 className={cn(
-                  "w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
+                  "vendor-order-card w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
                   options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
                   getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
                 )}
@@ -1473,7 +1591,9 @@ export default function VendorDashboard() {
             return (
               <button
                 key={umbrella.id}
-                onClick={() => order ? setSelectedOrder(order) : undefined}
+                onClick={() => order
+                  ? setSelectedOrder(order)
+                  : umbrella.active ? setManualAccountUmbrella(umbrella) : undefined}
                 className={cn(
                   "relative aspect-square min-h-12 rounded-xl border text-sm font-black transition-all",
                   "vendor-umbrella-tile",
@@ -1483,7 +1603,10 @@ export default function VendorDashboard() {
                   umbrella.active && closing && "border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
                   umbrella.active && serviceRequest && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
                 )}
-                title={serviceRequest ? `${serviceRequest.label} - guarda-sol ${umbrella.number}` : order ? `${order.customer} - ${formatCurrency(order.total)}` : umbrella.label}
+                title={serviceRequest
+                  ? `${serviceRequest.label} - guarda-sol ${umbrella.number}`
+                  : order ? `${order.customer} - ${formatCurrency(order.total)}`
+                    : umbrella.active ? `Abrir comanda manual no guarda-sol ${umbrella.number}` : 'Guarda-sol inativo'}
               >
                 <span className="flex h-full min-w-0 flex-col items-center justify-center px-1 leading-tight">
                   <span>{umbrella.number}</span>
@@ -1496,6 +1619,9 @@ export default function VendorDashboard() {
                     <span className="mt-0.5 max-w-full truncate text-[9px] font-black opacity-90">
                       {accountTotal}
                     </span>
+                  )}
+                  {!occupied && umbrella.active && (
+                    <span className="mt-0.5 text-[8px] font-black uppercase opacity-75">Abrir comanda</span>
                   )}
                 </span>
                 {serviceRequest && (
@@ -1616,7 +1742,13 @@ export default function VendorDashboard() {
 
           {/* ========== ABA 2: CARDÁPIO ========== */}
           {activeTab === "stock" && (
-            <OpeningDayStockControl
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <button onClick={() => setShowStockAdjustment(true)} className="rounded-xl bg-red-600 px-5 py-3 font-black text-white hover:bg-red-700">
+                  Registrar perda ou consumo
+                </button>
+              </div>
+              <OpeningDayStockControl
               vendorId={vendorId || undefined}
               products={products}
               onProductsLoaded={(loaded) => setProducts(loaded.map((product) => ({
@@ -1655,7 +1787,8 @@ export default function VendorDashboard() {
                 setShowProductModal(true);
               }}
               onDeleteProduct={deleteProduct}
-            />
+              />
+            </div>
           )}
 
 
@@ -2250,6 +2383,13 @@ export default function VendorDashboard() {
                         {closingMessage}
                       </p>
                     )}
+                    <p className="mt-2 text-sm font-black text-gray-500">
+                      {cashControl?.status === "open"
+                        ? `Caixa aberto · Fundo inicial ${formatCurrency(cashControl.opening_cash)}`
+                        : cashControl?.status === "closed"
+                          ? `Caixa fechado · Diferença ${formatCurrency(Number(cashControl.difference || 0))}`
+                          : "Caixa ainda não aberto hoje"}
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex-none">
@@ -2261,13 +2401,27 @@ export default function VendorDashboard() {
                     Exportar vendas
                   </button>
                   <button
-                    onClick={closeBusinessDay}
-                    disabled={closingDay}
+                    onClick={() => setShowCashModal(true)}
+                    disabled={closingDay || cashControl?.status === "closed"}
                     className="min-h-11 rounded-xl bg-[#2F4858] px-3 py-2 text-sm font-black text-white flex items-center justify-center gap-2 hover:bg-[#243845] disabled:opacity-50 sm:w-44"
                   >
                     <CalendarCheck size={18} />
-                    {closingDay ? "Fechando..." : "Fechar dia"}
+                    {closingDay ? "Processando..." : cashControl?.status === "open" ? "Fechar caixa" : cashControl?.status === "closed" ? "Caixa fechado" : "Abrir caixa"}
                   </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-orange-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-black uppercase text-[#FF6B00]">Previsão de movimento</p>
+                  <div className="mt-2 flex items-end justify-between gap-4"><div><h3 className="text-xl font-black text-gray-900 capitalize">{managementIntelligence?.forecast.day || "Amanhã"}</h3><p className="text-sm font-bold text-gray-500">{managementIntelligence?.forecast.expected_orders || 0} pedidos · {formatCurrency(Number(managementIntelligence?.forecast.expected_revenue || 0))}</p></div><p className="text-4xl font-black text-[#FF6B00]">{managementIntelligence?.forecast.movement_percent || 0}%</p></div>
+                  <p className="mt-4 rounded-xl bg-orange-50 p-3 text-sm font-black text-gray-700">{managementIntelligence?.forecast.suggestion || "A previsão aparecerá quando houver histórico suficiente."}</p>
+                  <p className="mt-2 text-xs font-bold text-gray-400">Baseado em {managementIntelligence?.forecast.sample_days || 0} dias equivalentes do histórico. Clima ainda não incluído.</p>
+                </div>
+                <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-black uppercase text-blue-600">Assistente gerencial</p><h3 className="mt-1 text-xl font-black text-gray-900">Pergunte em um toque</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">{["Quanto vendi hoje?", "Qual garçom vendeu mais?", "Qual produto está acabando?", "Qual é meu lucro da semana?", "O que devo comprar amanhã?"].map(question => <button key={question} disabled={assistantLoading} onClick={() => askManagementAssistant(question)} className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">{question}</button>)}</div>
+                  <p className="mt-4 min-h-16 rounded-xl bg-gray-50 p-3 text-sm font-black leading-6 text-gray-700">{assistantLoading ? "Consultando seus dados..." : assistantAnswer || "Escolha uma pergunta acima."}</p>
                 </div>
               </div>
 
@@ -2401,6 +2555,24 @@ export default function VendorDashboard() {
                             <p className="text-xs font-bold text-[#5a2d1d]">{item.quantity} itens vendidos</p>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                      <h4 className="mb-4 flex items-center gap-2 font-black text-gray-900"><Users size={18} className="text-[#FF6B00]" /> Faturamento e comissão por garçom</h4>
+                      <div className="space-y-3">
+                        {(reportData.staff_performance || []).length === 0 ? <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhuma venda lançada por usuário da equipe neste período.</p> : (reportData.staff_performance || []).map(staff => (
+                          <div key={staff.user_id} className="rounded-xl border border-gray-100 bg-gray-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-black text-gray-900">{staff.name}</p><p className="text-xs font-bold text-gray-500">{staff.orders} pedidos</p></div><p className="font-black text-[#FF6B00]">{formatCurrency(staff.revenue)}</p></div><div className="mt-2 flex justify-between border-t border-gray-200 pt-2 text-sm"><span className="font-bold text-gray-500">Comissão a pagar</span><span className="font-black text-green-700">{formatCurrency(staff.commission_due)}</span></div></div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                      <h4 className="mb-4 flex items-center gap-2 font-black text-gray-900"><TrendingUp size={18} className="text-[#FF6B00]" /> Produtos parados e menor saída</h4>
+                      <div className="space-y-2">
+                        {(reportData.product_insights?.stagnant_products || []).slice(0, 5).map(product => <div key={`${product.name}-${product.category}`} className="flex justify-between rounded-xl bg-red-50 p-3"><span className="font-black text-gray-900">{product.name}</span><span className="text-xs font-bold text-red-700">Sem vendas</span></div>)}
+                        {(reportData.product_insights?.least_sold || []).slice(0, 5).map(product => <div key={product.name} className="flex justify-between rounded-xl bg-gray-50 p-3"><span className="font-black text-gray-900">{product.name}</span><span className="text-sm font-black text-gray-600">{product.quantity} vendidos</span></div>)}
                       </div>
                     </div>
                   </div>
@@ -2719,10 +2891,22 @@ export default function VendorDashboard() {
                   onChange={e => setTeamForm(p => ({ ...p, role: e.target.value }))}
                   className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                 >
-                  <option value="seller">Vendedor</option>
+                  <option value="seller">Garçom / Vendedor</option>
                   <option value="manager">Gerente</option>
                   <option value="owner">Proprietario</option>
                 </select>
+                {teamForm.role === "seller" && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-black text-gray-700">Comissão
+                      <select value={teamForm.commission_type} onChange={e => setTeamForm(p => ({ ...p, commission_type: e.target.value }))} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]">
+                        <option value="none">Sem comissão</option><option value="percent">Percentual das vendas</option><option value="fixed">Valor fixo por pedido</option>
+                      </select>
+                    </label>
+                    <label className="text-sm font-black text-gray-700">{teamForm.commission_type === "fixed" ? "Valor por pedido" : "Percentual"}
+                      <input type="number" min="0" max={teamForm.commission_type === "percent" ? 100 : undefined} step="0.01" disabled={teamForm.commission_type === "none"} value={teamForm.commission_value} onChange={e => setTeamForm(p => ({ ...p, commission_value: e.target.value }))} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00] disabled:opacity-50" placeholder={teamForm.commission_type === "fixed" ? "R$ 0,00" : "0%"} />
+                    </label>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     type="password"
@@ -2757,6 +2941,9 @@ export default function VendorDashboard() {
                       <div>
                         <p className="font-bold text-gray-900">{user.name}</p>
                         <p className="text-sm text-gray-500">Login: {user.login} {user.email ? `- ${user.email}` : ""}</p>
+                        {user.commission_type && user.commission_type !== 'none' && (
+                          <p className="mt-1 text-xs font-black text-[#FF6B00]">Comissão: {user.commission_type === 'percent' ? `${user.commission_value}% das vendas` : `${formatCurrency(Number(user.commission_value || 0))} por pedido`}</p>
+                        )}
                       </div>
                       <span className="rounded-full bg-[#EFD5CA] px-3 py-1 text-xs font-black text-[#3D1A0A]">
                         {user.role === 'manager' ? 'Gerente' : user.role === 'owner' ? 'Proprietario' : 'Vendedor'}
@@ -2819,7 +3006,40 @@ export default function VendorDashboard() {
           onReleaseEmpty={releaseEmptyUmbrella}
           onWaiterDone={acknowledgeWaiterCall}
           onCancelItem={cancelOrderItem}
+          onAddItems={(order) => { setSelectedOrder(null); setManualOrderingOrder(order); }}
         />
+      )}
+
+      {manualAccountUmbrella && (
+        <ManualAccountModal
+          umbrella={manualAccountUmbrella}
+          onClose={() => setManualAccountUmbrella(null)}
+          onSubmit={openManualAccount}
+        />
+      )}
+
+      {manualOrderingOrder && (
+        <ManualOrderMenuModal
+          order={manualOrderingOrder}
+          products={products}
+          onClose={() => setManualOrderingOrder(null)}
+          onSubmit={launchManualItems}
+        />
+      )}
+
+      {showCashModal && (
+        <CashControlModal
+          mode={cashControl?.status === "open" ? "close" : "open"}
+          cashControl={cashControl}
+          cashSales={todayCashSales}
+          submitting={closingDay}
+          onClose={() => setShowCashModal(false)}
+          onSubmit={submitCashControl}
+        />
+      )}
+
+      {showStockAdjustment && (
+        <StockAdjustmentModal products={products} onClose={() => setShowStockAdjustment(false)} onSubmit={registerStockAdjustment} />
       )}
 
       {payingOrder && (
@@ -2845,6 +3065,111 @@ export default function VendorDashboard() {
 // =========================================================
 // ORDER MODAL COMPONENT
 // =========================================================
+function StockAdjustmentModal({ products, onClose, onSubmit }: {
+  products: Product[];
+  onClose: () => void;
+  onSubmit: (values: { product_id: string; quantity: number; reason: string; location: string; note: string }) => Promise<void>;
+}) {
+  const controlled = products.filter(product => product.stock_tracking_enabled);
+  const [productId, setProductId] = useState(controlled[0]?.id || "");
+  const [quantity, setQuantity] = useState("1");
+  const [reason, setReason] = useState("loss");
+  const [location, setLocation] = useState("beach");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const selected = controlled.find(product => product.id === productId);
+  const current = location === "physical" ? Number(selected?.physical_stock_quantity || 0) : Number(selected?.beach_stock_quantity ?? selected?.stock_quantity ?? 0);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSubmitting(true); setError("");
+    try { await onSubmit({ product_id: productId, quantity: Number(quantity), reason, location, note }); }
+    catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Erro ao registrar baixa."); }
+    finally { setSubmitting(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex justify-between gap-4"><div><p className="text-xs font-black uppercase text-red-600">Controle de estoque</p><h3 className="text-2xl font-black text-gray-900">Registrar saída sem venda</h3></div><button type="button" onClick={onClose}><X /></button></div>
+        <label className="mt-5 block text-sm font-black text-gray-700">Produto<select required value={productId} onChange={event => setProductId(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3"><option value="">Selecione</option>{controlled.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <label className="text-sm font-black text-gray-700">Local<select value={location} onChange={event => setLocation(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3"><option value="beach">Estoque em uso</option><option value="physical">Estoque físico</option></select></label>
+          <label className="text-sm font-black text-gray-700">Quantidade (atual: {current})<input required type="number" min="1" max={current || undefined} value={quantity} onChange={event => setQuantity(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3" /></label>
+        </div>
+        <label className="mt-4 block text-sm font-black text-gray-700">Motivo<select value={reason} onChange={event => setReason(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3"><option value="loss">Perda</option><option value="internal_consumption">Consumo interno</option><option value="theft">Furto identificado</option><option value="breakage">Quebra ou avaria</option><option value="expired">Produto vencido</option><option value="count_error">Erro de contagem</option><option value="other">Outro</option></select></label>
+        <label className="mt-4 block text-sm font-black text-gray-700">Justificativa<textarea required value={note} onChange={event => setNote(event.target.value)} maxLength={500} className="mt-2 min-h-24 w-full rounded-xl border-2 border-gray-200 p-3" placeholder="Explique o que aconteceu" /></label>
+        {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+        <button disabled={submitting || controlled.length === 0} className="mt-5 min-h-12 w-full rounded-xl bg-red-600 py-3 font-black text-white disabled:opacity-50">{submitting ? "Registrando..." : "Confirmar baixa"}</button>
+      </form>
+    </div>
+  );
+}
+
+function CashControlModal({ mode, cashControl, cashSales, submitting, onClose, onSubmit }: {
+  mode: "open" | "close";
+  cashControl: CashControl | null;
+  cashSales: number;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (values: { opening_cash?: number; counted_cash?: number; difference_reason?: string; notes?: string }) => Promise<void>;
+}) {
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
+  const numericAmount = Math.max(0, Number(amount.replace(",", ".")) || 0);
+  const expected = Number((Number(cashControl?.opening_cash || 0) + cashSales).toFixed(2));
+  const difference = Number((numericAmount - expected).toFixed(2));
+  const needsReason = mode === "close" && Math.abs(difference) >= 0.01;
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (needsReason && !reason) return setError("Escolha uma justificativa para a diferença.");
+    setError("");
+    try {
+      await onSubmit(mode === "open"
+        ? { opening_cash: numericAmount, notes }
+        : { counted_cash: numericAmount, difference_reason: reason, notes });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Não foi possível atualizar o caixa.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-black uppercase text-[#FF6B00]">Controle financeiro</p><h3 className="text-2xl font-black text-gray-900">{mode === "open" ? "Abrir caixa" : "Fechar caixa"}</h3></div>
+          <button type="button" onClick={onClose} className="text-gray-400"><X size={24} /></button>
+        </div>
+        {mode === "close" && (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-gray-50 p-3"><p className="text-xs font-bold text-gray-500">Fundo inicial</p><p className="font-black text-gray-900">{formatCurrency(Number(cashControl?.opening_cash || 0))}</p></div>
+            <div className="rounded-xl bg-gray-50 p-3"><p className="text-xs font-bold text-gray-500">Vendas em dinheiro</p><p className="font-black text-gray-900">{formatCurrency(cashSales)}</p></div>
+            <div className="col-span-2 rounded-xl bg-orange-50 p-3"><p className="text-xs font-bold text-gray-500">Dinheiro esperado</p><p className="text-xl font-black text-[#FF6B00]">{formatCurrency(expected)}</p></div>
+          </div>
+        )}
+        <label className="mt-5 block text-sm font-black text-gray-700">
+          {mode === "open" ? "Fundo inicial em dinheiro" : "Valor contado no caixa"}
+          <input autoFocus required inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-lg font-black outline-none focus:border-[#FF6B00]" placeholder="0,00" />
+        </label>
+        {mode === "close" && <p className={cn("mt-3 rounded-xl p-3 text-sm font-black", difference === 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>Diferença: {formatCurrency(difference)}</p>}
+        {needsReason && (
+          <label className="mt-4 block text-sm font-black text-gray-700">Justificativa obrigatória
+            <select required value={reason} onChange={event => setReason(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]">
+              <option value="">Selecione</option><option value="discount">Desconto concedido</option><option value="loss">Perda ou quebra</option><option value="typing_error">Erro de digitação</option><option value="change_error">Erro de troco</option><option value="unregistered_expense">Despesa não registrada</option><option value="cash_withdrawal">Sangria/retirada</option><option value="other">Outro motivo</option>
+            </select>
+          </label>
+        )}
+        <label className="mt-4 block text-sm font-black text-gray-700">Observação
+          <textarea value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} className="mt-2 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]" placeholder="Detalhes opcionais" />
+        </label>
+        {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+        <button disabled={submitting} className="mt-5 min-h-12 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white disabled:opacity-50">{submitting ? "Processando..." : mode === "open" ? "Confirmar abertura" : "Conferir e fechar"}</button>
+      </form>
+    </div>
+  );
+}
+
 function OrderModal({
   order,
   onClose,
@@ -2853,6 +3178,7 @@ function OrderModal({
   onReleaseEmpty,
   onWaiterDone,
   onCancelItem,
+  onAddItems,
 }: {
   order: Order;
   onClose: () => void;
@@ -2861,6 +3187,7 @@ function OrderModal({
   onReleaseEmpty: (order: Order) => Promise<void>;
   onWaiterDone: (order: Order) => Promise<void>;
   onCancelItem: (order: Order, item: OrderItem) => Promise<void>;
+  onAddItems: (order: Order) => void;
 }) {
   const serviceRequest = getServiceRequest(order);
   const emptyAccount = isOrderEmpty(order);
@@ -2970,7 +3297,12 @@ function OrderModal({
             </div>
           )}
         </div>
-        <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:p-6">
+        <div className="grid grid-cols-1 gap-3 border-t border-gray-100 p-4 sm:grid-cols-2 sm:p-6">
+          {!order.paid && order.status !== 'closing_requested' && (
+            <button onClick={() => onAddItems(order)} className="min-h-12 rounded-xl bg-blue-600 py-3 font-black text-white hover:bg-blue-700">
+              <span className="inline-flex items-center gap-2"><Utensils size={18} /> Lancar itens</span>
+            </button>
+          )}
           <button onClick={onClose} className="min-h-12 flex-1 rounded-xl border-2 border-gray-200 py-3 font-bold text-gray-600 hover:bg-gray-50">
             Fechar
           </button>
@@ -2988,6 +3320,124 @@ function OrderModal({
             </button>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ManualAccountModal({
+  umbrella,
+  onClose,
+  onSubmit,
+}: {
+  umbrella: Umbrella;
+  onClose: () => void;
+  onSubmit: (umbrella: Umbrella, name: string, phone: string) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSubmit(umbrella, name, phone);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel abrir a comanda.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {umbrella.number}</p>
+            <h3 className="text-xl font-black text-gray-900">Abrir comanda manual</h3>
+            <p className="mt-1 text-sm font-semibold text-gray-500">Cadastre o cliente sem precisar ler o QR Code.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400"><X size={24} /></button>
+        </div>
+        <label className="mt-6 block text-sm font-black text-gray-700">
+          Nome do cliente
+          <input autoFocus required minLength={2} value={name} onChange={event => setName(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 px-4 py-3 outline-none focus:border-[#FF6B00]" placeholder="Nome do cliente" />
+        </label>
+        <label className="mt-4 block text-sm font-black text-gray-700">
+          Telefone com DDD
+          <input required inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 px-4 py-3 outline-none focus:border-[#FF6B00]" placeholder="(11) 99999-9999" />
+        </label>
+        {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+        <button disabled={submitting} className="mt-6 min-h-12 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white disabled:opacity-50">
+          {submitting ? 'Abrindo...' : 'Abrir comanda'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ManualOrderMenuModal({
+  order,
+  products,
+  onClose,
+  onSubmit,
+}: {
+  order: Order;
+  products: Product[];
+  onClose: () => void;
+  onSubmit: (order: Order, cart: Record<string, number>, notes: string) => Promise<void>;
+}) {
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const availableProducts = products.filter(product => product.active && !product.blocked_by_stock && product.name.toLowerCase().includes(search.toLowerCase()));
+  const priceFor = (product: Product) => Number(product.promotional_price ?? product.price);
+  const totalItems = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
+  const total = products.reduce((sum, product) => sum + priceFor(product) * (cart[product.id] || 0), 0);
+
+  const changeQuantity = (productId: string, delta: number) => {
+    setCart(current => ({ ...current, [productId]: Math.max(0, Math.min(50, (current[productId] || 0) + delta)) }));
+  };
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSubmit(order, cart, notes);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel lancar os itens.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="flex max-h-[96vh] w-full max-w-2xl flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <div className="border-b border-gray-100 p-5">
+          <div className="flex items-start justify-between">
+            <div><p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p><h3 className="text-xl font-black text-gray-900">Lancar itens na comanda</h3><p className="text-sm font-bold text-gray-500">{order.customer} - {order.phone}</p></div>
+            <button onClick={onClose} className="text-gray-400"><X size={24} /></button>
+          </div>
+          <div className="relative mt-4"><Search className="absolute left-3 top-3.5 text-gray-400" size={18} /><input value={search} onChange={event => setSearch(event.target.value)} className="w-full rounded-xl border-2 border-gray-200 py-3 pl-10 pr-4 outline-none focus:border-[#FF6B00]" placeholder="Buscar no cardapio" /></div>
+        </div>
+        <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          {availableProducts.map(product => (
+            <div key={product.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3">
+              <div className="min-w-0"><p className="truncate font-black text-gray-900">{product.name}</p><p className="text-xs font-bold text-gray-400">{product.category}</p><p className="font-black text-[#FF6B00]">{formatCurrency(priceFor(product))}</p></div>
+              <div className="flex items-center gap-2"><button onClick={() => changeQuantity(product.id, -1)} className="h-10 w-10 rounded-xl bg-gray-100 text-xl font-black">-</button><span className="w-7 text-center font-black">{cart[product.id] || 0}</span><button onClick={() => changeQuantity(product.id, 1)} className="h-10 w-10 rounded-xl bg-[#FF6B00] text-xl font-black text-white">+</button></div>
+            </div>
+          ))}
+          {availableProducts.length === 0 && <p className="py-8 text-center font-bold text-gray-400">Nenhum item disponivel.</p>}
+          <textarea value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} className="mt-3 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]" placeholder="Observacao do pedido (opcional)" />
+          {error && <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t border-gray-100 p-4"><div><p className="text-xs font-bold text-gray-400">{totalItems} itens</p><p className="text-xl font-black text-[#FF6B00]">{formatCurrency(total)}</p></div><button disabled={submitting || totalItems === 0} onClick={handleSubmit} className="min-h-12 rounded-xl bg-blue-600 px-6 py-3 font-black text-white disabled:opacity-40">{submitting ? 'Lancando...' : 'Lancar pedido'}</button></div>
       </div>
     </div>
   );

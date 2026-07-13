@@ -41,6 +41,10 @@ type TenantFeatureRow = {
   enabled: boolean | null;
 };
 
+const FEATURE_CACHE_TTL_MS = 30_000;
+const vendorFeatureCache = new Map<string, { expiresAt: number; enabled: boolean }>();
+const vendorFeatureInFlight = new Map<string, Promise<boolean>>();
+
 export const FEATURE_LABELS: Record<FeatureKey, string> = {
   login: 'Login',
   multi_tenant: 'Multi Tenant',
@@ -121,9 +125,25 @@ export async function featureEnabled(tenantId: string, featureKey: FeatureKey): 
 }
 
 export async function vendorFeatureEnabled(vendorId: string, featureKey: FeatureKey): Promise<boolean> {
+  const cacheKey = `${vendorId}:${featureKey}`;
+  const cached = vendorFeatureCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.enabled;
+  const pending = vendorFeatureInFlight.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
   const tenantId = await getVendorTenantId(vendorId);
-  if (!tenantId) return false;
-  return featureEnabled(tenantId, featureKey);
+    if (!tenantId) return false;
+    return featureEnabled(tenantId, featureKey);
+  })();
+  vendorFeatureInFlight.set(cacheKey, request);
+  try {
+    const enabled = await request;
+    vendorFeatureCache.set(cacheKey, { enabled, expiresAt: Date.now() + FEATURE_CACHE_TTL_MS });
+    return enabled;
+  } finally {
+    vendorFeatureInFlight.delete(cacheKey);
+  }
 }
 
 export function featureDisabledResponse(featureKey: FeatureKey) {

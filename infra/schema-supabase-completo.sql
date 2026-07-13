@@ -133,6 +133,8 @@ CREATE TABLE vendors (
     CHECK (plan_type IN ('trial','monthly','annual')),
   plan_expires_at TIMESTAMPTZ,
   plan_monthly_price NUMERIC(10,2) NOT NULL DEFAULT 499.99 CHECK (plan_monthly_price >= 0),
+  plan_quarterly_price NUMERIC(10,2) NOT NULL DEFAULT 499.99 CHECK (plan_quarterly_price >= 0),
+  plan_semester_price NUMERIC(10,2) NOT NULL DEFAULT 399.99 CHECK (plan_semester_price >= 0),
   plan_annual_monthly_price NUMERIC(10,2) NOT NULL DEFAULT 299.99 CHECK (plan_annual_monthly_price >= 0),
   max_umbrellas INTEGER NOT NULL DEFAULT 50 CHECK (max_umbrellas BETWEEN 1 AND 50),
   pix_enabled BOOLEAN NOT NULL DEFAULT FALSE,
@@ -222,6 +224,8 @@ CREATE TABLE products (
   price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
   promotional_price NUMERIC(10,2)
     CHECK (promotional_price IS NULL OR (promotional_price >= 0 AND promotional_price <= price)),
+  cost_price NUMERIC(10,2)
+    CHECK (cost_price IS NULL OR cost_price >= 0),
   image_url TEXT,
   is_default_image BOOLEAN NOT NULL DEFAULT TRUE,
   image_plan_type TEXT NOT NULL DEFAULT 'free',

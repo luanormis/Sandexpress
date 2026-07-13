@@ -1,7 +1,7 @@
 {
   "name": "SandExpress",
   "short_name": "SandExpress",
-  "description": "Seu quiosque vendendo mais, sem esforço.",
+  "description": "Seu quiosque vendendo mais e perdendo menos.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFF8F6",

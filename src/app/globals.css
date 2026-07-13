@@ -1873,6 +1873,30 @@ input[type="number"] {
     0 0.45rem 0.9rem rgba(61, 26, 10, 0.08);
 }
 
+/* Order cards use a light surface, so every label inside them needs dark contrast. */
+.vendor-ops-shell .vendor-order-card {
+  background-color: #fff8f3 !important;
+  color: #2d1b14 !important;
+  border-color: #e9bda5 !important;
+}
+
+.vendor-ops-shell .vendor-order-card :where(.text-gray-900, .text-gray-800, .text-gray-700) {
+  color: #28140d !important;
+}
+
+.vendor-ops-shell .vendor-order-card :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-gray-300) {
+  color: #633522 !important;
+}
+
+.vendor-ops-shell .vendor-order-card :where(.text-\[\#FF6B00\]) {
+  color: #c84f00 !important;
+}
+
+.vendor-ops-shell .vendor-order-card :where(.bg-gray-50, .bg-gray-100, .bg-gray-200) {
+  background-color: #f3ded2 !important;
+  border-color: #d5a58c !important;
+}
+
 .vendor-sales-surface {
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.4), 0 1.5rem 3rem rgba(61, 26, 10, 0.12);
 }
@@ -1926,36 +1950,38 @@ input[type="number"] {
 
 .landing-price-row {
   display: flex;
-  align-items: flex-end;
-  gap: 0.18rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
   min-width: 0;
   max-width: 100%;
-  flex-wrap: nowrap;
-  line-height: 0.92;
+  line-height: 1;
 }
 
 .landing-price-value {
-  flex: 0 1 auto;
+  display: block;
+  width: 100%;
   min-width: 0;
-  max-width: none;
+  max-width: 100%;
   overflow: visible;
   white-space: nowrap;
-  font-size: clamp(2rem, 2.45vw, 2.25rem);
+  font-size: clamp(1.75rem, 2.35vw, 2.2rem);
   font-weight: 900;
-  letter-spacing: 0;
+  letter-spacing: -0.04em;
 }
 
 .landing-price-unit {
-  flex: 0 0 auto;
+  display: block;
   white-space: nowrap;
-  padding-bottom: 0.18rem;
-  font-size: clamp(0.76rem, 0.95vw, 0.95rem);
+  padding: 0;
+  font-size: clamp(0.82rem, 1vw, 1rem);
   font-weight: 900;
+  line-height: 1.15;
 }
 
 @media (max-width: 420px) {
   .landing-price-value {
-    font-size: clamp(2rem, 11vw, 2.55rem);
+    font-size: clamp(1.85rem, 9vw, 2.2rem);
   }
 }
 
@@ -2054,8 +2080,16 @@ input[type="number"] {
   color: #fff7ed !important;
 }
 
+.vendor-sales-surface :where(.text-\[\#2d1b14\], .text-\[\#201411\]) {
+  color: #ffffff !important;
+}
+
 .vendor-sales-surface :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500, .text-orange-100, .text-green-100) {
   color: #f6d7c5 !important;
+}
+
+.vendor-sales-surface :where(.text-\[\#5a2d1d\], .text-\[\#8a3e22\], .text-\[\#82533f\]) {
+  color: #ffe4d6 !important;
 }
 
 .vendor-sales-surface :where(.text-green-600, .text-green-700, .text-green-900, .text-blue-600, .text-blue-700, .text-blue-900, .text-purple-600, .text-purple-700, .text-purple-900) {
@@ -2066,7 +2100,7 @@ input[type="number"] {
   color: #ffb4a8 !important;
 }
 
-.vendor-sales-surface :where(.text-\[\#FF6B00\], .text-orange-500, .text-orange-600, .text-amber-500) {
+.vendor-sales-surface :where(.text-\[\#FF6B00\], .text-\[\#a44100\], .text-orange-500, .text-orange-600, .text-amber-500) {
   color: #ffb17a !important;
 }
 

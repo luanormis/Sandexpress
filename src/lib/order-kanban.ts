@@ -39,6 +39,7 @@ export function shouldShowOrderInKanban(order: KanbanOrderRecord) {
   if (order.paid) return false;
   if (getActiveOrderRequest(order.customer_order_requests)) return true;
   if (order.status === 'cancelled') return false;
+  if (order.status === 'received') return true;
   if (order.status === 'closing_requested') return true;
   return Number(order.total || 0) > 0 || hasBillableOrderItems(order.order_items);
 }

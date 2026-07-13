@@ -7,6 +7,40 @@ import { closeKioskSessions } from '@/lib/kiosk-session';
 
 type PaymentSummary = Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
 
+type CashControl = {
+  status: 'open' | 'closed';
+  opened_at: string;
+  opened_by: string;
+  opening_cash: number;
+  expected_cash?: number;
+  counted_cash?: number;
+  difference?: number;
+  difference_reason?: string;
+  notes?: string;
+  closed_at?: string;
+  closed_by?: string;
+};
+
+const CASH_CONTROL_PREFIX = 'cash_control:';
+
+function parseCashControl(value: unknown): CashControl | null {
+  const text = String(value || '');
+  if (!text.startsWith(CASH_CONTROL_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(CASH_CONTROL_PREFIX.length)) as CashControl;
+  } catch {
+    return null;
+  }
+}
+
+function serializeCashControl(value: CashControl) {
+  return `${CASH_CONTROL_PREFIX}${JSON.stringify(value)}`;
+}
+
+function money(value: unknown) {
+  return Number(Math.max(0, Number(value || 0)).toFixed(2));
+}
+
 function dayRange(dateStr: string) {
   return {
     startOfDay: new Date(`${dateStr}T00:00:00-03:00`).toISOString(),
@@ -192,7 +226,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Nao autorizado para este vendor.' }, { status: 403 });
     }
 
-    return NextResponse.json(await buildDailyReport(vendorId, dateStr));
+    const report = await buildDailyReport(vendorId, dateStr);
+    const { data: dailyClosing } = await supabaseAdmin
+      .from('daily_closings')
+      .select('closed_by, closed_at')
+      .eq('vendor_id', vendorId)
+      .eq('business_date', dateStr)
+      .maybeSingle();
+    return NextResponse.json({
+      ...report,
+      cash_control: parseCashControl(dailyClosing?.closed_by),
+    });
   } catch (err) {
     console.error('Daily report error:', err);
     return NextResponse.json({ error: 'Erro ao gerar relatorio' }, { status: 500 });
@@ -204,6 +248,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const vendorId = body.vendor_id;
     const dateStr = body.date || new Date().toISOString().split('T')[0];
+    const action = body.action === 'open' ? 'open' : 'close';
 
     if (!vendorId) {
       return NextResponse.json({ error: 'vendor_id obrigatorio' }, { status: 400 });
@@ -222,7 +267,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vendor sem tenant configurado.' }, { status: 400 });
     }
 
+
+    const { data: currentClosing, error: currentClosingError } = await supabaseAdmin
+      .from('daily_closings')
+      .select('id, closed_by')
+      .eq('vendor_id', vendorId)
+      .eq('business_date', dateStr)
+      .maybeSingle();
+    if (currentClosingError) throw currentClosingError;
+    const currentCashControl = parseCashControl(currentClosing?.closed_by);
+
+    if (action === 'open') {
+      if (currentCashControl?.status === 'open') {
+        return NextResponse.json({ error: 'O caixa de hoje ja esta aberto.', cash_control: currentCashControl }, { status: 409 });
+      }
+      if (currentCashControl?.status === 'closed') {
+        return NextResponse.json({ error: 'O caixa de hoje ja foi fechado.' }, { status: 409 });
+      }
+      const cashControl: CashControl = {
+        status: 'open',
+        opened_at: new Date().toISOString(),
+        opened_by: session?.role || 'vendor',
+        opening_cash: money(body.opening_cash),
+        notes: String(body.notes || '').trim().slice(0, 500),
+      };
+      const { data: opening, error: openingError } = await (supabaseAdmin.from('daily_closings') as any)
+        .upsert({
+          tenant_id: vendor.tenant_id,
+          vendor_id: vendorId,
+          business_date: dateStr,
+          closed_by: serializeCashControl(cashControl),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'vendor_id,business_date' })
+        .select()
+        .single();
+      if (openingError) throw openingError;
+      return NextResponse.json({ opened: true, opening, cash_control: cashControl, message: 'Caixa aberto com sucesso.' });
+    }
+
+    if (!currentCashControl || currentCashControl.status !== 'open') {
+      return NextResponse.json({ error: 'Abra o caixa antes de fechar o dia.' }, { status: 409 });
+    }
+
     const report = await buildDailyReport(vendorId, dateStr);
+    const cashSales = Number(report.summary.payment_methods.cash?.total || 0);
+    const expectedCash = money(currentCashControl.opening_cash + cashSales);
+    const countedCash = money(body.counted_cash);
+    const difference = Number((countedCash - expectedCash).toFixed(2));
+    const allowedReasons = ['discount', 'loss', 'typing_error', 'change_error', 'unregistered_expense', 'cash_withdrawal', 'other'];
+    const differenceReason = allowedReasons.includes(String(body.difference_reason)) ? String(body.difference_reason) : '';
+    if (Math.abs(difference) >= 0.01 && !differenceReason) {
+      return NextResponse.json({ error: 'Informe a justificativa para a diferenca de caixa.', expected_cash: expectedCash, difference }, { status: 400 });
+    }
+    const closedCashControl: CashControl = {
+      ...currentCashControl,
+      status: 'closed',
+      expected_cash: expectedCash,
+      counted_cash: countedCash,
+      difference,
+      difference_reason: differenceReason || 'no_difference',
+      notes: String(body.notes || currentCashControl.notes || '').trim().slice(0, 500),
+      closed_at: new Date().toISOString(),
+      closed_by: session?.role || 'vendor',
+    };
     const { data: closing, error: closingErr } = await (supabaseAdmin.from('daily_closings') as any)
       .upsert({
         tenant_id: vendor.tenant_id,
@@ -240,7 +347,7 @@ export async function POST(req: NextRequest) {
         top_products: report.top_products,
         hourly_breakdown: report.hourly_breakdown,
         orders_snapshot: report.orders,
-        closed_by: session?.role || 'vendor',
+        closed_by: serializeCashControl(closedCashControl),
         closed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'vendor_id,business_date' })
@@ -256,6 +363,7 @@ export async function POST(req: NextRequest) {
       closing,
       report,
       stock_return,
+      cash_control: closedCashControl,
       message: 'Fechamento do dia consolidado com sucesso.',
     });
   } catch (err) {
