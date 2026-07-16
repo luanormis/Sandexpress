@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getPublicAppUrl } from '@/lib/public-url';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
+import { ADMIN_UMBRELLA_LIMIT, PLAN_UMBRELLA_LIMIT } from '@/lib/plans';
 
 /**
  * GET /api/umbrellas?vendor_id=xxx
@@ -45,7 +46,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    if (!body.vendor_id || body.number === undefined) {
+    const umbrellaNumber = Number(body.number);
+    if (!body.vendor_id || !Number.isInteger(umbrellaNumber) || umbrellaNumber < 1 || umbrellaNumber > 9999) {
       return NextResponse.json({ error: 'vendor_id e number sao obrigatorios.' }, { status: 400 });
     }
     const session = getRequestSession(req);
@@ -70,16 +72,20 @@ export async function POST(req: NextRequest) {
       .eq('vendor_id', body.vendor_id);
 
     if (countError) throw countError;
-    if ((count || 0) >= Number(vendor.max_umbrellas || 50)) {
-      return NextResponse.json({ error: 'Limite de guarda-sois do plano atingido.' }, { status: 409 });
+    const configuredLimit = Number(vendor.max_umbrellas || 0);
+    const effectiveLimit = !Number.isFinite(configuredLimit) || configuredLimit <= 0 || configuredLimit === 50
+      ? PLAN_UMBRELLA_LIMIT
+      : Math.min(ADMIN_UMBRELLA_LIMIT, Math.floor(configuredLimit));
+    if ((count || 0) >= effectiveLimit) {
+      return NextResponse.json({ error: `Limite de ${effectiveLimit} guarda-sois do plano atingido.` }, { status: 409 });
     }
 
     const { data, error } = await (supabaseAdmin.from('umbrellas') as any)
       .insert({
         tenant_id: vendor.tenant_id,
         vendor_id: body.vendor_id,
-        number: body.number,
-        label: body.label || `Guarda-sol ${body.number}`,
+        number: umbrellaNumber,
+        label: body.label || `Guarda-sol ${umbrellaNumber}`,
         active: true,
         is_occupied: false,
         map_x: body.map_x ?? null,
@@ -107,6 +113,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     console.error('Umbrellas POST error:', err);
+    const error = err as { code?: string; message?: string };
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'Ja existe um guarda-sol com este numero.' }, { status: 409 });
+    }
+    if (String(error.message || '').includes('Limite de')) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }

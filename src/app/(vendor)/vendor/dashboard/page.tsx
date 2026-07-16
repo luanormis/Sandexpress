@@ -6,10 +6,12 @@ import {
   Search, Clock, Trash2, Pencil, X, Upload, ImageIcon,
   Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
   Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
+  Volume2, CircleCheck, DollarSign,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithoutConsumption } from "@/lib/vendor-order-state";
+import { DEFAULT_DEVICE_ALERT_PREFERENCES, readDeviceAlertPreferences, saveDeviceAlertPreferences, vibrateDevice, type DeviceAlertPreferences } from "@/lib/device-alert-preferences";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
 const SERVICE_REQUEST_MARKERS = [
@@ -87,6 +89,8 @@ function getServiceRequest(order?: Pick<Order, "notes"> | null) {
 function getVisibleOrderNotes(notes?: string) {
   return getVisibleVendorOrderNotes(notes, SERVICE_REQUEST_MARKERS.map((request) => request.marker));
 }
+interface UpsellRule { trigger_product_id: string; suggested_product_ids: string[]; message: string }
+interface FlexiblePromotion { id: string; titulo: string; descricao?: string | null; desconto_tipo: string; desconto_valor: number; ativa: boolean; promocao_itens?: Array<{ product_id: string; quantidade: number; products?: { name?: string } }> }
 
 interface ProductCategory {
   id: string;
@@ -96,12 +100,26 @@ interface ProductCategory {
   sort_order: number;
 }
 
+function productOptionGroups(product: Pick<Product, 'option_group_name' | 'option_values'>) {
+  const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
+  if (values.length === 0) return [] as Array<{ name: string; options: string[] }>;
+  if (!values.some(value => value.includes('::'))) return [{ name: product.option_group_name || 'Opcao', options: values }];
+  const groups = new Map<string, string[]>();
+  values.forEach(value => { const [rawName, ...parts] = value.split('::'); const name = rawName.trim() || 'Opcao'; const option = parts.join('::').trim(); if (option) groups.set(name, [...(groups.get(name) || []), option]); });
+  return Array.from(groups, ([name, options]) => ({ name, options: Array.from(new Set(options)) }));
+}
+
 function isOrderEmpty(order: Pick<Order, "total" | "items" | "account_items">) {
   return isAccountWithoutConsumption(order);
 }
 
 function getFirstCustomerName(name?: string | null) {
   return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
+function formatServiceTime(seconds: number) {
+  const safe = Math.max(0, Math.round(Number(seconds || 0)));
+  return safe >= 60 ? `${Math.floor(safe / 60)}min ${safe % 60}s` : `${safe}s`;
 }
 
 interface Umbrella {
@@ -125,6 +143,7 @@ interface ReportData {
     total_gross_revenue?: number;
     total_payment_fees?: number;
     total_net_revenue?: number;
+    total_service_fees?: number;
     total_orders: number;
     avg_ticket: number;
     unique_customers: number;
@@ -137,14 +156,17 @@ interface ReportData {
     new_customers_today: number;
   };
   top_products: { name: string; quantity: number; revenue: number }[];
-  category_performance?: { category: string; quantity: number; revenue: number }[];
+  category_performance?: { category: string; quantity: number; revenue: number; cost?: number; profit?: number; cost_configured?: boolean; margin_percent?: number }[];
   low_stock_alerts?: { name: string; category: string; quantity: number; blocked: boolean }[];
   top_customers: { name: string; phone: string; visits: number; total_spent: number }[];
-  hourly_sales: { hour: string; orders: number }[];
+  hourly_sales: { hour: string; orders: number; revenue: number; avg_ticket: number }[];
   staff_performance?: Array<{ user_id: string; name: string; orders: number; revenue: number; commission_type: string; commission_value: number; commission_due: number }>;
+  waiter_service?: { total_calls: number; avg_response_seconds: number; avg_service_seconds: number; by_waiter: Array<{ user_id: string; name: string; calls: number; avg_response_seconds: number; avg_service_seconds: number }> };
+  operational_times?: { completed_requests: number; avg_preparation_seconds: number; avg_service_seconds: number; delayed_requests: number; fastest_preparation_seconds: number; slowest_preparation_seconds: number };
   product_insights?: {
-    least_sold: Array<{ name: string; quantity: number; revenue: number }>;
-    highest_revenue_products: Array<{ name: string; quantity: number; revenue: number }>;
+    least_sold: Array<{ name: string; quantity: number; revenue: number; profit?: number; margin_percent?: number; cost_configured?: boolean }>;
+    highest_revenue_products: Array<{ name: string; quantity: number; revenue: number; profit?: number; margin_percent?: number; cost_configured?: boolean }>;
+    highest_profit_products: Array<{ name: string; quantity: number; revenue: number; profit: number; margin_percent: number; cost_configured: boolean }>;
     stagnant_products: Array<{ name: string; category: string }>;
   };
   payment_methods?: Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
@@ -234,9 +256,28 @@ interface CashControl {
   notes?: string;
 }
 
+interface StockAdjustmentHistory {
+  items: Array<{
+    id: string;
+    created_at: string;
+    product_name: string;
+    reason: string;
+    location: string;
+    quantity: number;
+    previous_quantity: number;
+    next_quantity: number;
+    note: string;
+    user_name: string;
+    estimated_cost: number;
+  }>;
+  summary: Record<string, { quantity: number; estimated_cost: number }>;
+  total_quantity: number;
+  total_estimated_cost: number;
+}
+
 interface ManagementIntelligence {
-  forecast: { day: string; movement_percent: number; expected_orders: number; expected_revenue: number; sample_days: number; suggestion: string };
-  today: { revenue: number; orders: number; customers: number };
+  forecast: { day: string; movement_percent: number; expected_orders: number; expected_revenue: number; sample_days: number; suggestion: string; historical_percent?: number; weather_adjustment?: number; weather?: { available: boolean; location?: string; condition?: string; temperature_max?: number; temperature_min?: number; precipitation_probability?: number; precipitation_sum?: number; wind_speed_max?: number; error?: string } };
+  today: { revenue: number; orders: number; customers: number; avg_ticket: number; items_sold: number; estimated_profit: number };
 }
 
 type PaymentFeeType = "percent" | "fixed";
@@ -290,6 +331,16 @@ const PAYMENT_METHOD_OPTIONS = [
   { id: "debit_card", label: "Debito", Icon: CreditCard },
   { id: "credit_card", label: "Credito", Icon: CreditCard },
 ] as const;
+
+const STOCK_REASON_LABELS: Record<string, string> = {
+  loss: "Perda",
+  internal_consumption: "Consumo interno",
+  theft: "Furto",
+  breakage: "Quebra",
+  expired: "Produto vencido",
+  count_error: "Erro de contagem",
+  other: "Outro",
+};
 
 const PAYMENT_SETTINGS = [
   {
@@ -425,6 +476,7 @@ type DailySalesReport = {
     total_gross_revenue?: number;
     total_payment_fees?: number;
     total_net_revenue?: number;
+    total_service_fees?: number;
     payment_methods?: Record<string, DailySalesPayment>;
   };
   orders?: DailySalesOrder[];
@@ -499,6 +551,13 @@ export default function VendorDashboard() {
   const [manualAccountUmbrella, setManualAccountUmbrella] = useState<Umbrella | null>(null);
   const [manualOrderingOrder, setManualOrderingOrder] = useState<Order | null>(null);
   const [showStockAdjustment, setShowStockAdjustment] = useState(false);
+  const [stockAdjustmentHistory, setStockAdjustmentHistory] = useState<StockAdjustmentHistory | null>(null);
+  const [stockHistoryLoading, setStockHistoryLoading] = useState(false);
+  const [stockHistoryError, setStockHistoryError] = useState("");
+  const [showUpsellSettings, setShowUpsellSettings] = useState(false);
+  const [showPromotionSettings, setShowPromotionSettings] = useState(false);
+  const [upsellRules, setUpsellRules] = useState<UpsellRule[]>([]);
+  const [flexiblePromotions, setFlexiblePromotions] = useState<FlexiblePromotion[]>([]);
 
   // --- Reports State ---
   const [reportPeriod, setReportPeriod] = useState("month");
@@ -510,9 +569,19 @@ export default function VendorDashboard() {
   const [cashControl, setCashControl] = useState<CashControl | null>(null);
   const [showCashModal, setShowCashModal] = useState(false);
   const [todayCashSales, setTodayCashSales] = useState(0);
+  const [cashControlLoading, setCashControlLoading] = useState(true);
   const [managementIntelligence, setManagementIntelligence] = useState<ManagementIntelligence | null>(null);
   const [assistantAnswer, setAssistantAnswer] = useState("");
   const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [dailySalesGoal, setDailySalesGoal] = useState(0);
+  const [dailySalesGoalDraft, setDailySalesGoalDraft] = useState("");
+  const [editingDailyGoal, setEditingDailyGoal] = useState(false);
+  const [savingDailyGoal, setSavingDailyGoal] = useState(false);
+  const [dailyGoalMessage, setDailyGoalMessage] = useState("");
+  const [soundAlertsReady, setSoundAlertsReady] = useState(false);
+  const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [alertPreferences, setAlertPreferences] = useState<DeviceAlertPreferences>(DEFAULT_DEVICE_ALERT_PREFERENCES);
 
   // --- Customers State ---
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -523,11 +592,19 @@ export default function VendorDashboard() {
     name: "", email: "", login: "", role: "seller", password: "", password_confirm: "", commission_type: "none", commission_value: "",
   });
   const [teamMessage, setTeamMessage] = useState("");
+  const [commissionUser, setCommissionUser] = useState<VendorUser | null>(null);
+  const [commissionForm, setCommissionForm] = useState({ type: "none", value: "" });
+  const [commissionSaving, setCommissionSaving] = useState(false);
+  const [commissionMessage, setCommissionMessage] = useState("");
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState("");
   const knownOrderStatusesRef = useRef<Map<string, string>>(new Map());
+  const ordersRevisionRef = useRef("");
   const audioContextRef = useRef<AudioContext | null>(null);
+  const cashRegisterAudioRef = useRef<HTMLAudioElement | null>(null);
+  const orderBellAudioRef = useRef<HTMLAudioElement | null>(null);
+  const alertPreferencesRef = useRef<DeviceAlertPreferences>(DEFAULT_DEVICE_ALERT_PREFERENCES);
 
   const getAudioContext = () => {
     if (typeof window === "undefined") return null;
@@ -560,19 +637,35 @@ export default function VendorDashboard() {
   };
 
   const playNewOrderSound = () => {
-    playToneSequence([
-      { frequency: 880, start: 0, duration: 0.12 },
-      { frequency: 1175, start: 0.14, duration: 0.18 },
-    ]);
+    vibrateDevice(alertPreferencesRef.current);
+    if (typeof window === "undefined" || alertPreferencesRef.current.volume <= 0) return;
+    const sound = orderBellAudioRef.current || new Audio('/sounds/order-bell.mp3');
+    orderBellAudioRef.current = sound;
+    sound.currentTime = 0;
+    sound.volume = alertPreferencesRef.current.volume;
+    sound.play().catch(() => {
+      playToneSequence([
+        { frequency: 880, start: 0, duration: 0.12 },
+        { frequency: 1175, start: 0.14, duration: 0.18 },
+      ]);
+    });
   };
 
   const playCashRegisterSound = () => {
-    playToneSequence([
-      { frequency: 1046, start: 0, duration: 0.08, type: "triangle" },
-      { frequency: 1318, start: 0.08, duration: 0.08, type: "triangle" },
-      { frequency: 1568, start: 0.17, duration: 0.18, type: "square" },
-      { frequency: 784, start: 0.38, duration: 0.14, type: "triangle" },
-    ]);
+    vibrateDevice(alertPreferencesRef.current);
+    if (typeof window === "undefined" || alertPreferencesRef.current.volume <= 0) return;
+    const sound = cashRegisterAudioRef.current || new Audio('/sounds/cash-register-kaching.mp3');
+    cashRegisterAudioRef.current = sound;
+    sound.currentTime = 0;
+    sound.volume = alertPreferencesRef.current.volume;
+    sound.play().catch(() => {
+      playToneSequence([
+        { frequency: 1046, start: 0, duration: 0.08, type: "triangle" },
+        { frequency: 1318, start: 0.08, duration: 0.08, type: "triangle" },
+        { frequency: 1568, start: 0.17, duration: 0.18, type: "square" },
+        { frequency: 784, start: 0.38, duration: 0.14, type: "triangle" },
+      ]);
+    });
   };
 
   const playWaiterCallSound = () => {
@@ -583,21 +676,52 @@ export default function VendorDashboard() {
     ]);
   };
 
+  const activateSoundAlerts = async () => {
+    const audioContext = getAudioContext();
+    await audioContext?.resume().catch(() => undefined);
+    const sounds = [cashRegisterAudioRef.current, orderBellAudioRef.current].filter(Boolean) as HTMLAudioElement[];
+    if (sounds.length === 0) return;
+    try {
+      for (const sound of sounds) {
+        sound.muted = true;
+        sound.currentTime = 0;
+        await sound.play();
+        sound.pause();
+        sound.currentTime = 0;
+        sound.muted = false;
+      }
+      setSoundAlertsReady(true);
+    } catch {
+      sounds.forEach(sound => { sound.muted = false; });
+      setSoundAlertsReady(false);
+    }
+  };
+
+  const updateAlertPreferences = (next: DeviceAlertPreferences) => {
+    alertPreferencesRef.current = next;
+    setAlertPreferences(next);
+    saveDeviceAlertPreferences(next);
+    if (orderBellAudioRef.current) orderBellAudioRef.current.volume = next.volume;
+  };
+
   // Data loading functions
   const loadOrders = async (vid: string) => {
     try {
       const res = await fetch(`/api/orders?vendor_id=${vid}`);
       if (res.ok) {
+        ordersRevisionRef.current = res.headers.get('X-Orders-Revision') || ordersRevisionRef.current;
         const data = await res.json();
         const nextStatusMap = new Map<string, string>();
         let hasNewOrder = false;
         let hasNewClosingRequest = false;
         let hasNewWaiterCall = false;
         data.forEach((order: Order) => {
-          const currentSignature = `${order.status}:${getServiceRequest(order)?.marker || "normal"}:${order.notes || ""}`;
+          const requestId = order.active_request?.id || order.active_request_id || "";
+          const currentSignature = `${order.status}:${requestId}:${getServiceRequest(order)?.marker || "normal"}:${order.notes || ""}`;
           const previousStatus = knownOrderStatusesRef.current.get(order.id);
           nextStatusMap.set(order.id, currentSignature);
           if (!previousStatus && order.status === "received") hasNewOrder = true;
+          if (previousStatus && order.status === "received" && (requestId ? !previousStatus.includes(`:${requestId}:`) : !previousStatus.startsWith("received:"))) hasNewOrder = true;
           if (!previousStatus && order.status === "closing_requested") hasNewClosingRequest = true;
           if (!previousStatus && getServiceRequest(order)) hasNewWaiterCall = true;
           if (previousStatus && !previousStatus.startsWith("closing_requested") && order.status === "closing_requested") {
@@ -621,6 +745,18 @@ export default function VendorDashboard() {
     return [] as Order[];
   };
 
+  const loadOrdersWhenChanged = async (vid: string) => {
+    try {
+      const response = await fetch(`/api/orders?vendor_id=${vid}&mode=revision`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json();
+      const revision = String(data.revision || '');
+      if (!ordersRevisionRef.current || revision !== ordersRevisionRef.current) await loadOrders(vid);
+    } catch (error) {
+      console.error('Failed to check order updates:', error);
+    }
+  };
+
   const loadProducts = async (vid: string) => {
     try {
       const res = await fetch(`/api/products?vendor_id=${vid}`);
@@ -631,6 +767,24 @@ export default function VendorDashboard() {
     } catch (err) {
       console.error('Failed to load products:', err);
     }
+  };
+
+  const loadUpsellSettings = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/upsell-settings?vendor_id=${vid}`);
+      const data = await res.json();
+      setUpsellRules(data.rules || []);
+    } catch {
+      setUpsellRules([]);
+    }
+  };
+
+  const loadFlexiblePromotions = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/promotions?vendor_id=${vid}`);
+      const data = await res.json().catch(() => ({}));
+      setFlexiblePromotions(data.promotions || []);
+    } catch { setFlexiblePromotions([]); }
   };
 
   const loadUmbrellas = async (vid: string) => {
@@ -681,6 +835,45 @@ export default function VendorDashboard() {
     }
   };
 
+  const loadManagementIntelligence = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/management-assistant?vendor_id=${vid}`);
+      const data = await res.json();
+      if (res.ok && !data.error) setManagementIntelligence(data);
+    } catch (err) {
+      console.error('Failed to load management summary:', err);
+    }
+  };
+
+  const loadDailySalesGoal = async (vid: string) => {
+    try {
+      const res = await fetch(`/api/sales-goal?vendor_id=${vid}`);
+      const data = await res.json();
+      if (res.ok) {
+        const goal = Number(data.daily_goal || 0);
+        setDailySalesGoal(goal);
+        setDailySalesGoalDraft(goal > 0 ? String(goal) : "");
+      }
+    } catch (err) {
+      console.error('Failed to load daily sales goal:', err);
+    }
+  };
+
+  const loadTodayCashControl = async (vid: string) => {
+    setCashControlLoading(true);
+    try {
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+      const response = await fetch(`/api/daily-report?vendor_id=${vid}&date=${today}`);
+      const data = await response.json();
+      if (response.ok) {
+        setCashControl(data.cash_control || null);
+        setTodayCashSales(Number(data.summary?.payment_methods?.cash?.total || 0));
+      }
+    } catch (error) {
+      console.error('Failed to load cash control:', error);
+    } finally { setCashControlLoading(false); }
+  };
+
   // Load vendor ID and initial data
   useEffect(() => {
     const vid = sessionStorage.getItem("vendor_id");
@@ -689,13 +882,46 @@ export default function VendorDashboard() {
       // Load initial data
       loadOrders(vid);
       loadProducts(vid);
+      loadUpsellSettings(vid);
+      loadFlexiblePromotions(vid);
       loadProductCategories(vid);
       loadUmbrellas(vid);
       loadCustomers(vid);
       loadTeam(vid);
       loadTheme(vid);
+      loadManagementIntelligence(vid);
+      loadDailySalesGoal(vid);
+      loadTodayCashControl(vid);
     }
   }, []);
+
+  const saveDailySalesGoal = async () => {
+    if (!vendorId) return;
+    const goal = Number(String(dailySalesGoalDraft).replace(',', '.'));
+    if (!Number.isFinite(goal) || goal < 0) {
+      setDailyGoalMessage("Informe um valor valido.");
+      return;
+    }
+    setSavingDailyGoal(true);
+    setDailyGoalMessage("");
+    try {
+      const res = await fetch('/api/sales-goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, daily_goal: goal }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Nao foi possivel salvar a meta.');
+      setDailySalesGoal(Number(data.daily_goal || 0));
+      setDailySalesGoalDraft(data.daily_goal > 0 ? String(data.daily_goal) : "");
+      setEditingDailyGoal(false);
+      setDailyGoalMessage("Meta atualizada.");
+    } catch (error) {
+      setDailyGoalMessage(error instanceof Error ? error.message : "Erro ao salvar a meta.");
+    } finally {
+      setSavingDailyGoal(false);
+    }
+  };
 
   const saveTheme = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -726,23 +952,56 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     if (!vendorId) return;
-    const timer = window.setInterval(() => {
-      loadOrders(vendorId);
-      loadUmbrellas(vendorId);
-    }, 5000);
-    return () => window.clearInterval(timer);
+    let refreshing = false;
+    const refreshOrders = async (includeUmbrellas = false) => {
+      if (refreshing || document.visibilityState !== 'visible' || !navigator.onLine) return;
+      refreshing = true;
+      try {
+        await Promise.all([loadOrdersWhenChanged(vendorId), includeUmbrellas ? loadUmbrellas(vendorId) : Promise.resolve()]);
+      } finally {
+        refreshing = false;
+      }
+    };
+    const ordersTimer = window.setInterval(() => void refreshOrders(false), 5000);
+    const umbrellasTimer = window.setInterval(() => void refreshOrders(true), 30000);
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refreshOrders(true); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.clearInterval(ordersTimer);
+      window.clearInterval(umbrellasTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [vendorId]);
 
   useEffect(() => {
-    const unlockAudio = () => {
-      const audio = getAudioContext();
-      audio?.resume().catch(() => undefined);
-    };
+    if (!vendorId || activeTab !== "orders") return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) loadManagementIntelligence(vendorId);
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, vendorId]);
+
+  useEffect(() => {
+    const preferences = readDeviceAlertPreferences();
+    alertPreferencesRef.current = preferences;
+    setAlertPreferences(preferences);
+    const sound = new Audio('/sounds/cash-register-kaching.mp3');
+    const orderBell = new Audio('/sounds/order-bell.mp3');
+    sound.preload = 'auto';
+    orderBell.preload = 'auto';
+    orderBell.volume = preferences.volume;
+    cashRegisterAudioRef.current = sound;
+    orderBellAudioRef.current = orderBell;
+    const unlockAudio = () => { activateSoundAlerts(); };
     window.addEventListener("pointerdown", unlockAudio, { once: true });
     window.addEventListener("keydown", unlockAudio, { once: true });
     return () => {
       window.removeEventListener("pointerdown", unlockAudio);
       window.removeEventListener("keydown", unlockAudio);
+      sound.pause();
+      orderBell.pause();
+      cashRegisterAudioRef.current = null;
+      orderBellAudioRef.current = null;
     };
   }, []);
 
@@ -781,20 +1040,14 @@ export default function VendorDashboard() {
         .then(r => r.json())
         .then(d => { setReportData(d); setReportLoading(false); })
         .catch(() => setReportLoading(false));
-      const today = new Date().toISOString().split("T")[0];
-      fetch(`/api/daily-report?vendor_id=${vendorId}&date=${today}`)
-        .then(r => r.json())
-        .then(d => {
-          setCashControl(d.cash_control || null);
-          setTodayCashSales(Number(d.summary?.payment_methods?.cash?.total || 0));
-        })
-        .catch(() => undefined);
-      fetch(`/api/management-assistant?vendor_id=${vendorId}`)
-        .then(r => r.json())
-        .then(d => { if (!d.error) setManagementIntelligence(d); })
-        .catch(() => undefined);
+      loadTodayCashControl(vendorId);
+      loadManagementIntelligence(vendorId);
     }
   }, [activeTab, reportPeriod, vendorId]);
+
+  useEffect(() => {
+    if (activeTab === "stock" && vendorId) loadStockAdjustments(vendorId);
+  }, [activeTab, vendorId]);
 
   // Order management
   const moveOrder = async (id: string, newStatus: string) => {
@@ -825,7 +1078,7 @@ export default function VendorDashboard() {
 
   const submitCashControl = async (values: { opening_cash?: number; counted_cash?: number; difference_reason?: string; notes?: string }) => {
     if (!vendorId) return;
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     setClosingDay(true);
     setClosingMessage("");
     try {
@@ -851,6 +1104,27 @@ export default function VendorDashboard() {
     } finally {
       setClosingDay(false);
     }
+  };
+
+  const openCommissionEditor = (user: VendorUser) => {
+    setCommissionUser(user);
+    setCommissionForm({ type: user.commission_type || 'none', value: user.commission_type && user.commission_type !== 'none' ? String(user.commission_value || 0) : '' });
+    setCommissionMessage("");
+  };
+
+  const saveCommission = async () => {
+    if (!vendorId || !commissionUser) return;
+    setCommissionSaving(true); setCommissionMessage("");
+    try {
+      const response = await fetch('/api/vendor-users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, user_id: commissionUser.id, commission_type: commissionForm.type, commission_value: commissionForm.type === 'none' ? 0 : Number(commissionForm.value) }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Nao foi possivel atualizar a comissao.');
+      setTeam(current => current.map(user => user.id === commissionUser.id ? { ...user, commission_type: data.commission_type, commission_value: Number(data.commission_value || 0) } : user));
+      setCommissionUser(null);
+      setTeamMessage(`Comissao de ${commissionUser.name} atualizada.`);
+    } catch (error) {
+      setCommissionMessage(error instanceof Error ? error.message : 'Erro ao atualizar comissao.');
+    } finally { setCommissionSaving(false); }
   };
 
   const askManagementAssistant = async (question: string) => {
@@ -881,7 +1155,7 @@ export default function VendorDashboard() {
 
   const exportTodaySalesPdf = async () => {
     if (!vendorId) return;
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     try {
       const res = await fetch(`/api/daily-report?vendor_id=${vendorId}&date=${today}`);
       const report = (await res.json()) as DailySalesReport;
@@ -1166,7 +1440,32 @@ export default function VendorDashboard() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Não foi possível registrar a baixa.');
     await loadProducts(vendorId);
+    await loadStockAdjustments(vendorId);
     setShowStockAdjustment(false);
+  };
+
+  const loadStockAdjustments = async (id: string) => {
+    setStockHistoryLoading(true);
+    setStockHistoryError("");
+    try {
+      const response = await fetch(`/api/stock-adjustments?vendor_id=${encodeURIComponent(id)}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível carregar as movimentações.");
+      setStockAdjustmentHistory(data);
+    } catch (error) {
+      setStockHistoryError(error instanceof Error ? error.message : "Erro ao carregar movimentações.");
+    } finally {
+      setStockHistoryLoading(false);
+    }
+  };
+
+  const saveUpsellSettings = async (rules: UpsellRule[]) => {
+    if (!vendorId) throw new Error("Quiosque não identificado.");
+    const res = await fetch('/api/upsell-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, rules }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Não foi possível salvar as sugestões.');
+    setUpsellRules(data.rules || []);
+    setShowUpsellSettings(false);
   };
 
   const openManualAccount = async (umbrella: Umbrella, name: string, phone: string) => {
@@ -1202,6 +1501,7 @@ export default function VendorDashboard() {
         umbrella_id: order.umbrella_id,
         items,
         notes: notes.trim() || 'Pedido lancado manualmente pelo quiosque',
+        idempotency_key: crypto.randomUUID(),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -1265,7 +1565,7 @@ export default function VendorDashboard() {
 
   const generateQR = async (umbrella: Umbrella) => {
     try {
-      const res = await fetch(`/api/qr?umbrella_id=${encodeURIComponent(umbrella.id)}&format=png`);
+      const res = await fetch(`/api/qr?umbrella_id=${encodeURIComponent(umbrella.id)}&format=json`);
       const data = await res.json();
       if (!res.ok) {
         alert(data.error || "Não foi possível gerar o QR Code.");
@@ -1315,21 +1615,24 @@ export default function VendorDashboard() {
     setPayingOrder(order);
   };
 
-  const confirmAccountPaid = async (order: Order, paymentMethod: string) => {
+  const confirmAccountPaid = async (order: Order, paymentMethod: string, amount: number, payerName: string) => {
     if (!vendorId) return;
     const label = PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod;
-    const confirmed = confirm(`Confirmar pagamento da conta do guarda-sol ${order.umbrella} em ${label}?`);
+    const confirmed = confirm(`Confirmar recebimento de ${formatCurrency(amount)} do guarda-sol ${order.umbrella} em ${label}?`);
     if (!confirmed) return;
 
     try {
-      const res = await fetch('/api/close-account', {
+      const res = await fetch('/api/account-payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendor_id: vendorId,
-          umbrella_id: order.umbrella_id,
+          order_id: order.id,
+          amount,
           payment_method: paymentMethod,
-          notes: order.notes || 'Conta paga no Kanban',
+          payer_name: payerName || order.customer,
+          note: 'Recebido pelo painel do quiosque',
+          idempotency_key: crypto.randomUUID(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1337,8 +1640,13 @@ export default function VendorDashboard() {
         alert(data.error || 'Não foi possível confirmar o pagamento.');
         return;
       }
-      setOrders(prev => prev.filter(o => o.id !== order.id));
-      setUmbrellas(prev => prev.map(u => u.id === order.umbrella_id ? { ...u, is_occupied: false, current_order_id: null } : u));
+      if (data.closed) {
+        setOrders(prev => prev.filter(o => o.id !== order.id));
+        setUmbrellas(prev => prev.map(u => u.id === order.umbrella_id ? { ...u, is_occupied: false, current_order_id: null } : u));
+      } else {
+        await loadOrders(vendorId);
+        alert(`Pagamento registrado. Saldo restante: ${formatCurrency(Number(data.remaining_amount || 0))}.`);
+      }
       setSelectedOrder(null);
       setPayingOrder(null);
     } catch (err) {
@@ -1480,11 +1788,13 @@ export default function VendorDashboard() {
             <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
             {title}
           </h3>
-          <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
+          <span className="vendor-kanban-count bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">{colOrders.length}</span>
         </div>
         <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar">
           {colOrders.map(order => {
             const emptyAccount = isOrderEmpty(order);
+            const requestAgeMinutes = order.active_request?.created_at ? Math.max(0, Math.floor((Date.now() - new Date(order.active_request.created_at).getTime()) / 60000)) : 0;
+            const delayed = Boolean(order.active_request && requestAgeMinutes >= 20 && ['received', 'preparing'].includes(order.status));
             return (
               <button
                 key={order.id}
@@ -1492,7 +1802,8 @@ export default function VendorDashboard() {
                 className={cn(
                   "vendor-order-card w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-left transition-all hover:border-[#FF6B00] hover:shadow-md",
                   options.pulse && "animate-pulse border-[#ff6b00] bg-[#fff8f6] shadow-md",
-                  getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200"
+                  getServiceRequest(order) && "border-red-300 bg-red-50 shadow-md ring-2 ring-red-200",
+                  delayed && "border-red-500 bg-red-50 ring-2 ring-red-300"
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -1504,6 +1815,7 @@ export default function VendorDashboard() {
                     {getServiceRequest(order)?.label}
                   </p>
                 )}
+                {delayed && <p className="mt-2 rounded-md bg-red-700 px-2 py-1 text-center text-xs font-black uppercase text-white">Atrasado · {requestAgeMinutes} min</p>}
                 {emptyAccount && (
                   <p className="mt-2 rounded-md bg-gray-100 px-2 py-1 text-center text-xs font-black uppercase text-gray-500">
                     Sem consumo
@@ -1563,6 +1875,51 @@ export default function VendorDashboard() {
     );
   };
 
+  const renderTodayManagementSummary = () => {
+    const today = managementIntelligence?.today;
+    const progress = dailySalesGoal > 0 ? Math.min(100, Math.round((Number(today?.revenue || 0) / dailySalesGoal) * 100)) : 0;
+    const cards = [
+      { label: "Faturamento", value: formatCurrency(Number(today?.revenue || 0)) },
+      { label: "Pedidos", value: String(today?.orders || 0) },
+      { label: "Clientes", value: String(today?.customers || 0) },
+      { label: "Ticket medio", value: formatCurrency(Number(today?.avg_ticket || 0)) },
+      { label: "Produtos vendidos", value: String(today?.items_sold || 0) },
+      { label: "Lucro estimado", value: formatCurrency(Number(today?.estimated_profit || 0)) },
+    ];
+    return (
+      <section className="vendor-today-summary rounded-2xl border border-orange-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-[#C65300]">Hoje</p>
+            <h3 className="text-lg font-black text-gray-900">Resumo do quiosque</h3>
+          </div>
+          <button type="button" onClick={() => { setEditingDailyGoal(value => !value); setDailyGoalMessage(""); }} className="vendor-daily-goal-button min-h-11 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 text-base font-black text-[#9A3E00] hover:bg-orange-100">
+            {dailySalesGoal > 0 ? `Meta: ${formatCurrency(dailySalesGoal)}` : "Definir meta diaria"}
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          {cards.map(card => <div key={card.label} className="vendor-summary-metric rounded-xl bg-gray-50 p-3"><p className="text-xs font-black uppercase text-gray-600">{card.label}</p><p className="mt-1 break-words text-xl font-black text-gray-950">{card.value}</p></div>)}
+        </div>
+        {dailySalesGoal > 0 && (
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm font-black text-gray-700"><span>Progresso da meta</span><span>{progress}%</span></div>
+            <div className="h-3 overflow-hidden rounded-full bg-orange-100"><div className={cn("h-full rounded-full transition-all", progress >= 100 ? "bg-green-600" : "bg-[#FF6B00]")} style={{ width: `${progress}%` }} /></div>
+            <p className="mt-2 text-sm font-bold text-gray-600">{progress >= 100 ? "Meta alcancada. Excelente resultado!" : `Faltam ${formatCurrency(Math.max(0, dailySalesGoal - Number(today?.revenue || 0)))} para atingir a meta.`}</p>
+          </div>
+        )}
+        {editingDailyGoal && (
+          <div className="mt-4 flex flex-col gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-xs font-black uppercase text-gray-700">Meta de faturamento por dia
+              <input type="number" min="0" step="0.01" value={dailySalesGoalDraft} onChange={event => setDailySalesGoalDraft(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border-2 border-white bg-white px-3 text-base font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder="Ex.: 3000,00" />
+            </label>
+            <button type="button" onClick={saveDailySalesGoal} disabled={savingDailyGoal} className="min-h-11 rounded-xl bg-[#FF6B00] px-5 font-black text-white hover:bg-[#E56000] disabled:opacity-60">{savingDailyGoal ? "Salvando..." : "Salvar meta"}</button>
+          </div>
+        )}
+        {dailyGoalMessage && <p className="mt-2 text-sm font-black text-[#8A3E22]">{dailyGoalMessage}</p>}
+      </section>
+    );
+  };
+
   const renderBeachMap = () => {
     const activeAccounts = orders.filter(order => !order.paid).length;
     const occupiedUmbrellas = umbrellas.filter(umbrella => umbrella.is_occupied || umbrella.current_order_id).length;
@@ -1570,13 +1927,13 @@ export default function VendorDashboard() {
       <section className="vendor-beach-map rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-black text-gray-900">Mapa da praia</h3>
-            <p className="text-xs font-bold text-gray-400">{occupiedUmbrellas} ocupados · {activeAccounts} contas abertas</p>
+            <h3 className="text-base font-black text-gray-900">Mapa da praia</h3>
+            <p className="text-sm font-bold text-gray-400">{occupiedUmbrellas} ocupados · {activeAccounts} contas abertas</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold text-gray-500">
-            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Livre</span>
-            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#FF6B00]" />Ocupado</span>
-            <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />Conta</span>
+          <div className="vendor-beach-legend flex flex-wrap items-center gap-3 text-sm font-black text-gray-500">
+            <span className="is-free inline-flex items-center gap-1.5"><CircleCheck size={17} aria-hidden="true" />Livre</span>
+            <span className="is-occupied inline-flex items-center gap-1.5"><Clock size={17} aria-hidden="true" />Ocupada</span>
+            <span className="is-closing inline-flex items-center gap-1.5"><DollarSign size={17} aria-hidden="true" />Conta</span>
           </div>
         </div>
         <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8 md:grid-cols-12">
@@ -1588,6 +1945,8 @@ export default function VendorDashboard() {
             const occupied = Boolean(umbrella.is_occupied || umbrella.current_order_id || order);
             const firstCustomerName = getFirstCustomerName(order?.customer);
             const accountTotal = order ? formatCurrency(Number(order.total || 0)) : '';
+            const StatusIcon = closing ? DollarSign : occupied ? Clock : CircleCheck;
+            const statusLabel = closing ? 'Conta' : occupied ? 'Ocupada' : 'Livre';
             return (
               <button
                 key={umbrella.id}
@@ -1597,11 +1956,11 @@ export default function VendorDashboard() {
                 className={cn(
                   "relative aspect-square min-h-12 rounded-xl border text-sm font-black transition-all",
                   "vendor-umbrella-tile",
-                  !umbrella.active && "border-gray-200 bg-gray-100 text-gray-300",
-                  umbrella.active && !occupied && "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
-                  umbrella.active && occupied && !closing && "border-orange-200 bg-orange-50 text-[#FF6B00] hover:bg-orange-100",
-                  umbrella.active && closing && "border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
-                  umbrella.active && serviceRequest && "animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
+                  !umbrella.active && "is-inactive border-gray-200 bg-gray-100 text-gray-300",
+                  umbrella.active && !occupied && "is-free border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
+                  umbrella.active && occupied && !closing && "is-occupied border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
+                  umbrella.active && closing && "is-closing border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
+                  umbrella.active && serviceRequest && "is-service animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
                 )}
                 title={serviceRequest
                   ? `${serviceRequest.label} - guarda-sol ${umbrella.number}`
@@ -1609,19 +1968,22 @@ export default function VendorDashboard() {
                     : umbrella.active ? `Abrir comanda manual no guarda-sol ${umbrella.number}` : 'Guarda-sol inativo'}
               >
                 <span className="flex h-full min-w-0 flex-col items-center justify-center px-1 leading-tight">
-                  <span>{umbrella.number}</span>
+                  <span className="text-lg font-black">{umbrella.number}</span>
+                  {umbrella.active && (
+                    <span className="vendor-umbrella-status mt-1 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide">
+                      <StatusIcon size={14} strokeWidth={2.75} aria-hidden="true" />
+                      {statusLabel}
+                    </span>
+                  )}
                   {firstCustomerName && (
-                    <span className="mt-0.5 max-w-full truncate text-[10px] font-black opacity-80">
+                    <span className="mt-1 max-w-full truncate text-[11px] font-black opacity-90">
                       {firstCustomerName}
                     </span>
                   )}
                   {firstCustomerName && accountTotal && (
-                    <span className="mt-0.5 max-w-full truncate text-[9px] font-black opacity-90">
+                    <span className="mt-0.5 max-w-full truncate text-[10px] font-black">
                       {accountTotal}
                     </span>
-                  )}
-                  {!occupied && umbrella.active && (
-                    <span className="mt-0.5 text-[8px] font-black uppercase opacity-75">Abrir comanda</span>
                   )}
                 </span>
                 {serviceRequest && (
@@ -1697,13 +2059,27 @@ export default function VendorDashboard() {
             {TABS.find(t => t.id === activeTab)?.label}
             </h2>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Quiosque Aberto
-            </span>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button type="button" onClick={() => { setShowAlertSettings(true); activateSoundAlerts(); }} className={cn("vendor-sound-button flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-black", soundAlertsReady ? "bg-blue-100 text-blue-800" : "animate-pulse bg-orange-100 text-[#9A3E00]")} title="Configurar som, volume e vibracao" aria-label="Configurar alertas de novos pedidos">
+              <Volume2 size={16} /> <span className="hidden sm:inline">{soundAlertsReady ? "Som ativo" : "Ativar som"}</span>
+            </button>
+            <button type="button" disabled={cashControlLoading || cashControl?.status === 'closed'} onClick={() => setShowCashModal(true)} className={cn("vendor-cash-button flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-black", cashControlLoading ? "bg-gray-100 text-gray-600" : cashControl?.status === 'open' ? "bg-green-100 text-green-800" : cashControl?.status === 'closed' ? "bg-red-100 text-red-800" : "animate-pulse bg-amber-100 text-amber-900")} title={cashControl?.status === 'open' ? 'Clique para fechar o caixa' : 'Clique para abrir o caixa'}>
+              <Banknote size={16} /> <span className="hidden sm:inline">{cashControlLoading ? 'Carregando caixa' : cashControl?.status === 'open' ? 'Caixa aberto' : cashControl?.status === 'closed' ? 'Dia encerrado' : 'Abrir caixa'}</span>
+            </button>
           </div>
         </header>
+
+        {showAlertSettings && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="alert-settings-title">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 text-gray-950 shadow-2xl">
+            <div className="flex items-start justify-between gap-4"><div><h3 id="alert-settings-title" className="text-xl font-black">Alertas sonoros</h3><p className="mt-1 text-sm font-semibold text-gray-600">Teste separadamente novo pedido e pedido de fechamento de conta.</p></div><button type="button" onClick={() => setShowAlertSettings(false)} className="rounded-full bg-gray-100 p-2" aria-label="Fechar"><X size={20} /></button></div>
+            <label className="mt-6 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-gray-200 p-4"><span><strong className="block">Vibrar celular ou tablet</strong><small className="text-gray-600">Ativado por padrao em aparelhos compativeis.</small></span><input type="checkbox" checked={alertPreferences.vibrationEnabled} onChange={event => updateAlertPreferences({ ...alertPreferences, vibrationEnabled: event.target.checked })} className="h-6 w-6 accent-[#FF6B00]" /></label>
+            <label className="mt-4 block rounded-2xl border border-gray-200 p-4"><span className="flex justify-between font-black"><span>Volume da campainha</span><span>{Math.round(alertPreferences.volume * 100)}%</span></span><input type="range" min="0" max="100" step="5" value={Math.round(alertPreferences.volume * 100)} onChange={event => updateAlertPreferences({ ...alertPreferences, volume: Number(event.target.value) / 100 })} className="mt-4 w-full accent-[#FF6B00]" /><small className="mt-2 block text-gray-600">O resultado tambem respeita o volume fisico e o modo silencioso do aparelho.</small></label>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={async () => { await activateSoundAlerts(); playNewOrderSound(); }} className="min-h-12 rounded-2xl bg-[#FF6B00] px-3 font-black text-white"><Volume2 className="mr-2 inline" size={19} /> Novo pedido</button>
+              <button type="button" onClick={async () => { await activateSoundAlerts(); playCashRegisterSound(); }} className="min-h-12 rounded-2xl bg-[#3D1A0A] px-3 font-black text-white"><Banknote className="mr-2 inline" size={19} /> Pedido da conta</button>
+            </div>
+          </div>
+        </div>}
 
         {/* Tab Contents */}
           <div className="flex-1 overflow-auto bg-gray-50 p-3 pb-[calc(100px+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(104px+env(safe-area-inset-bottom))] lg:pb-6">
@@ -1711,6 +2087,7 @@ export default function VendorDashboard() {
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
             <div className="space-y-4">
+              {renderTodayManagementSummary()}
               {renderBeachMap()}
               <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-3">
                 {renderCompactKanbanColumn(
@@ -1788,6 +2165,31 @@ export default function VendorDashboard() {
               }}
               onDeleteProduct={deleteProduct}
               />
+
+              <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="text-xs font-black uppercase text-red-700">Auditoria de estoque</p><h3 className="text-xl font-black text-gray-950">Perdas e baixas registradas</h3><p className="mt-1 text-sm font-bold text-gray-600">Últimas 100 movimentações, com responsável e impacto estimado.</p></div>
+                  <button type="button" onClick={() => vendorId && loadStockAdjustments(vendorId)} disabled={stockHistoryLoading} className="min-h-11 rounded-xl border-2 border-gray-200 px-4 text-sm font-black text-gray-800 hover:bg-gray-50 disabled:opacity-50">{stockHistoryLoading ? "Atualizando..." : "Atualizar histórico"}</button>
+                </div>
+                {stockHistoryError && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-black text-red-800">{stockHistoryError}</p>}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl bg-red-50 p-3"><p className="text-xs font-black uppercase text-red-700">Itens baixados</p><p className="mt-1 text-2xl font-black text-red-900">{stockAdjustmentHistory?.total_quantity || 0}</p></div>
+                  <div className="rounded-xl bg-orange-50 p-3"><p className="text-xs font-black uppercase text-orange-700">Custo estimado</p><p className="mt-1 text-2xl font-black text-orange-900">{formatCurrency(Number(stockAdjustmentHistory?.total_estimated_cost || 0))}</p></div>
+                  {Object.entries(stockAdjustmentHistory?.summary || {}).sort(([, a], [, b]) => b.quantity - a.quantity).slice(0, 2).map(([reason, data]) => <div key={reason} className="rounded-xl bg-gray-50 p-3"><p className="text-xs font-black uppercase text-gray-600">{STOCK_REASON_LABELS[reason] || reason}</p><p className="mt-1 text-2xl font-black text-gray-950">{data.quantity} un.</p><p className="text-xs font-bold text-gray-600">{formatCurrency(Number(data.estimated_cost || 0))}</p></div>)}
+                </div>
+                <div className="mt-4 space-y-2">
+                  {!stockHistoryLoading && (stockAdjustmentHistory?.items || []).length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-700">Nenhuma perda ou baixa registrada.</p>}
+                  {(stockAdjustmentHistory?.items || []).map(item => (
+                    <article key={item.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-black text-gray-950">{item.product_name}</p><span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-black text-red-800">{STOCK_REASON_LABELS[item.reason] || item.reason}</span></div><p className="mt-1 text-sm font-bold text-gray-700">{item.note}</p></div>
+                        <div className="shrink-0 text-left sm:text-right"><p className="text-lg font-black text-red-800">-{item.quantity} un.</p><p className="text-xs font-bold text-gray-600">Impacto: {formatCurrency(Number(item.estimated_cost || 0))}</p></div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-xs font-bold text-gray-600"><span>{item.location === 'physical' ? 'Estoque central' : 'Estoque da praia'}</span><span>Saldo: {item.previous_quantity} → {item.next_quantity}</span><span>{item.user_name}</span><span>{new Date(item.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</span></div>
+                    </article>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
 
@@ -1801,6 +2203,8 @@ export default function VendorDashboard() {
                     <p className="text-gray-500 text-sm">{products.length} itens cadastrados · {products.filter(p => p.active).length} ativos</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
+                    <button type="button" onClick={() => setShowUpsellSettings(true)} className="rounded-xl border border-blue-500 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100">Sugestões de venda</button>
+                    <button type="button" onClick={() => setShowPromotionSettings(true)} className="rounded-xl border border-green-600 bg-green-50 px-4 py-2 text-sm font-black text-green-700 hover:bg-green-100">Promoções prontas</button>
                     <button
                       type="button"
                       onClick={() => {
@@ -1957,7 +2361,7 @@ export default function VendorDashboard() {
                                 </p>
                                 {Array.isArray(p.option_values) && p.option_values.length > 0 && (
                                   <p className="text-[11px] font-bold text-orange-700 truncate max-w-[240px]">
-                                    {p.option_group_name || "Opções"}: {p.option_values.join(", ")}
+                                    {p.option_group_name || "Opções"}: {p.option_values.map(value => value.replace('::', ': ')).join(", ")}
                                   </p>
                                 )}
                               </div>
@@ -2021,17 +2425,29 @@ export default function VendorDashboard() {
           {activeTab === "qr" && (
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
                   <div>
                     <h3 className="font-bold text-lg">Guarda-Sóis</h3>
                     <p className="text-gray-500 text-sm">{umbrellas.length} cadastrados · {umbrellas.filter(u => u.active).length} ativos</p>
                   </div>
-                  <button
-                    onClick={() => setShowAddUmbrella(true)}
-                    className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 hover:bg-[#E56000] active:scale-95 transition-all"
-                  >
-                    <Plus size={20} /> Adicionar Barraca
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    {vendorId && umbrellas.length > 0 && (
+                      <a
+                        href={`/vendor/qr-print?vendor_id=${encodeURIComponent(vendorId)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="border-2 border-[#FF6B00] bg-white text-[#C75200] px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 hover:bg-orange-50 active:scale-95 transition-all"
+                      >
+                        <Download size={19} /> Imprimir todos os QRs
+                      </a>
+                    )}
+                    <button
+                      onClick={() => setShowAddUmbrella(true)}
+                      className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 hover:bg-[#E56000] active:scale-95 transition-all"
+                    >
+                      <Plus size={20} /> Adicionar Barraca
+                    </button>
+                  </div>
                 </div>
 
                 {/* Add umbrella inline form */}
@@ -2072,10 +2488,10 @@ export default function VendorDashboard() {
                           <p className="text-xs text-gray-400 text-center break-all">{u.qr_url}</p>
                           <a
                             href={u.qr_image_url}
-                            download={`qr-barraca-${u.number}.png`}
+                            download={`qr-guarda-sol-${u.number}-sandexpress.svg`}
                             className="flex items-center gap-1 text-sm font-bold text-[#FF6B00] hover:underline"
                           >
-                            <Download size={14} /> Baixar PNG
+                            <Download size={14} /> Baixar QR com logo
                           </a>
                         </div>
                       ) : (
@@ -2415,13 +2831,18 @@ export default function VendorDashboard() {
                 <div className="rounded-2xl border border-orange-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-black uppercase text-[#FF6B00]">Previsão de movimento</p>
                   <div className="mt-2 flex items-end justify-between gap-4"><div><h3 className="text-xl font-black text-gray-900 capitalize">{managementIntelligence?.forecast.day || "Amanhã"}</h3><p className="text-sm font-bold text-gray-500">{managementIntelligence?.forecast.expected_orders || 0} pedidos · {formatCurrency(Number(managementIntelligence?.forecast.expected_revenue || 0))}</p></div><p className="text-4xl font-black text-[#FF6B00]">{managementIntelligence?.forecast.movement_percent || 0}%</p></div>
+                  {managementIntelligence?.forecast.weather?.available && <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-blue-50 p-2 text-center"><p className="text-xs font-bold text-gray-500">Clima</p><p className="text-sm font-black text-blue-700">{managementIntelligence.forecast.weather.condition}</p></div><div className="rounded-xl bg-orange-50 p-2 text-center"><p className="text-xs font-bold text-gray-500">Máxima</p><p className="text-sm font-black text-orange-700">{managementIntelligence.forecast.weather.temperature_max}°C</p></div><div className="rounded-xl bg-slate-50 p-2 text-center"><p className="text-xs font-bold text-gray-500">Chuva</p><p className="text-sm font-black text-slate-700">{managementIntelligence.forecast.weather.precipitation_probability}%</p></div></div>}
                   <p className="mt-4 rounded-xl bg-orange-50 p-3 text-sm font-black text-gray-700">{managementIntelligence?.forecast.suggestion || "A previsão aparecerá quando houver histórico suficiente."}</p>
-                  <p className="mt-2 text-xs font-bold text-gray-400">Baseado em {managementIntelligence?.forecast.sample_days || 0} dias equivalentes do histórico. Clima ainda não incluído.</p>
+                  <p className="mt-2 text-xs font-bold text-gray-400">Baseado em {managementIntelligence?.forecast.sample_days || 0} dias equivalentes, ajustado pela previsão da Open-Meteo. {managementIntelligence?.forecast.weather?.location || managementIntelligence?.forecast.weather?.error}</p>
                 </div>
                 <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-black uppercase text-blue-600">Assistente gerencial</p><h3 className="mt-1 text-xl font-black text-gray-900">Pergunte em um toque</h3>
-                  <div className="mt-3 flex flex-wrap gap-2">{["Quanto vendi hoje?", "Qual garçom vendeu mais?", "Qual produto está acabando?", "Qual é meu lucro da semana?", "O que devo comprar amanhã?"].map(question => <button key={question} disabled={assistantLoading} onClick={() => askManagementAssistant(question)} className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">{question}</button>)}</div>
-                  <p className="mt-4 min-h-16 rounded-xl bg-gray-50 p-3 text-sm font-black leading-6 text-gray-700">{assistantLoading ? "Consultando seus dados..." : assistantAnswer || "Escolha uma pergunta acima."}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">{["Quanto vendi hoje?", "Qual garçom vendeu mais?", "Qual produto está acabando?", "Qual é meu lucro da semana?", "O que devo comprar amanhã?", "Qual foi o melhor horário hoje?", "Como está minha meta?", "Quais produtos estão parados?"].map(question => <button key={question} disabled={assistantLoading} onClick={() => { setAssistantQuestion(question); askManagementAssistant(question); }} className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-50">{question}</button>)}</div>
+                  <form className="mt-3 flex gap-2" onSubmit={event => { event.preventDefault(); const question = assistantQuestion.trim(); if (question) askManagementAssistant(question); }}>
+                    <input value={assistantQuestion} onChange={event => setAssistantQuestion(event.target.value)} maxLength={160} aria-label="Pergunta para o assistente" placeholder="Digite sua pergunta..." className="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-gray-200 bg-white px-3 text-sm font-bold text-gray-900 outline-none focus:border-blue-500" />
+                    <button type="submit" disabled={assistantLoading || !assistantQuestion.trim()} className="min-h-11 rounded-xl bg-blue-600 px-4 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-50">Perguntar</button>
+                  </form>
+                  <p className="mt-3 min-h-16 rounded-xl bg-gray-50 p-3 text-sm font-black leading-6 text-gray-700" aria-live="polite">{assistantLoading ? "Consultando seus dados..." : assistantAnswer || "Escolha uma pergunta ou escreva do seu jeito."}</p>
                 </div>
               </div>
 
@@ -2474,7 +2895,7 @@ export default function VendorDashboard() {
                   </div>
 
                   {/* KPIs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
                     <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Faturamento</p>
                       <p className="sales-value-gradient text-3xl font-display font-bold">{formatCurrency(reportData.kpis.total_revenue)}</p>
@@ -2490,6 +2911,11 @@ export default function VendorDashboard() {
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Clientes Únicos</p>
                       <p className="sales-value-gradient text-3xl font-display font-bold">{reportData.kpis.unique_customers}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-gray-400 text-sm font-bold mb-1">Taxa de Serviço</p>
+                      <p className="text-3xl font-display font-bold text-green-700">{formatCurrency(Number(reportData.kpis.total_service_fees || 0))}</p>
+                      <p className="text-xs font-bold text-gray-500">Separada das vendas</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <p className="text-gray-400 text-sm font-bold mb-1">Satisfação</p>
@@ -2553,8 +2979,24 @@ export default function VendorDashboard() {
                               <span className="text-sm font-black text-[#a44100]">{formatCurrency(item.revenue)}</span>
                             </div>
                             <p className="text-xs font-bold text-[#5a2d1d]">{item.quantity} itens vendidos</p>
+                            {item.cost_configured ? <p className="mt-1 text-xs font-black text-green-800">Lucro {formatCurrency(Number(item.profit || 0))} · margem {Number(item.margin_percent || 0)}%</p> : <p className="mt-1 text-xs font-black text-amber-800">Cadastre todos os custos para ver o lucro</p>}
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-orange-200 bg-white p-6 shadow-sm">
+                      <h4 className="mb-4 flex items-center gap-2 font-black text-gray-950"><TrendingUp size={18} className="text-[#FF6B00]" /> Maior faturamento por produto</h4>
+                      <div className="space-y-2">
+                        {(reportData.product_insights?.highest_revenue_products || []).length === 0 ? <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-600">Sem vendas pagas no periodo.</p> : (reportData.product_insights?.highest_revenue_products || []).map((product, index) => <div key={product.name} className="flex items-center justify-between gap-3 rounded-xl bg-orange-50 p-3"><div className="min-w-0"><p className="truncate font-black text-gray-950">{index + 1}. {product.name}</p><p className="text-xs font-bold text-gray-700">{product.quantity} vendidos</p></div><span className="shrink-0 font-black text-[#9A3E00]">{formatCurrency(product.revenue)}</span></div>)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-green-200 bg-white p-6 shadow-sm">
+                      <h4 className="mb-4 flex items-center gap-2 font-black text-gray-950"><Award size={18} className="text-green-700" /> Maior lucro por produto</h4>
+                      <div className="space-y-2">
+                        {(reportData.product_insights?.highest_profit_products || []).length === 0 ? <p className="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-900">Cadastre o custo dos produtos vendidos para calcular o lucro.</p> : (reportData.product_insights?.highest_profit_products || []).map((product, index) => <div key={product.name} className="rounded-xl bg-green-50 p-3"><div className="flex items-center justify-between gap-3"><p className="min-w-0 truncate font-black text-gray-950">{index + 1}. {product.name}</p><span className="shrink-0 font-black text-green-800">{formatCurrency(product.profit)}</span></div><p className="mt-1 text-xs font-black text-green-900">Margem {product.margin_percent}% · faturamento {formatCurrency(product.revenue)}</p></div>)}
                       </div>
                     </div>
                   </div>
@@ -2575,6 +3017,18 @@ export default function VendorDashboard() {
                         {(reportData.product_insights?.least_sold || []).slice(0, 5).map(product => <div key={product.name} className="flex justify-between rounded-xl bg-gray-50 p-3"><span className="font-black text-gray-900">{product.name}</span><span className="text-sm font-black text-gray-600">{product.quantity} vendidos</span></div>)}
                       </div>
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+                    <h4 className="mb-4 flex items-center gap-2 font-black text-gray-900"><Clock size={18} className="text-blue-600" /> Desempenho dos chamados</h4>
+                    <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-blue-50 p-4"><p className="text-xs font-black text-blue-700">ATENDIMENTOS</p><p className="text-2xl font-black text-blue-950">{reportData.waiter_service?.total_calls || 0}</p></div><div className="rounded-xl bg-orange-50 p-4"><p className="text-xs font-black text-orange-700">TEMPO PARA ASSUMIR</p><p className="text-2xl font-black text-orange-950">{formatServiceTime(reportData.waiter_service?.avg_response_seconds || 0)}</p></div><div className="rounded-xl bg-green-50 p-4"><p className="text-xs font-black text-green-700">DURAÇÃO MÉDIA</p><p className="text-2xl font-black text-green-950">{formatServiceTime(reportData.waiter_service?.avg_service_seconds || 0)}</p></div></div>
+                    {(reportData.waiter_service?.by_waiter || []).length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2">{reportData.waiter_service!.by_waiter.map(waiter => <div key={waiter.user_id} className="flex items-center justify-between rounded-xl bg-gray-50 p-3"><div><p className="font-black text-gray-900">{waiter.name}</p><p className="text-xs font-bold text-gray-500">{waiter.calls} chamados · resposta {formatServiceTime(waiter.avg_response_seconds)}</p></div><span className="text-sm font-black text-green-700">{formatServiceTime(waiter.avg_service_seconds)}</span></div>)}</div>}
+                  </div>
+
+                  <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">
+                    <h4 className="mb-4 flex items-center gap-2 font-black text-gray-900"><Utensils size={18} className="text-[#FF6B00]" /> Tempo de preparo e atendimento</h4>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-xl bg-orange-50 p-4"><p className="text-xs font-black text-orange-700">PREPARO MÉDIO</p><p className="text-2xl font-black text-orange-950">{formatServiceTime(reportData.operational_times?.avg_preparation_seconds || 0)}</p></div><div className="rounded-xl bg-blue-50 p-4"><p className="text-xs font-black text-blue-700">ATENDIMENTO TOTAL</p><p className="text-2xl font-black text-blue-950">{formatServiceTime(reportData.operational_times?.avg_service_seconds || 0)}</p></div><div className="rounded-xl bg-green-50 p-4"><p className="text-xs font-black text-green-700">MAIS RÁPIDO</p><p className="text-2xl font-black text-green-950">{formatServiceTime(reportData.operational_times?.fastest_preparation_seconds || 0)}</p></div><div className={`rounded-xl p-4 ${(reportData.operational_times?.delayed_requests || 0) > 0 ? 'bg-red-50' : 'bg-gray-50'}`}><p className={`text-xs font-black ${(reportData.operational_times?.delayed_requests || 0) > 0 ? 'text-red-700' : 'text-gray-600'}`}>ACIMA DE 20 MIN</p><p className="text-2xl font-black text-gray-950">{reportData.operational_times?.delayed_requests || 0}</p></div></div>
+                    {(reportData.operational_times?.completed_requests || 0) === 0 && <p className="mt-3 text-sm font-bold text-gray-500">A medição começa automaticamente nas próximas movimentações do Kanban.</p>}
                   </div>
 
                   <div className="grid gap-6">
@@ -2640,11 +3094,11 @@ export default function VendorDashboard() {
                       {salesChartType === "bars" ? (
                       <div className="flex items-end gap-2 h-40">
                         {reportData.hourly_sales.map((h, i) => {
-                          const maxOrders = Math.max(...reportData.hourly_sales.map(s => s.orders));
-                          const height = maxOrders > 0 ? (h.orders / maxOrders) * 100 : 0;
+                          const maxRevenue = Math.max(...reportData.hourly_sales.map(s => s.revenue));
+                          const height = maxRevenue > 0 ? (h.revenue / maxRevenue) * 100 : 0;
                           return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                              <span className="text-[10px] text-[#5A2D1D] font-bold">{h.orders}</span>
+                              <span className="whitespace-nowrap text-[9px] font-bold text-[#5A2D1D]" title={`${formatCurrency(h.revenue)} · ${h.orders} pedido(s) · ticket ${formatCurrency(h.avg_ticket)}`}>{h.revenue >= 1000 ? `R$${(h.revenue / 1000).toFixed(1)}k` : `R$${Math.round(h.revenue)}`}</span>
                               <div
                                 className="w-full rounded-t-md bg-gradient-to-t from-[#8A3E22] to-[#FF6B00] transition-all"
                                 style={{ height: `${height}%`, minHeight: 4 }}
@@ -2656,13 +3110,13 @@ export default function VendorDashboard() {
                       </div>
                       ) : (
                         (() => {
-                          const slices = reportData.hourly_sales.filter((h) => h.orders > 0);
-                          const total = slices.reduce((sum, h) => sum + h.orders, 0);
+                          const slices = reportData.hourly_sales.filter((h) => h.revenue > 0);
+                          const total = slices.reduce((sum, h) => sum + h.revenue, 0);
                           let cursor = 0;
                           const gradient = total > 0
                             ? slices.map((h, i) => {
                                 const start = cursor;
-                                const end = cursor + (h.orders / total) * 100;
+                                const end = cursor + (h.revenue / total) * 100;
                                 cursor = end;
                                 return `${SALES_CHART_COLORS[i % SALES_CHART_COLORS.length]} ${start}% ${end}%`;
                               }).join(", ")
@@ -2683,7 +3137,7 @@ export default function VendorDashboard() {
                                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: SALES_CHART_COLORS[i % SALES_CHART_COLORS.length] }} />
                                       {h.hour}
                                     </span>
-                                    <span className="font-black text-[#5A2D1D]">{h.orders} venda{h.orders === 1 ? "" : "s"}</span>
+                                    <span className="text-right font-black text-[#5A2D1D]">{formatCurrency(h.revenue)}<small className="block text-[10px] font-bold opacity-75">{h.orders} pedido{h.orders === 1 ? "" : "s"} · ticket {formatCurrency(h.avg_ticket)}</small></span>
                                   </div>
                                 ))}
                               </div>
@@ -2858,6 +3312,10 @@ export default function VendorDashboard() {
           {/* ========== ABA 6: EQUIPE ========== */}
           {activeTab === "team" && (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950 lg:col-span-2">
+                <p className="font-black">Acesso exclusivo do garcom</p>
+                <p className="mt-1 text-sm font-bold leading-5 text-blue-800">Crie o usuario como Garcom / Vendedor. Depois que o administrador liberar o modulo, ele entra pelo botao “Acesso do garcom” e atende mesas e guarda-sois em /garcom.</p>
+              </div>
               <form onSubmit={createTeamUser} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
                 <div>
                   <h3 className="font-bold text-lg text-gray-900">Criar usuário do quiosque</h3>
@@ -2945,9 +3403,12 @@ export default function VendorDashboard() {
                           <p className="mt-1 text-xs font-black text-[#FF6B00]">Comissão: {user.commission_type === 'percent' ? `${user.commission_value}% das vendas` : `${formatCurrency(Number(user.commission_value || 0))} por pedido`}</p>
                         )}
                       </div>
-                      <span className="rounded-full bg-[#EFD5CA] px-3 py-1 text-xs font-black text-[#3D1A0A]">
-                        {user.role === 'manager' ? 'Gerente' : user.role === 'owner' ? 'Proprietario' : 'Vendedor'}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <span className="rounded-full bg-[#EFD5CA] px-3 py-1 text-xs font-black text-[#3D1A0A]">
+                          {user.role === 'manager' ? 'Gerente' : user.role === 'owner' ? 'Proprietario' : 'Garcom / Vendedor'}
+                        </span>
+                        {user.role === 'seller' && <button type="button" onClick={() => openCommissionEditor(user)} className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#9A3E00] hover:bg-orange-100">Editar comissao</button>}
+                      </div>
                     </div>
                   ))}
                   {team.length === 0 && (
@@ -3042,9 +3503,15 @@ export default function VendorDashboard() {
         <StockAdjustmentModal products={products} onClose={() => setShowStockAdjustment(false)} onSubmit={registerStockAdjustment} />
       )}
 
+      {showUpsellSettings && <UpsellSettingsModal products={products.filter(product => product.active)} initialRules={upsellRules} onClose={() => setShowUpsellSettings(false)} onSave={saveUpsellSettings} />}
+      {showPromotionSettings && <PromotionSettingsModal vendorId={vendorId || ''} products={products.filter(product => product.active)} promotions={flexiblePromotions} onClose={() => setShowPromotionSettings(false)} onChanged={() => vendorId ? loadFlexiblePromotions(vendorId) : Promise.resolve()} />}
+
+      {commissionUser && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setCommissionUser(null)}><div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}><button type="button" onClick={() => setCommissionUser(null)} className="float-right rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X /></button><p className="text-xs font-black uppercase text-[#C65300]">Comissao automatica</p><h3 className="text-2xl font-black text-gray-950">{commissionUser.name}</h3><p className="mt-1 text-sm font-bold text-gray-600">A nova regra sera usada nos proximos relatorios e fica registrada no historico.</p><label className="mt-5 block text-sm font-black text-gray-800">Forma de comissao<select value={commissionForm.type} onChange={event => setCommissionForm({ type: event.target.value, value: event.target.value === 'none' ? '' : commissionForm.value })} className="mt-2 min-h-12 w-full rounded-xl border-2 border-gray-200 bg-white p-3 outline-none focus:border-[#FF6B00]"><option value="none">Sem comissao</option><option value="percent">Percentual das vendas</option><option value="fixed">Valor fixo por pedido</option></select></label>{commissionForm.type !== 'none' && <label className="mt-4 block text-sm font-black text-gray-800">{commissionForm.type === 'percent' ? 'Percentual' : 'Valor por pedido'}<input type="number" min="0" max={commissionForm.type === 'percent' ? 100 : undefined} step="0.01" value={commissionForm.value} onChange={event => setCommissionForm(current => ({ ...current, value: event.target.value }))} className="mt-2 min-h-12 w-full rounded-xl border-2 border-gray-200 p-3 text-lg font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder={commissionForm.type === 'percent' ? 'Ex.: 10' : 'Ex.: 5,00'} /></label>}{commissionMessage && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{commissionMessage}</p>}<button type="button" disabled={commissionSaving || (commissionForm.type !== 'none' && (!commissionForm.value || Number(commissionForm.value) < 0))} onClick={saveCommission} className="mt-5 min-h-13 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000] disabled:opacity-40">{commissionSaving ? 'Salvando...' : 'Salvar comissao'}</button></div></div>}
+
       {payingOrder && (
         <PaymentMethodModal
           order={payingOrder}
+          vendorId={vendorId || ''}
           settings={themeForm}
           onClose={() => setPayingOrder(null)}
           onConfirm={confirmAccountPaid}
@@ -3065,6 +3532,89 @@ export default function VendorDashboard() {
 // =========================================================
 // ORDER MODAL COMPONENT
 // =========================================================
+function PromotionSettingsModal({ vendorId, products, promotions, onClose, onChanged }: { vendorId: string; products: Product[]; promotions: FlexiblePromotion[]; onClose: () => void; onChanged: () => Promise<void> }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [benefitType, setBenefitType] = useState<'percent' | 'fixed' | 'closed_price' | 'free_product'>('percent');
+  const [discountValue, setDiscountValue] = useState('10');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({});
+  const [rewardProductId, setRewardProductId] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const applyTemplate = (type: typeof benefitType) => {
+    setBenefitType(type);
+    if (type === 'percent') { setTitle('10% de desconto'); setDiscountValue('10'); }
+    if (type === 'fixed') { setTitle('R$ 10 de desconto'); setDiscountValue('10'); }
+    if (type === 'closed_price') { setTitle('Combo especial'); setDiscountValue('49.90'); }
+    if (type === 'free_product') { setTitle('Compre e ganhe'); setDiscountValue(''); }
+  };
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const itemIds = [...new Set([...selected, ...(benefitType === 'free_product' && rewardProductId ? [rewardProductId] : [])])];
+      const response = await fetch('/api/promotions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, title, description, benefit_type: benefitType, discount_value: discountValue, reward_product_id: rewardProductId, items: itemIds.map(product_id => ({ product_id, quantity: product_id === rewardProductId ? 1 : Math.max(1, selectedQuantities[product_id] || 1), group: product_id === rewardProductId ? 'brinde' : 'principal' })), starts_at: startsAt ? new Date(startsAt).toISOString() : null, ends_at: endsAt ? new Date(endsAt).toISOString() : null, limit_per_order: 1 }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Nao foi possivel criar a promocao.');
+      setTitle(''); setDescription(''); setSelected([]); setSelectedQuantities({}); setRewardProductId(''); await onChanged();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Erro ao criar promocao.'); }
+    finally { setSaving(false); }
+  };
+  const toggle = async (promotion: FlexiblePromotion) => {
+    const response = await fetch('/api/promotions', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, id: promotion.id, active: !promotion.ativa }) });
+    if (response.ok) await onChanged();
+  };
+  const remove = async (promotion: FlexiblePromotion) => {
+    if (!confirm(`Excluir a promocao "${promotion.titulo}"?`)) return;
+    const response = await fetch(`/api/promotions?vendor_id=${vendorId}&id=${promotion.id}`, { method: 'DELETE' });
+    if (response.ok) await onChanged();
+  };
+  const benefitLabel = (promotion: FlexiblePromotion) => promotion.descricao?.startsWith('[PRODUTO_GRATIS]') ? 'Produto gratis' : promotion.desconto_tipo === 'percentual' ? `${promotion.desconto_valor}% de desconto` : promotion.desconto_tipo === 'preco_fechado' ? `Combo por ${formatCurrency(Number(promotion.desconto_valor))}` : `${formatCurrency(Number(promotion.desconto_valor))} de desconto`;
+  const selectedGross = [...new Set([...selected, ...(benefitType === 'free_product' && rewardProductId ? [rewardProductId] : [])])].reduce((sum, id) => {
+    const product = products.find(item => item.id === id);
+    const quantity = id === rewardProductId ? 1 : Math.max(1, selectedQuantities[id] || 1);
+    return sum + Number(product?.promotional_price ?? product?.price ?? 0) * quantity;
+  }, 0);
+  const numericBenefit = Math.max(0, Number(discountValue || 0));
+  const reward = products.find(product => product.id === rewardProductId);
+  const rewardPrice = Number(reward?.promotional_price ?? reward?.price ?? 0);
+  const projectedDiscount = benefitType === 'percent' ? selectedGross * Math.min(100, numericBenefit) / 100 : benefitType === 'closed_price' ? Math.max(0, selectedGross - numericBenefit) : benefitType === 'free_product' ? rewardPrice : Math.min(selectedGross, numericBenefit);
+  const projectedTotal = Math.max(0, selectedGross - projectedDiscount);
+  const invalidClosedPrice = benefitType === 'closed_price' && (numericBenefit <= 0 || numericBenefit >= selectedGross);
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-2 sm:items-center sm:p-4" onClick={onClose}><div className="max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6" onClick={event => event.stopPropagation()}>
+    <div className="flex justify-between gap-4"><div><p className="text-xs font-black uppercase text-green-700">Ofertas automaticas</p><h3 className="text-2xl font-black text-gray-950">Promoções prontas</h3><p className="mt-1 text-sm font-bold text-gray-600">O desconto entra automaticamente quando todos os produtos estiverem no carrinho.</p></div><button onClick={onClose}><X /></button></div>
+    <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{([['percent','10% OFF'],['fixed','R$ de desconto'],['closed_price','Preço de combo'],['free_product','Produto grátis']] as const).map(([type, label]) => <button key={type} onClick={() => applyTemplate(type)} className={`rounded-xl border-2 p-3 text-sm font-black ${benefitType === type ? 'border-green-600 bg-green-50 text-green-800' : 'border-gray-200 text-gray-600'}`}>{label}</button>)}</div>
+    <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm font-black text-gray-800">Nome da oferta<input value={title} onChange={event => setTitle(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-green-600" placeholder="Ex: Combo fim de tarde" /></label>{benefitType !== 'free_product' && <label className="text-sm font-black text-gray-800">{benefitType === 'percent' ? 'Percentual' : benefitType === 'closed_price' ? 'Preço final do combo' : 'Valor do desconto'}<input type="number" min="0" step="0.01" value={discountValue} onChange={event => setDiscountValue(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-green-600" /></label>}</div>
+    <textarea value={description} onChange={event => setDescription(event.target.value)} className="mt-4 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3" placeholder="Mensagem que o cliente verá" />
+    <p className="mt-4 text-sm font-black text-gray-800">Produtos necessários para ativar a oferta</p><div className="mt-2 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">{products.map(product => { const checked = selected.includes(product.id); return <div key={product.id} className={`rounded-xl border p-3 text-sm font-bold ${checked ? 'border-green-400 bg-green-50 text-gray-900' : 'border-gray-200 text-gray-800'}`}><label className="flex items-center gap-2"><input type="checkbox" checked={checked} onChange={event => { setSelected(current => event.target.checked ? [...current, product.id] : current.filter(id => id !== product.id)); if (event.target.checked) setSelectedQuantities(current => ({ ...current, [product.id]: current[product.id] || 1 })); }} /><span className="min-w-0 flex-1 truncate">{product.name}</span><span className="text-xs text-gray-600">{formatCurrency(Number(product.promotional_price ?? product.price))}</span></label>{checked && <label className="mt-2 flex items-center justify-between gap-3 text-xs font-black text-gray-700">Quantidade<input type="number" min="1" max="50" value={selectedQuantities[product.id] || 1} onChange={event => setSelectedQuantities(current => ({ ...current, [product.id]: Math.max(1, Math.min(50, Number(event.target.value) || 1)) }))} className="h-9 w-20 rounded-lg border border-green-300 bg-white px-2 text-center text-sm font-black" /></label>}</div>; })}</div>
+    {benefitType === 'free_product' && <label className="mt-4 block text-sm font-black text-gray-800">Produto grátis<select value={rewardProductId} onChange={event => setRewardProductId(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3"><option value="">Escolha o brinde</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>}
+    {selectedGross > 0 && <div className={`mt-4 rounded-xl border p-4 ${invalidClosedPrice ? 'border-red-300 bg-red-50' : 'border-green-200 bg-green-50'}`}><p className="text-xs font-black uppercase text-gray-700">Simulação da oferta</p><div className="mt-2 grid grid-cols-3 gap-2 text-center"><div><p className="text-xs font-bold text-gray-600">Preço normal</p><p className="font-black text-gray-900">{formatCurrency(selectedGross)}</p></div><div><p className="text-xs font-bold text-gray-600">Economia</p><p className="font-black text-green-700">{formatCurrency(projectedDiscount)}</p></div><div><p className="text-xs font-bold text-gray-600">Cliente paga</p><p className="font-black text-green-800">{formatCurrency(projectedTotal)}</p></div></div>{invalidClosedPrice && <p className="mt-2 text-sm font-black text-red-800">O preço do combo precisa ser menor que {formatCurrency(selectedGross)}.</p>}</div>}
+    <details className="mt-4 rounded-xl border border-gray-200 p-3"><summary className="cursor-pointer text-sm font-black text-gray-700">Agendar início e fim (opcional)</summary><div className="mt-3 grid gap-3 sm:grid-cols-2"><input type="datetime-local" value={startsAt} onChange={event => setStartsAt(event.target.value)} className="rounded-xl border-2 border-gray-200 p-3" /><input type="datetime-local" value={endsAt} onChange={event => setEndsAt(event.target.value)} className="rounded-xl border-2 border-gray-200 p-3" /></div></details>
+    {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<button disabled={saving || title.trim().length < 3 || selected.length === 0 || invalidClosedPrice || (benefitType === 'free_product' && (!rewardProductId || !selected.some(id => id !== rewardProductId)))} onClick={save} className="mt-4 min-h-13 w-full rounded-xl bg-green-600 py-3 font-black text-white disabled:opacity-40">{saving ? 'Salvando...' : 'Criar promoção'}</button>
+    <div className="mt-6 border-t pt-5"><h4 className="font-black text-gray-950">Promoções cadastradas</h4><div className="mt-3 space-y-2">{promotions.map(promotion => <div key={promotion.id} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 p-3"><div className="min-w-0"><p className="truncate font-black text-gray-900">{promotion.titulo}</p><p className="text-xs font-bold text-green-700">{benefitLabel(promotion)} · {promotion.promocao_itens?.map(item => item.products?.name).filter(Boolean).join(' + ')}</p></div><div className="flex gap-2"><button onClick={() => toggle(promotion)} className={`rounded-lg px-3 py-2 text-xs font-black ${promotion.ativa ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}`}>{promotion.ativa ? 'Ativa' : 'Pausada'}</button><button onClick={() => remove(promotion)} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 size={17} /></button></div></div>)}{promotions.length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhuma promoção cadastrada.</p>}</div></div>
+  </div></div>;
+}
+
+function UpsellSettingsModal({ products, initialRules, onClose, onSave }: { products: Product[]; initialRules: UpsellRule[]; onClose: () => void; onSave: (rules: UpsellRule[]) => Promise<void> }) {
+  const [rules, setRules] = useState<UpsellRule[]>(initialRules);
+  const [trigger, setTrigger] = useState(products[0]?.id || "");
+  const [targets, setTargets] = useState<string[]>([]);
+  const [message, setMessage] = useState("Que tal adicionar também?");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const addRule = () => {
+    if (!trigger || targets.length === 0) return setError("Escolha o produto principal e ao menos um complemento.");
+    setRules(current => [...current.filter(rule => rule.trigger_product_id !== trigger), { trigger_product_id: trigger, suggested_product_ids: targets, message }]);
+    setTargets([]); setError("");
+  };
+  const save = async () => { setSaving(true); setError(""); try { await onSave(rules); } catch (e) { setError(e instanceof Error ? e.message : "Erro ao salvar."); } finally { setSaving(false); } };
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}><div className="flex justify-between"><div><p className="text-xs font-black uppercase text-blue-600">Upsell</p><h3 className="text-2xl font-black text-gray-900">Sugestões de venda</h3><p className="text-sm font-bold text-gray-500">Escolha o que oferecer quando um produto entrar no carrinho.</p></div><button onClick={onClose}><X /></button></div><label className="mt-5 block text-sm font-black text-gray-700">Quando o cliente adicionar<select value={trigger} onChange={e => setTrigger(e.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3">{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><p className="mt-4 text-sm font-black text-gray-700">Sugerir estes complementos</p><div className="mt-2 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">{products.filter(product => product.id !== trigger).map(product => <label key={product.id} className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 text-sm font-bold text-gray-700"><input type="checkbox" checked={targets.includes(product.id)} onChange={e => setTargets(current => e.target.checked ? [...current, product.id] : current.filter(id => id !== product.id))} />{product.name}</label>)}</div><input value={message} onChange={e => setMessage(e.target.value)} maxLength={120} className="mt-4 w-full rounded-xl border-2 border-gray-200 p-3" placeholder="Mensagem da sugestão" /><button onClick={addRule} className="mt-3 w-full rounded-xl border-2 border-blue-500 py-3 font-black text-blue-700">Adicionar regra</button><div className="mt-5 space-y-2">{rules.map((rule, index) => <div key={`${rule.trigger_product_id}-${index}`} className="flex items-center justify-between rounded-xl bg-gray-50 p-3"><div><p className="font-black text-gray-900">{products.find(p => p.id === rule.trigger_product_id)?.name}</p><p className="text-xs font-bold text-gray-500">Sugere {rule.suggested_product_ids.map(id => products.find(p => p.id === id)?.name).filter(Boolean).join(", ")}</p></div><button onClick={() => setRules(current => current.filter((_, i) => i !== index))} className="text-red-600"><Trash2 size={18} /></button></div>)}</div>{error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<button disabled={saving} onClick={save} className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-black text-white disabled:opacity-50">{saving ? "Salvando..." : "Salvar sugestões"}</button></div></div>;
+}
+
 function StockAdjustmentModal({ products, onClose, onSubmit }: {
   products: Product[];
   onClose: () => void;
@@ -3124,6 +3674,7 @@ function CashControlModal({ mode, cashControl, cashSales, submitting, onClose, o
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (needsReason && !reason) return setError("Escolha uma justificativa para a diferença.");
+    if (needsReason && notes.trim().length < 5) return setError("Explique em poucas palavras o que causou a diferença.");
     setError("");
     try {
       await onSubmit(mode === "open"
@@ -3156,12 +3707,12 @@ function CashControlModal({ mode, cashControl, cashSales, submitting, onClose, o
         {needsReason && (
           <label className="mt-4 block text-sm font-black text-gray-700">Justificativa obrigatória
             <select required value={reason} onChange={event => setReason(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]">
-              <option value="">Selecione</option><option value="discount">Desconto concedido</option><option value="loss">Perda ou quebra</option><option value="typing_error">Erro de digitação</option><option value="change_error">Erro de troco</option><option value="unregistered_expense">Despesa não registrada</option><option value="cash_withdrawal">Sangria/retirada</option><option value="other">Outro motivo</option>
+              <option value="">Selecione</option><option value="discount">Desconto concedido</option><option value="loss">Perda ou quebra</option><option value="typing_error">Erro de digitação</option><option value="change_error">Erro de troco</option><option value="payment_method_error">Forma de pagamento incorreta</option><option value="unregistered_expense">Despesa não registrada</option><option value="cash_withdrawal">Sangria/retirada</option><option value="cash_deposit">Suprimento/entrada não registrada</option><option value="other">Outro motivo</option>
             </select>
           </label>
         )}
-        <label className="mt-4 block text-sm font-black text-gray-700">Observação
-          <textarea value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} className="mt-2 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]" placeholder="Detalhes opcionais" />
+        <label className="mt-4 block text-sm font-black text-gray-700">Observação {needsReason ? "obrigatória" : "opcional"}
+          <textarea required={needsReason} value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} className="mt-2 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]" placeholder={needsReason ? "Explique o que causou a diferença" : "Detalhes da abertura ou fechamento"} />
         </label>
         {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
         <button disabled={submitting} className="mt-5 min-h-12 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white disabled:opacity-50">{submitting ? "Processando..." : mode === "open" ? "Confirmar abertura" : "Conferir e fechar"}</button>
@@ -3396,6 +3947,8 @@ function ManualOrderMenuModal({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [configuringProduct, setConfiguringProduct] = useState<Product | null>(null);
+  const [optionSelections, setOptionSelections] = useState<Record<string, string>>({});
   const availableProducts = products.filter(product => product.active && !product.blocked_by_stock && product.name.toLowerCase().includes(search.toLowerCase()));
   const priceFor = (product: Product) => Number(product.promotional_price ?? product.price);
   const totalItems = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
@@ -3404,11 +3957,13 @@ function ManualOrderMenuModal({
   const changeQuantity = (productId: string, delta: number) => {
     setCart(current => ({ ...current, [productId]: Math.max(0, Math.min(50, (current[productId] || 0) + delta)) }));
   };
+  const optionSignature = (product: Product) => productOptionGroups(product).map(group => `${group.name}: ${optionSelections[`${product.id}:${group.name}`] || group.options[0]}`).join(' | ');
   const handleSubmit = async () => {
     setSubmitting(true);
     setError('');
     try {
-      await onSubmit(order, cart, notes);
+      const optionNotes = products.filter(product => (cart[product.id] || 0) > 0 && productOptionGroups(product).length > 0).map(product => `${product.name}: ${optionSignature(product)}`).join('; ');
+      await onSubmit(order, cart, [notes.trim(), optionNotes ? `Opcoes escolhidas: ${optionNotes}` : ''].filter(Boolean).join('\n'));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel lancar os itens.');
     } finally {
@@ -3427,40 +3982,60 @@ function ManualOrderMenuModal({
           <div className="relative mt-4"><Search className="absolute left-3 top-3.5 text-gray-400" size={18} /><input value={search} onChange={event => setSearch(event.target.value)} className="w-full rounded-xl border-2 border-gray-200 py-3 pl-10 pr-4 outline-none focus:border-[#FF6B00]" placeholder="Buscar no cardapio" /></div>
         </div>
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
-          {availableProducts.map(product => (
-            <div key={product.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3">
-              <div className="min-w-0"><p className="truncate font-black text-gray-900">{product.name}</p><p className="text-xs font-bold text-gray-400">{product.category}</p><p className="font-black text-[#FF6B00]">{formatCurrency(priceFor(product))}</p></div>
-              <div className="flex items-center gap-2"><button onClick={() => changeQuantity(product.id, -1)} className="h-10 w-10 rounded-xl bg-gray-100 text-xl font-black">-</button><span className="w-7 text-center font-black">{cart[product.id] || 0}</span><button onClick={() => changeQuantity(product.id, 1)} className="h-10 w-10 rounded-xl bg-[#FF6B00] text-xl font-black text-white">+</button></div>
-            </div>
-          ))}
+          {availableProducts.map(product => { const groups = productOptionGroups(product); return <div key={product.id} className="rounded-xl border border-gray-200 bg-white p-3"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate font-black text-gray-900">{product.name}</p><p className="text-xs font-bold text-gray-500">{product.category}</p><p className="font-black text-[#FF6B00]">{formatCurrency(priceFor(product))}</p>{groups.length > 0 && (cart[product.id] || 0) > 0 && <p className="mt-1 text-xs font-black text-blue-700">{optionSignature(product)}</p>}</div><div className="flex items-center gap-2"><button onClick={() => changeQuantity(product.id, -1)} className="h-10 w-10 rounded-xl bg-gray-100 text-xl font-black">-</button><span className="w-7 text-center font-black">{cart[product.id] || 0}</span><button onClick={() => groups.length > 0 ? setConfiguringProduct(product) : changeQuantity(product.id, 1)} className="h-10 w-10 rounded-xl bg-[#FF6B00] text-xl font-black text-white">+</button></div></div>{groups.length > 0 && <button type="button" onClick={() => setConfiguringProduct(product)} className="mt-2 w-full rounded-lg border border-blue-200 bg-blue-50 py-2 text-xs font-black text-blue-700">Escolher opcoes</button>}</div>; })}
           {availableProducts.length === 0 && <p className="py-8 text-center font-bold text-gray-400">Nenhum item disponivel.</p>}
           <textarea value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} className="mt-3 min-h-20 w-full rounded-xl border-2 border-gray-200 p-3 outline-none focus:border-[#FF6B00]" placeholder="Observacao do pedido (opcional)" />
           {error && <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
         </div>
         <div className="flex items-center justify-between gap-4 border-t border-gray-100 p-4"><div><p className="text-xs font-bold text-gray-400">{totalItems} itens</p><p className="text-xl font-black text-[#FF6B00]">{formatCurrency(total)}</p></div><button disabled={submitting || totalItems === 0} onClick={handleSubmit} className="min-h-12 rounded-xl bg-blue-600 px-6 py-3 font-black text-white disabled:opacity-40">{submitting ? 'Lancando...' : 'Lancar pedido'}</button></div>
       </div>
+      {configuringProduct && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setConfiguringProduct(null)}><div className="w-full max-w-md rounded-3xl bg-white p-5" onClick={event => event.stopPropagation()}><button type="button" onClick={() => setConfiguringProduct(null)} className="float-right text-2xl text-gray-500">×</button><p className="text-xs font-black uppercase text-blue-700">Escolher opcoes</p><h4 className="text-xl font-black text-gray-950">{configuringProduct.name}</h4><div className="mt-4 space-y-3">{productOptionGroups(configuringProduct).map(group => <div key={group.name} className="rounded-xl border border-gray-200 p-3"><p className="text-sm font-black text-gray-800">{group.name}</p><div className="mt-2 flex flex-wrap gap-2">{group.options.map(option => <button key={option} type="button" onClick={() => setOptionSelections(current => ({ ...current, [`${configuringProduct.id}:${group.name}`]: option }))} className={`rounded-full border px-3 py-2 text-sm font-black ${(optionSelections[`${configuringProduct.id}:${group.name}`] || group.options[0]) === option ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{option}</button>)}</div></div>)}</div><button type="button" onClick={() => { changeQuantity(configuringProduct.id, 1); setConfiguringProduct(null); }} className="mt-4 min-h-12 w-full rounded-xl bg-blue-600 font-black text-white">Adicionar com estas escolhas</button></div></div>}
     </div>
   );
 }
 
 function PaymentMethodModal({
   order,
+  vendorId,
   settings,
   onClose,
   onConfirm,
 }: {
   order: Order;
+  vendorId: string;
   settings: KioskTheme;
   onClose: () => void;
-  onConfirm: (order: Order, paymentMethod: string) => Promise<void>;
+  onConfirm: (order: Order, paymentMethod: string, amount: number, payerName: string) => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [remaining, setRemaining] = useState(Number(order.total || 0));
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [serviceFeeAmount, setServiceFeeAmount] = useState(0);
+  const [mode, setMode] = useState<'full' | 'partial'>('full');
+  const [amount, setAmount] = useState(String(order.total || ''));
+  const [payerName, setPayerName] = useState(order.customer || 'Cliente');
+  const [paymentMethod, setPaymentMethod] = useState('pix');
   const activePaymentOptions = PAYMENT_METHOD_OPTIONS.filter(({ id }) => settings[`${id}_active` as keyof KioskTheme] !== false);
 
-  const handleConfirm = async (paymentMethod: string) => {
+  useEffect(() => {
+    fetch(`/api/account-payments?vendor_id=${vendorId}&order_id=${order.id}`)
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data) return;
+        const nextRemaining = Number(data.remaining_amount || 0);
+        setRemaining(nextRemaining);
+        setPaidAmount(Number(data.paid_amount || 0));
+        setServiceFeeAmount(Number(data.service_fee_amount || 0));
+        setAmount(String(nextRemaining));
+      })
+      .finally(() => setLoadingSummary(false));
+  }, [vendorId, order.id]);
+
+  const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      await onConfirm(order, paymentMethod);
+      await onConfirm(order, paymentMethod, mode === 'full' ? remaining : Number(amount), payerName);
     } finally {
       setSubmitting(false);
     }
@@ -3472,26 +4047,31 @@ function PaymentMethodModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase text-[#FF6B00]">Guarda-sol {order.umbrella}</p>
-            <h3 className="text-xl font-display font-bold text-gray-900">Conta paga</h3>
-            <p className="mt-1 text-sm font-bold text-gray-500">{order.customer} - {formatCurrency(order.total)}</p>
+            <h3 className="text-xl font-display font-bold text-gray-900">Receber conta</h3>
+            <p className="mt-1 text-sm font-bold text-gray-500">{order.customer} · Consumo {formatCurrency(order.total)}{serviceFeeAmount > 0 ? ` + serviço ${formatCurrency(serviceFeeAmount)}` : ''}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-xl bg-green-50 p-3"><p className="text-xs font-black text-green-700">JA RECEBIDO</p><p className="text-xl font-black text-green-700">{formatCurrency(paidAmount)}</p></div><div className="rounded-xl bg-orange-50 p-3"><p className="text-xs font-black text-orange-700">SALDO</p><p className="text-xl font-black text-[#FF6B00]">{formatCurrency(remaining)}</p></div></div>
+        <div className="mt-4 grid grid-cols-2 gap-2"><button onClick={() => { setMode('full'); setAmount(String(remaining)); }} className={`rounded-xl border-2 p-3 text-sm font-black ${mode === 'full' ? 'border-green-600 bg-green-50 text-green-800' : 'border-gray-200 text-gray-600'}`}>Receber saldo</button><button onClick={() => setMode('partial')} className={`rounded-xl border-2 p-3 text-sm font-black ${mode === 'partial' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-gray-200 text-gray-600'}`}>Receber parte</button></div>
+        <input value={payerName} onChange={event => setPayerName(event.target.value)} className="mt-4 w-full rounded-xl border-2 border-gray-200 p-3 font-bold outline-none focus:border-[#FF6B00]" placeholder="Nome de quem pagou" />
+        {mode === 'partial' && <input value={amount} onChange={event => setAmount(event.target.value.replace(',', '.'))} inputMode="decimal" className="mt-3 w-full rounded-xl border-2 border-gray-200 p-3 text-lg font-black outline-none focus:border-blue-600" placeholder="Valor recebido" />}
+        <p className="mb-2 mt-4 text-sm font-black text-gray-700">Forma de pagamento</p><div className="grid grid-cols-2 gap-3">
           {activePaymentOptions.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
               disabled={submitting}
-              onClick={() => handleConfirm(id)}
-              className="min-h-24 rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 text-left transition hover:border-[#FF6B00] hover:bg-[#FFF2E5] disabled:opacity-50"
+              onClick={() => setPaymentMethod(id)}
+              className={`min-h-20 rounded-2xl border-2 p-4 text-left transition disabled:opacity-50 ${paymentMethod === id ? 'border-[#FF6B00] bg-[#FFF2E5]' : 'border-gray-100 bg-gray-50'}`}
             >
               <Icon className="mb-3 text-[#FF6B00]" size={24} />
               <span className="block font-black text-gray-900">{label}</span>
             </button>
           ))}
         </div>
+        <button disabled={submitting || loadingSummary || remaining <= 0 || (mode === 'partial' && (Number(amount) <= 0 || Number(amount) > remaining))} onClick={handleConfirm} className="mt-5 min-h-14 w-full rounded-xl bg-green-600 font-black text-white disabled:opacity-40">{submitting ? 'Registrando...' : mode === 'full' ? `Receber ${formatCurrency(remaining)} e fechar` : `Registrar ${formatCurrency(Number(amount || 0))}`}</button>
       </div>
     </div>
   );
@@ -3527,9 +4107,14 @@ function ProductModal({
     sort_order: 99,
   });
   const [hasOptions, setHasOptions] = useState(() => Boolean(product?.option_group_name || product?.option_values?.length));
-  const [optionRows, setOptionRows] = useState<string[]>(() => {
+  const [optionGroups, setOptionGroups] = useState<Array<{ name: string; options: string[] }>>(() => {
     const values = Array.isArray(product?.option_values) ? product.option_values.filter(Boolean) : [];
-    return values.length > 0 ? values : [""];
+    if (values.some(value => value.includes('::'))) {
+      const groups = new Map<string, string[]>();
+      values.forEach(value => { const [rawName, ...parts] = value.split('::'); const name = rawName.trim() || 'Opcao'; const option = parts.join('::').trim(); if (option) groups.set(name, [...(groups.get(name) || []), option]); });
+      return Array.from(groups, ([name, options]) => ({ name, options }));
+    }
+    return [{ name: product?.option_group_name || 'Opcao', options: values.length > 0 ? values : [''] }];
   });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
@@ -3542,16 +4127,12 @@ function ProductModal({
     ? categories.filter(category => category.parent_id === selectedRoot.id && category.active !== false)
     : [];
   const categoryNames = Array.from(new Set([...existingCategoryNames, ...rootCategories.map(category => category.name)].filter(Boolean)));
-  const normalizedOptionValues = optionRows.map(item => item.trim()).filter(Boolean).slice(0, 30);
+  const normalizedOptionGroups = optionGroups.map(group => ({ name: group.name.trim() || 'Opcao', options: group.options.map(option => option.trim()).filter(Boolean) })).filter(group => group.options.length > 0).slice(0, 8);
+  const normalizedOptionValues = normalizedOptionGroups.flatMap(group => group.options.map(option => `${group.name}::${option}`)).slice(0, 50);
 
-  const updateOptionRow = (index: number, value: string) => {
-    setOptionRows(prev => prev.map((item, currentIndex) => currentIndex === index ? value : item));
-  };
-
-  const addOptionRow = () => setOptionRows(prev => [...prev, ""]);
-  const removeOptionRow = (index: number) => {
-    setOptionRows(prev => prev.length <= 1 ? [""] : prev.filter((_, currentIndex) => currentIndex !== index));
-  };
+  const updateOptionGroup = (groupIndex: number, updater: (group: { name: string; options: string[] }) => { name: string; options: string[] }) => setOptionGroups(current => current.map((group, index) => index === groupIndex ? updater(group) : group));
+  const addOptionGroup = () => setOptionGroups(current => [...current, { name: `Escolha ${current.length + 1}`, options: [''] }]);
+  const removeOptionGroup = (groupIndex: number) => setOptionGroups(current => current.length <= 1 ? [{ name: 'Opcao', options: [''] }] : current.filter((_, index) => index !== groupIndex));
 
   const createSubcategory = async () => {
     if (!vendorId || !selectedRoot?.id || !newSubcategoryName.trim()) {
@@ -3804,7 +4385,7 @@ function ProductModal({
                     onChange={e => {
                       const checked = e.target.checked;
                       setHasOptions(checked);
-                      if (checked && optionRows.length === 0) setOptionRows([""]);
+                      if (checked && optionGroups.length === 0) setOptionGroups([{ name: 'Opcao', options: [''] }]);
                     }}
                     className="w-5 h-5 accent-[#FF6B00]"
                   />
@@ -3812,45 +4393,9 @@ function ProductModal({
                 </label>
                 {hasOptions && (
                   <div className="mt-3 space-y-3 rounded-xl border border-orange-100 bg-white p-4">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1">Nome do grupo</label>
-                      <input
-                        value={form.option_group_name || ""}
-                        onChange={e => setForm(prev => ({ ...prev, option_group_name: e.target.value }))}
-                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                        placeholder="Ex: Sabor, Fruta, Refrigerante"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-bold text-gray-700">Linhas de opção</label>
-                        <button
-                          type="button"
-                          onClick={addOptionRow}
-                          className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-black text-white hover:bg-[#e56000]"
-                        >
-                          + Adicionar opção
-                        </button>
-                      </div>
-                      {optionRows.map((value, index) => (
-                        <div key={index} className="flex gap-2">
-                          <input
-                            value={value}
-                            onChange={e => updateOptionRow(index, e.target.value)}
-                            className="min-w-0 flex-1 border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
-                            placeholder={index === 0 ? "Ex: Limão" : "Nova opção"}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeOptionRow(index)}
-                            className="shrink-0 rounded-xl border border-red-200 px-3 py-2 text-sm font-black text-red-700 hover:bg-red-50"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs font-bold text-gray-500">Cada linha vira uma escolha no cardápio do cliente antes de adicionar ao carrinho.</p>
+                    <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-black text-gray-900">Etapas de escolha</p><p className="text-xs font-bold text-gray-500">Ex.: bebida, acompanhamento e molho.</p></div><button type="button" onClick={addOptionGroup} className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-black text-white hover:bg-[#e56000]">+ Novo grupo</button></div>
+                    {optionGroups.map((group, groupIndex) => <div key={groupIndex} className="rounded-xl border-2 border-orange-100 bg-orange-50/40 p-3"><div className="flex gap-2"><input value={group.name} onChange={event => updateOptionGroup(groupIndex, current => ({ ...current, name: event.target.value }))} className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 bg-white p-3 font-black outline-none focus:border-[#FF6B00]" placeholder="Nome do grupo: Bebida" /><button type="button" onClick={() => removeOptionGroup(groupIndex)} className="rounded-xl border border-red-200 px-3 text-xs font-black text-red-700 hover:bg-red-50">Remover grupo</button></div><div className="mt-3 space-y-2">{group.options.map((option, optionIndex) => <div key={optionIndex} className="flex gap-2"><input value={option} onChange={event => updateOptionGroup(groupIndex, current => ({ ...current, options: current.options.map((value, index) => index === optionIndex ? event.target.value : value) }))} className="min-w-0 flex-1 rounded-xl border-2 border-gray-200 bg-white p-3 outline-none focus:border-[#FF6B00]" placeholder={optionIndex === 0 ? 'Ex.: Coca-Cola' : 'Nova escolha'} /><button type="button" onClick={() => updateOptionGroup(groupIndex, current => ({ ...current, options: current.options.length <= 1 ? [''] : current.options.filter((_, index) => index !== optionIndex) }))} className="rounded-xl border border-red-200 px-3 text-sm font-black text-red-700">×</button></div>)}</div><button type="button" onClick={() => updateOptionGroup(groupIndex, current => ({ ...current, options: [...current.options, ''] }))} className="mt-2 w-full rounded-lg border-2 border-dashed border-orange-300 py-2 text-xs font-black text-[#9A3E00]">+ Adicionar escolha</button></div>)}
+                    <p className="text-xs font-bold text-gray-600">O cliente escolhe uma opção de cada grupo antes de adicionar o combo ao carrinho.</p>
                   </div>
                 )}
               </div>
@@ -3971,7 +4516,7 @@ function ProductModal({
                 ...form,
                 category: form.category.trim(),
                 subcategory: form.subcategory?.trim() || null,
-                option_group_name: hasOptions ? (form.option_group_name?.trim() || "Opcao") : "",
+                option_group_name: hasOptions ? (normalizedOptionGroups.length > 1 ? "Monte seu combo" : normalizedOptionGroups[0]?.name || "Opcao") : "",
                 option_values: hasOptions ? normalizedOptionValues : [],
                 menu_highlight: Boolean(form.menu_highlight || form.is_combo || form.promotional_price),
               });

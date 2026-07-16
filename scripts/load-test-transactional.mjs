@@ -20,6 +20,11 @@ const runId = `codex-load-${new Date().toISOString().replace(/\D/g, '').slice(0,
 const registrationIp = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
 const reportPath = process.env.LOAD_TEST_REPORT_PATH || null;
 const orderConcurrency = Number(process.env.LOAD_TEST_ORDER_CONCURRENCY || 2500);
+const totalVendors = Math.min(1000, Math.max(1, Number(process.env.LOAD_TEST_VENDOR_COUNT || 50)));
+const activeVendorCount = Math.min(totalVendors, Math.max(1, Number(process.env.LOAD_TEST_ACTIVE_VENDOR_COUNT || 25)));
+const umbrellasPerVendor = Math.min(100, Math.max(1, Number(process.env.LOAD_TEST_UMBRELLAS_PER_VENDOR || 10)));
+const requestsPerUmbrella = Math.max(1, Number(process.env.LOAD_TEST_REQUESTS_PER_UMBRELLA || 10));
+const seededVendorLimit = Math.min(100, Math.max(1, Number(process.env.LOAD_TEST_VENDOR_LIMIT || 100)));
 
 if (confirmation !== 'CREATE_AND_DELETE') throw new Error('Defina LOAD_TEST_CONFIRM=CREATE_AND_DELETE.');
 if (!supabaseUrl || !serviceKey || !sessionSecret) throw new Error('Variáveis Supabase/SESSION_SECRET ausentes.');
@@ -110,7 +115,7 @@ async function cleanup() {
   if (createdTenantIds.length) cleanup.tenants = await admin.from('tenants').delete().in('id', createdTenantIds);
   cleanup.beaches = await admin.from('beaches').delete().ilike('name', `${runId}%`);
   cleanup.rate_limit = await admin.from('rate_limit_buckets').delete().eq('key', `vendor-register:${registrationIp}`);
-  for (const table of ['tenants', 'vendors', 'umbrellas', 'customers', 'products', 'orders', 'order_items']) {
+  for (const table of ['tenants', 'vendors', 'umbrellas', 'customers', 'products', 'orders', 'order_items', 'daily_closings']) {
     const column = table === 'tenants' ? 'id' : 'tenant_id';
     const { count, error } = await admin.from(table).select('id', { head: true, count: 'exact' }).in(column, createdTenantIds.length ? createdTenantIds : [crypto.randomUUID()]);
     cleanup.remaining[table] = error ? `ERROR ${error.code}: ${error.message}` : count;
@@ -122,7 +127,7 @@ async function cleanup() {
 
 let finalReport;
 try {
-  const tenants = await insert('tenants', Array.from({ length: 50 }, (_, i) => ({
+  const tenants = await insert('tenants', Array.from({ length: totalVendors }, (_, i) => ({
     name: `${runId}-tenant-${i + 1}`,
     status: 'active', city: 'Load Test', state: 'SP', beach_name: runId,
   })));
@@ -136,7 +141,7 @@ try {
     owner_phone: `119${String(10000000 + i).slice(-8)}`,
     owner_email: 'delivered@resend.dev',
     city: 'Load Test', state: 'SP', beach_name: runId,
-    subscription_status: 'trial', plan_type: 'trial', max_umbrellas: 50, is_active: true,
+    subscription_status: 'trial', plan_type: 'trial', max_umbrellas: seededVendorLimit, is_active: true,
   })));
 
   const features = [];
@@ -147,7 +152,7 @@ try {
   }
   await insert('tenant_features', features);
 
-  const umbrellas = await insert('umbrellas', vendors.flatMap((vendor) => Array.from({ length: 10 }, (_, i) => ({
+  const umbrellas = await insert('umbrellas', vendors.flatMap((vendor) => Array.from({ length: umbrellasPerVendor }, (_, i) => ({
     tenant_id: vendor.tenant_id, vendor_id: vendor.id, number: i + 1,
     label: `${runId}-guarda-sol-${i + 1}`, active: true, is_occupied: false,
   }))));
@@ -157,7 +162,20 @@ try {
     price: 10 + i, active: true, stock_tracking_enabled: false,
   }))));
 
-  const activeVendors = vendors.slice(0, 25);
+  const activeVendors = vendors.slice(0, activeVendorCount);
+  const openedAt = new Date().toISOString();
+  const currentBusinessDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const dailyClosings = await insert('daily_closings', activeVendors.map((vendor) => ({
+    tenant_id: vendor.tenant_id,
+    vendor_id: vendor.id,
+    business_date: currentBusinessDate,
+    closed_by: `cash_control:${JSON.stringify({
+      status: 'open', opened_at: openedAt, opened_by: 'load-test', opening_cash: 0,
+    })}`,
+    closed_at: openedAt,
+  })));
   const activeUmbrellas = umbrellas.filter((row) => activeVendors.some((vendor) => vendor.id === row.vendor_id));
   const customers = await insert('customers', activeUmbrellas.map((umbrella, i) => ({
     tenant_id: umbrella.tenant_id, vendor_id: umbrella.vendor_id,
@@ -176,7 +194,7 @@ try {
   }
 
   const orderCalls = [];
-  for (let request = 1; request <= 10; request++) {
+  for (let request = 1; request <= requestsPerUmbrella; request++) {
     for (const umbrella of activeUmbrellas) {
       const vendorUmbrellas = activeUmbrellas.filter((item) => item.vendor_id === umbrella.vendor_id);
       const index = vendorUmbrellas.findIndex((item) => item.id === umbrella.id);
@@ -187,7 +205,7 @@ try {
       orderCalls.push(() => http('/api/orders', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie, 'user-agent': `SandExpress-Load/${runId}`, 'x-forwarded-for': virtualClientIp },
-        body: JSON.stringify({ vendor_id: umbrella.vendor_id, customer_id: customer.id, umbrella_id: umbrella.id, items: [{ product_id: product.id, quantity: 1 }], notes: `${runId}-${request}` }),
+        body: JSON.stringify({ vendor_id: umbrella.vendor_id, customer_id: customer.id, umbrella_id: umbrella.id, items: [{ product_id: product.id, quantity: 1 }], notes: `${runId}-${request}`, idempotency_key: crypto.randomUUID() }),
       }));
     }
   }
@@ -196,11 +214,15 @@ try {
   const orderResponses = await runWithConcurrency(orderCalls, orderConcurrency);
   const orderStatuses = new Map();
   for (const response of orderResponses) orderStatuses.set(response.status, (orderStatuses.get(response.status) || 0) + 1);
-  summarize(`2.500 pedidos / concorrência ${orderConcurrency}`, orderResponses.map((item) => item.latency), orderStatuses, orderStarted);
+  const orderMetric = summarize(`${orderCalls.length} pedidos / concorrência ${orderConcurrency}`, orderResponses.map((item) => item.latency), orderStatuses, orderStarted);
+  orderMetric.sample_failures = orderResponses
+    .filter((item) => item.status < 200 || item.status >= 300)
+    .slice(0, 5)
+    .map((item) => ({ status: item.status, body: item.body }));
 
-  const { data: savedOrders, error: ordersError } = await admin.from('orders').select('id,tenant_id,vendor_id,customer_id,umbrella_id,total,paid,status').in('tenant_id', tenants.slice(0, 25).map((row) => row.id));
+  const { data: savedOrders, error: ordersError } = await admin.from('orders').select('id,tenant_id,vendor_id,customer_id,umbrella_id,total,paid,status').in('tenant_id', tenants.slice(0, activeVendorCount).map((row) => row.id));
   if (ordersError) throw ordersError;
-  const { data: savedItems, count: savedItemCount, error: itemsError } = await admin.from('order_items').select('id,tenant_id,order_id,quantity,subtotal', { count: 'exact' }).in('tenant_id', tenants.slice(0, 25).map((row) => row.id));
+  const { count: savedItemCount, error: itemsError } = await admin.from('order_items').select('id', { count: 'exact', head: true }).in('tenant_id', tenants.slice(0, activeVendorCount).map((row) => row.id));
   if (itemsError) throw itemsError;
 
   const firstVendor = vendors[0];
@@ -230,11 +252,11 @@ try {
   if (registration.status === 201 && registration.body?.tenant_id) createdTenantIds.push(registration.body.tenant_id);
 
   const integrity = {
-    expected_order_requests: 2500,
+    expected_order_requests: orderCalls.length,
     successful_order_requests: orderResponses.filter((item) => item.status === 201).length,
     persisted_open_orders: savedOrders.length,
     persisted_order_items: savedItemCount,
-    orders_with_total_100: savedOrders.filter((row) => Number(row.total) === 100).length,
+    orders_with_expected_total: savedOrders.filter((row) => Number(row.total) === requestsPerUmbrella * 10).length,
     duplicate_open_accounts: savedOrders.length - new Set(savedOrders.map((row) => row.umbrella_id)).size,
     negative_totals: savedOrders.filter((row) => Number(row.total) < 0).length,
   };
@@ -242,8 +264,8 @@ try {
   finalReport = {
     run_id: runId,
     generated_at: new Date().toISOString(),
-    target: { registered_kiosks: 50, active_kiosks: 25, umbrellas_per_kiosk: 10, orders_per_umbrella: 10 },
-    seeded: { tenants: tenants.length, vendors: vendors.length, umbrellas: umbrellas.length, products: products.length, customers: customers.length },
+    target: { registered_kiosks: totalVendors, active_kiosks: activeVendorCount, umbrellas_per_kiosk: umbrellasPerVendor, orders_per_umbrella: requestsPerUmbrella },
+    seeded: { tenants: tenants.length, vendors: vendors.length, umbrellas: umbrellas.length, products: products.length, customers: customers.length, open_cash_registers: dailyClosings.length },
     metrics,
     integrity,
     image_upload: { status: upload.status, body: upload.body },
@@ -258,5 +280,9 @@ try {
     const { writeFile } = await import('node:fs/promises');
     await writeFile(reportPath, JSON.stringify(finalReport, null, 2));
   }
-  if (finalReport.fatal_error || Object.values(finalReport.cleanup.remaining).some((count) => count !== 0)) process.exitCode = 1;
+  const loadFailed = finalReport.metrics?.some((metric) => metric.failed > 0);
+  const integrityFailed = finalReport.integrity
+    ? finalReport.integrity.successful_order_requests !== finalReport.integrity.expected_order_requests
+    : false;
+  if (finalReport.fatal_error || loadFailed || integrityFailed || Object.values(finalReport.cleanup.remaining).some((count) => count !== 0)) process.exitCode = 1;
 }

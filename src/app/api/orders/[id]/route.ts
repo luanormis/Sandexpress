@@ -26,7 +26,7 @@ export async function PATCH(
 
     const { data: lookup, error: lookupError } = await supabaseAdmin
       .from('orders')
-      .select('id, vendor_id, tenant_id, umbrella_id, total, status, paid, order_items(id), customer_order_requests(id, status, sequence)')
+      .select('id, vendor_id, tenant_id, umbrella_id, customer_id, total, status, paid, created_at, order_items(id), customer_order_requests(id, status, sequence, created_at)')
       .eq('id', id)
       .single();
 
@@ -76,6 +76,26 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+    if (requestedStatus && requestedStatus !== String((activeRequest as any)?.status || lookup.status || '')) {
+      const startedAt = (activeRequest as any)?.created_at || (lookup as any).created_at || new Date().toISOString();
+      void supabaseAdmin.from('analytics_events').insert({
+        tenant_id: lookup.tenant_id,
+        vendor_id: lookup.vendor_id,
+        customer_id: (lookup as any).customer_id,
+        umbrella_id: lookup.umbrella_id,
+        event_type: 'order_status_transition',
+        metadata: {
+          order_id: id,
+          request_id: (activeRequest as any)?.id || null,
+          request_sequence: (activeRequest as any)?.sequence || null,
+          from_status: String((activeRequest as any)?.status || lookup.status || ''),
+          to_status: requestedStatus,
+          started_at: startedAt,
+          user_id: session.user_id || null,
+        },
+        payload: {},
+      } as any);
+    }
     if (safeUpdate.status === 'cancelled' && (data as any)?.umbrella_id) {
       await supabaseAdmin
         .from('umbrellas')

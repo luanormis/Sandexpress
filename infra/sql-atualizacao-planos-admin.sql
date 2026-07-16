@@ -13,7 +13,7 @@ VALUES (
     "trial_days": 3,
     "monthly_price": 499.99,
     "annual_monthly_price": 299.99,
-    "max_umbrellas": 50
+    "max_umbrellas": 100
   }'::jsonb,
   'Planos comerciais atuais usados apenas como padrao para novos quiosques.'
 )
@@ -23,7 +23,10 @@ SET value = platform_settings.value
     'monthly_price', COALESCE(platform_settings.value->'monthly_price', '499.99'::jsonb),
     'annual_monthly_price', COALESCE(platform_settings.value->'annual_monthly_price', '299.99'::jsonb),
     'trial_days', COALESCE(platform_settings.value->'trial_days', '3'::jsonb),
-    'max_umbrellas', COALESCE(platform_settings.value->'max_umbrellas', '50'::jsonb)
+    'max_umbrellas', CASE
+      WHEN COALESCE((platform_settings.value->>'max_umbrellas')::INTEGER, 50) = 50 THEN '100'::jsonb
+      ELSE COALESCE(platform_settings.value->'max_umbrellas', '100'::jsonb)
+    END
   ),
   description = EXCLUDED.description,
   updated_at = NOW();

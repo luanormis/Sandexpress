@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { toMoney } from '@/lib/payments';
+import { isCanonicalUuid } from '@/lib/uuid';
 
 const OPEN_ACCOUNT_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
@@ -36,8 +37,6 @@ export async function POST(req: NextRequest) {
       notes,
       request_only,
       payment_amount,
-      service_fee_amount,
-      service_fee_enabled,
       split_people,
       split_mode,
     } = body;
@@ -64,6 +63,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
+    let verifiedAccountTotal = 0;
     if (umbrella_id) {
       const { data: openOrder, error: openOrderError } = await supabaseAdmin
         .from('orders')
@@ -83,17 +83,20 @@ export async function POST(req: NextRequest) {
           error: 'Comanda vazia não pode ir para fechamento. Use "Liberar guarda-sol vazio".',
         }, { status: 409 });
       }
+      verifiedAccountTotal = toMoney(Number((openOrder as any)?.total || 0));
     }
 
     let requestNotes = notes || null;
     if (request_only) {
-      const paymentAmount = toMoney(payment_amount);
-      const serviceFeeAmount = toMoney(service_fee_amount);
+      const serviceFeeEnabled = body.service_fee_enabled !== false;
+      const serviceFeeAmount = serviceFeeEnabled ? toMoney(verifiedAccountTotal * 0.1) : 0;
+      const billTotal = toMoney(verifiedAccountTotal + serviceFeeAmount);
+      const paymentAmount = Math.min(billTotal, toMoney(payment_amount));
       const splitPeople = Math.max(1, Math.min(50, Number(split_people || 1)));
       requestNotes = [
         notes || 'Fechamento solicitado pelo cliente',
         '--- Resumo solicitado pelo cliente ---',
-        `10% do garçom: ${service_fee_enabled === false ? 'dispensado' : formatMoney(serviceFeeAmount)}`,
+        `10% do garçom: ${serviceFeeEnabled ? formatMoney(serviceFeeAmount) : 'dispensado'}`,
         split_mode === 'split'
           ? `Divisão: ${splitPeople} pessoas`
           : split_mode === 'custom'
@@ -159,15 +162,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('cashier'), { status: 403 });
     }
 
+    let resolvedUmbrellaId = umbrella_id;
+    if (umbrella_id && !isCanonicalUuid(umbrella_id)) {
+      const umbrellaNumber = Number(umbrella_id);
+      if (!Number.isInteger(umbrellaNumber) || umbrellaNumber < 1) {
+        return NextResponse.json({ error: 'Numero de guarda-sol invalido.' }, { status: 400 });
+      }
+      const { data: umbrella } = await supabaseAdmin.from('umbrellas').select('id').eq('vendor_id', vendor_id).eq('number', umbrellaNumber).maybeSingle();
+      if (!umbrella) return NextResponse.json({ error: 'Guarda-sol nao encontrado.' }, { status: 404 });
+      resolvedUmbrellaId = umbrella.id;
+    }
+
     let query = supabaseAdmin
       .from('orders')
-      .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone)')
+      .select('id, customer_id, umbrella_id, total, status, created_at, order_items(id), customers(id, name, phone), umbrellas!orders_umbrella_id_fkey(number)')
       .eq('vendor_id', vendor_id)
       .in('status', OPEN_ACCOUNT_STATUSES)
       .eq('paid', false);
 
-    if (umbrella_id) {
-      query = query.eq('umbrella_id', umbrella_id);
+    if (resolvedUmbrellaId) {
+      query = query.eq('umbrella_id', resolvedUmbrellaId);
     }
 
     const { data: orders, error } = await query;
@@ -181,13 +195,14 @@ export async function GET(req: NextRequest) {
     }
 
     let selectedOrder = orders[0];
-    if (customer_phone && orders.length > 1) {
+    if (customer_phone) {
       const cleanPhone = customer_phone.replace(/\D/g, '');
       const matching = orders.find((o: any) => {
         const orderPhone = (o.customers?.phone || '').replace(/\D/g, '');
         return orderPhone === cleanPhone;
       });
-      if (matching) selectedOrder = matching;
+      if (!matching) return NextResponse.json({ error: 'Nenhuma conta aberta encontrada para este telefone.' }, { status: 404 });
+      selectedOrder = matching;
     }
 
     return NextResponse.json({
@@ -196,6 +211,7 @@ export async function GET(req: NextRequest) {
       customer_name: (selectedOrder as any).customers?.name,
       customer_phone: (selectedOrder as any).customers?.phone,
       umbrella_id: selectedOrder.umbrella_id,
+      umbrella_number: Array.isArray((selectedOrder as any).umbrellas) ? (selectedOrder as any).umbrellas[0]?.number : (selectedOrder as any).umbrellas?.number,
       total: selectedOrder.total,
       items_count: (selectedOrder as any).order_items ? (selectedOrder as any).order_items.length : 0,
       created_at: selectedOrder.created_at,

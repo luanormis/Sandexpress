@@ -21,7 +21,7 @@ WHERE key = 'plans.current';
 INSERT INTO platform_settings(key, value, description)
 VALUES (
   'plans.current',
-  '{"trial_days":3,"quarterly_price":499.99,"semester_price":399.99,"annual_monthly_price":299.99,"max_umbrellas":50}'::jsonb,
+  '{"trial_days":3,"quarterly_price":499.99,"semester_price":399.99,"annual_monthly_price":299.99,"max_umbrellas":100}'::jsonb,
   'Planos comerciais trimestral, semestral e anual.'
 )
 ON CONFLICT (key) DO NOTHING;

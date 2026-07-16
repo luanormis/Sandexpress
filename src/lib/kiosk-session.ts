@@ -1,14 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-const OPTIONAL_SCHEMA_CODES = new Set(['42P01', 'PGRST205', '42703', '42883']);
-
-export function isOptionalPromotionSchemaError(error: any) {
-  return OPTIONAL_SCHEMA_CODES.has(error?.code || '') ||
-    String(error?.message || '').includes('sessoes_quiosque') ||
-    String(error?.message || '').includes('promocoes') ||
-    String(error?.message || '').includes('customer_push_tokens') ||
-    String(error?.message || '').includes('function');
-}
 
 export async function touchKioskSession({
   vendorId,
@@ -29,7 +20,7 @@ export async function touchKioskSession({
     p_inactivity_minutes: 120,
   });
 
-  if (error && !isOptionalPromotionSchemaError(error)) throw error;
+  if (error) throw error;
 }
 
 export async function closeKioskSessions(vendorId: string) {
@@ -37,5 +28,5 @@ export async function closeKioskSessions(vendorId: string) {
     p_vendor_id: vendorId,
   });
 
-  if (error && !isOptionalPromotionSchemaError(error)) throw error;
+  if (error) throw error;
 }

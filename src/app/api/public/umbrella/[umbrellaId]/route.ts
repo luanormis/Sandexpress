@@ -63,11 +63,6 @@ export async function GET(
       return NextResponse.json({ error: 'Quiosque indisponivel.' }, { status: 403 });
     }
 
-    const { data: tenantTheme } = await (supabaseAdmin.from('tenants') as any)
-      .select('primary_color, secondary_color, button_color, button_text_color, logo_url')
-      .eq('id', umbrella.tenant_id)
-      .single();
-
     const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select('id, name, category, subcategory, description, price, promotional_price, image_url, active, is_combo, sort_order, stock_tracking_enabled, beach_stock_quantity, stock_quantity, blocked_by_stock, option_group_name, option_values, menu_highlight, promotion_starts_at, promotion_ends_at')
@@ -96,11 +91,11 @@ export async function GET(
         id: vendor.id,
         tenant_id: vendor.tenant_id,
         name: vendor.name,
-        primary_color: tenantTheme?.primary_color || vendor.primary_color,
-        secondary_color: tenantTheme?.secondary_color || vendor.secondary_color,
-        button_color: tenantTheme?.button_color || (vendor as any).button_color,
-        button_text_color: tenantTheme?.button_text_color || (vendor as any).button_text_color,
-        logo_url: tenantTheme?.logo_url || vendor.logo_url,
+        primary_color: vendor.primary_color,
+        secondary_color: vendor.secondary_color,
+        button_color: (vendor as any).button_color,
+        button_text_color: (vendor as any).button_text_color,
+        logo_url: vendor.logo_url,
       },
       features,
       products: visible,

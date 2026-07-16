@@ -178,7 +178,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-8 hidden gap-3 text-xs font-black text-[#ffe7dc] sm:grid sm:max-w-xl sm:grid-cols-3">
             <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">3 dias grátis</span>
-            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Até 50 guarda-sóis</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Até {planSettings.max_umbrellas} guarda-sóis</span>
             <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Pedidos em tempo real</span>
           </div>
         </div>

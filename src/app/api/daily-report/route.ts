@@ -4,38 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { fetchArchivedOrders } from '@/lib/order-archive';
 import { returnBeachStockToPhysical } from '@/lib/stock-handler';
 import { closeKioskSessions } from '@/lib/kiosk-session';
+import { businessDate, CashControl, parseCashControl, serializeCashControl } from '@/lib/cash-control';
+import { OPEN_ACCOUNT_STATUSES } from '@/lib/order-account';
+import { serviceFeeFromOrderNotes } from '@/lib/service-fee';
+import { fetchAllSupabaseRows } from '@/lib/supabase-pagination';
 
 type PaymentSummary = Record<string, { count: number; gross: number; fees: number; net: number; total: number }>;
-
-type CashControl = {
-  status: 'open' | 'closed';
-  opened_at: string;
-  opened_by: string;
-  opening_cash: number;
-  expected_cash?: number;
-  counted_cash?: number;
-  difference?: number;
-  difference_reason?: string;
-  notes?: string;
-  closed_at?: string;
-  closed_by?: string;
-};
-
-const CASH_CONTROL_PREFIX = 'cash_control:';
-
-function parseCashControl(value: unknown): CashControl | null {
-  const text = String(value || '');
-  if (!text.startsWith(CASH_CONTROL_PREFIX)) return null;
-  try {
-    return JSON.parse(text.slice(CASH_CONTROL_PREFIX.length)) as CashControl;
-  } catch {
-    return null;
-  }
-}
-
-function serializeCashControl(value: CashControl) {
-  return `${CASH_CONTROL_PREFIX}${JSON.stringify(value)}`;
-}
 
 function money(value: unknown) {
   return Number(Math.max(0, Number(value || 0)).toFixed(2));
@@ -51,16 +25,17 @@ function dayRange(dateStr: string) {
 async function buildDailyReport(vendorId: string, dateStr: string) {
   const { startOfDay, endOfDay } = dayRange(dateStr);
 
-  const { data: orders, error: ordersErr } = await supabaseAdmin
+  const currentOrderPage = await fetchAllSupabaseRows<any>((from, to) => supabaseAdmin
     .from('orders')
-    .select('id, umbrella_id, customer_id, total, gross_total, payment_fee_amount, net_total, status, paid, payment_method, created_at, paid_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
+    .select('id, umbrella_id, customer_id, total, gross_total, payment_fee_amount, net_total, status, paid, payment_method, notes, created_at, paid_at, order_items(quantity, unit_price, product_id), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)')
     .eq('vendor_id', vendorId)
     .eq('paid', true)
     .gte('paid_at', startOfDay)
     .lte('paid_at', endOfDay)
-    .order('paid_at', { ascending: true });
+    .order('paid_at', { ascending: true })
+    .range(from, to), { maxRows: 20000 });
 
-  if (ordersErr) throw ordersErr;
+  if (currentOrderPage.truncated) throw new Error('Volume diario acima do limite seguro de 20.000 comandas.');
 
   const archivedOrders = await fetchArchivedOrders({
     vendorId,
@@ -68,26 +43,44 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     endDate: endOfDay,
   });
 
-  const completedOrders = [...(orders || []), ...archivedOrders.filter((order: any) => Boolean(order.paid))];
+  const completedOrders = [...currentOrderPage.rows, ...archivedOrders.filter((order: any) => Boolean(order.paid))];
   const totalRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
   const totalGrossRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.gross_total || order.total || 0), 0);
   const totalPaymentFees = completedOrders.reduce((sum: number, order: any) => sum + Number(order.payment_fee_amount || 0), 0);
   const totalNetRevenue = completedOrders.reduce((sum: number, order: any) => sum + Number(order.net_total || order.total || 0), 0);
+  const totalServiceFees = completedOrders.reduce((sum: number, order: any) => sum + serviceFeeFromOrderNotes(order.notes), 0);
   const totalItems = completedOrders.reduce((sum: number, order: any) => {
     return sum + (order.order_items || []).reduce((itemSum: number, item: any) => itemSum + Number(item.quantity || 0), 0);
   }, 0);
   const avgTicket = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
-  const uniqueCustomers = new Set(completedOrders.map((order: any) => order.customer_id)).size;
+  const uniqueCustomers = new Set(completedOrders.map((order: any) => order.customer_id).filter(Boolean)).size;
+
+  const completedOrderIds = new Set(completedOrders.map((order: any) => String(order.id)));
+  const { data: partialPaymentEvents } = await supabaseAdmin.from('analytics_events')
+    .select('metadata, created_at').eq('vendor_id', vendorId).eq('event_type', 'partial_account_payment')
+    .order('created_at', { ascending: true }).limit(5000);
+  const paymentsByOrder = new Map<string, any[]>();
+  (partialPaymentEvents || []).forEach((event: any) => {
+    const orderId = String(event.metadata?.order_id || '');
+    if (!completedOrderIds.has(orderId)) return;
+    paymentsByOrder.set(orderId, [...(paymentsByOrder.get(orderId) || []), event.metadata]);
+  });
 
   const paymentMethods: PaymentSummary = {};
   completedOrders.forEach((order: any) => {
-    const method = order.payment_method || 'cash';
-    if (!paymentMethods[method]) paymentMethods[method] = { count: 0, gross: 0, fees: 0, net: 0, total: 0 };
-    paymentMethods[method].count += 1;
-    paymentMethods[method].gross += Number(order.gross_total || order.total || 0);
-    paymentMethods[method].fees += Number(order.payment_fee_amount || 0);
-    paymentMethods[method].net += Number(order.net_total || order.total || 0);
-    paymentMethods[method].total += Number(order.total || 0);
+    const parts = paymentsByOrder.get(String(order.id)) || [];
+    const allocations = parts.length > 0 ? parts : [{ payment_method: order.payment_method || 'cash', amount: Number(order.total || 0) }];
+    allocations.forEach((payment: any) => {
+      const method = payment.payment_method || 'cash';
+      const amount = Number(payment.amount || 0);
+      const proportionalFee = Number(order.total || 0) > 0 ? Number(order.payment_fee_amount || 0) * amount / Number(order.total) : 0;
+      if (!paymentMethods[method]) paymentMethods[method] = { count: 0, gross: 0, fees: 0, net: 0, total: 0 };
+      paymentMethods[method].count += 1;
+      paymentMethods[method].gross += amount;
+      paymentMethods[method].fees += proportionalFee;
+      paymentMethods[method].net += amount - proportionalFee;
+      paymentMethods[method].total += amount;
+    });
   });
 
   const productIds = new Set<string>();
@@ -162,8 +155,11 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     .slice(0, 8);
 
   const hourlyMap: Record<string, { orders: number; revenue: number }> = {};
+  const businessHourFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' });
   completedOrders.forEach((order: any) => {
-    const hour = new Date(order.paid_at || order.created_at).getHours().toString().padStart(2, '0');
+    const paidDate = new Date(order.paid_at || order.created_at);
+    if (Number.isNaN(paidDate.getTime())) return;
+    const hour = businessHourFormatter.format(paidDate).replace(/\D/g, '').padStart(2, '0');
     const hourKey = `${hour}:00`;
     if (!hourlyMap[hourKey]) hourlyMap[hourKey] = { orders: 0, revenue: 0 };
     hourlyMap[hourKey].orders += 1;
@@ -180,6 +176,8 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
     customer_name: order.customers?.name || 'Nao identificado',
     customer_phone: order.customers?.phone || 'N/A',
     total: Number(order.total || 0),
+    service_fee_amount: serviceFeeFromOrderNotes(order.notes),
+    received_total: Number(order.total || 0) + serviceFeeFromOrderNotes(order.notes),
     gross_total: Number(order.gross_total || order.total || 0),
     payment_fee_amount: Number(order.payment_fee_amount || 0),
     net_total: Number(order.net_total || order.total || 0),
@@ -198,6 +196,7 @@ async function buildDailyReport(vendorId: string, dateStr: string) {
       total_gross_revenue: totalGrossRevenue,
       total_payment_fees: totalPaymentFees,
       total_net_revenue: totalNetRevenue,
+      total_service_fees: totalServiceFees,
       total_items_sold: totalItems,
       avg_ticket: avgTicket,
       unique_customers: uniqueCustomers,
@@ -215,7 +214,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const vendorId = searchParams.get('vendor_id');
-    const dateStr = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const dateStr = searchParams.get('date') || businessDate();
 
     if (!vendorId) {
       return NextResponse.json({ error: 'vendor_id obrigatorio' }, { status: 400 });
@@ -247,7 +246,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const vendorId = body.vendor_id;
-    const dateStr = body.date || new Date().toISOString().split('T')[0];
+    const dateStr = body.date || businessDate();
     const action = body.action === 'open' ? 'open' : 'close';
 
     if (!vendorId) {
@@ -309,15 +308,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Abra o caixa antes de fechar o dia.' }, { status: 409 });
     }
 
+    const { count: openAccountCount, error: openAccountError } = await supabaseAdmin
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('vendor_id', vendorId)
+      .eq('paid', false)
+      .in('status', OPEN_ACCOUNT_STATUSES);
+    if (openAccountError) throw openAccountError;
+    if (Number(openAccountCount || 0) > 0) {
+      return NextResponse.json({
+        error: `Existem ${openAccountCount} comanda(s) aberta(s). Receba ou libere todas antes de fechar o caixa.`,
+        code: 'OPEN_ACCOUNTS_PENDING',
+        open_accounts: openAccountCount,
+      }, { status: 409 });
+    }
+
     const report = await buildDailyReport(vendorId, dateStr);
     const cashSales = Number(report.summary.payment_methods.cash?.total || 0);
     const expectedCash = money(currentCashControl.opening_cash + cashSales);
     const countedCash = money(body.counted_cash);
     const difference = Number((countedCash - expectedCash).toFixed(2));
-    const allowedReasons = ['discount', 'loss', 'typing_error', 'change_error', 'unregistered_expense', 'cash_withdrawal', 'other'];
+    const allowedReasons = ['discount', 'loss', 'typing_error', 'change_error', 'payment_method_error', 'unregistered_expense', 'cash_withdrawal', 'cash_deposit', 'other'];
     const differenceReason = allowedReasons.includes(String(body.difference_reason)) ? String(body.difference_reason) : '';
+    const differenceNotes = String(body.notes || '').trim().slice(0, 500);
     if (Math.abs(difference) >= 0.01 && !differenceReason) {
       return NextResponse.json({ error: 'Informe a justificativa para a diferenca de caixa.', expected_cash: expectedCash, difference }, { status: 400 });
+    }
+    if (Math.abs(difference) >= 0.01 && differenceNotes.length < 5) {
+      return NextResponse.json({ error: 'Descreva em poucas palavras o que causou a diferenca de caixa.', expected_cash: expectedCash, difference }, { status: 400 });
     }
     const closedCashControl: CashControl = {
       ...currentCashControl,
@@ -326,7 +344,7 @@ export async function POST(req: NextRequest) {
       counted_cash: countedCash,
       difference,
       difference_reason: differenceReason || 'no_difference',
-      notes: String(body.notes || currentCashControl.notes || '').trim().slice(0, 500),
+      notes: differenceNotes || String(currentCashControl.notes || '').trim().slice(0, 500),
       closed_at: new Date().toISOString(),
       closed_by: session?.role || 'vendor',
     };

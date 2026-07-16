@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { isOptionalPromotionSchemaError } from '@/lib/kiosk-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function hasCronSecret(req: NextRequest) {
@@ -37,12 +36,7 @@ export async function POST(req: NextRequest) {
     if (vendorId) query = query.eq('vendor_id', vendorId);
 
     const { data: promotions, error } = await query;
-    if (error) {
-      if (isOptionalPromotionSchemaError(error)) {
-        return NextResponse.json({ dispatched: 0, unavailable: true });
-      }
-      throw error;
-    }
+    if (error) throw error;
 
     let dispatched = 0;
     const details: Array<{ promocao_id: string; queued: number }> = [];
@@ -51,10 +45,7 @@ export async function POST(req: NextRequest) {
       const { data, error: enqueueError } = await supabaseAdmin.rpc('enfileirar_push_promocao', {
         p_promocao_id: promotion.id,
       });
-      if (enqueueError) {
-        if (isOptionalPromotionSchemaError(enqueueError)) continue;
-        throw enqueueError;
-      }
+      if (enqueueError) throw enqueueError;
       const queued = Number(data || 0);
       dispatched += queued;
       details.push({ promocao_id: promotion.id, queued });

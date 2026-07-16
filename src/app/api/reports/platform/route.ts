@@ -205,7 +205,7 @@ export async function GET(req: NextRequest) {
       }
 
       const { data, error } = await satisfactionQuery;
-      if (error && !['42P01', 'PGRST205'].includes(error.code)) throw error;
+      if (error) throw error;
       satisfactionRows = (data || []) as any[];
     }
 

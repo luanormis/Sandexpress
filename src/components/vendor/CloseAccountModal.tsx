@@ -13,6 +13,16 @@ interface OrderPreview {
   items_count: number;
   created_at: string;
   opened_at: string;
+  umbrella_number?: number;
+}
+
+interface AccountPaymentSummary {
+  total: number;
+  base_total: number;
+  service_fee_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payments: Array<{ id: string; amount: number; payer_name: string; payment_method: string; created_at: string }>;
 }
 
 export default function CloseAccountModal() {
@@ -23,6 +33,8 @@ export default function CloseAccountModal() {
   const [partialAmount, setPartialAmount] = useState('');
   const [splitPeople, setSplitPeople] = useState(2);
   const [notes, setNotes] = useState('');
+  const [payerName, setPayerName] = useState('');
+  const [accountSummary, setAccountSummary] = useState<AccountPaymentSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [orderPreview, setOrderPreview] = useState<OrderPreview | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -36,6 +48,7 @@ export default function CloseAccountModal() {
     setError('');
     setMessage('');
     setOrderPreview(null);
+    setAccountSummary(null);
 
     if (!searchInput.trim()) {
       setError('Digite um número de guarda-sol ou telefone');
@@ -64,6 +77,9 @@ export default function CloseAccountModal() {
       }
 
       setOrderPreview(result);
+      setPayerName(result.customer_name || 'Cliente');
+      const paymentResponse = await fetch(`/api/account-payments?vendor_id=${encodeURIComponent(vendorId)}&order_id=${encodeURIComponent(result.order_id)}`);
+      if (paymentResponse.ok) setAccountSummary(await paymentResponse.json());
       setMessage('✓ Conta encontrada! Revise os dados antes de confirmar.');
     } catch (err) {
       setError('Erro na busca: ' + (err instanceof Error ? err.message : ''));
@@ -80,36 +96,24 @@ export default function CloseAccountModal() {
     setMessage('');
 
     try {
-      const body: any = {
-        vendor_id: vendorId,
-        payment_method: paymentMethod,
-      };
-      const total = Number(orderPreview.total || 0);
+      const total = Number(accountSummary?.remaining_amount ?? orderPreview.total ?? 0);
       const parsedPartial = Math.max(0, Number(partialAmount.replace(',', '.')) || 0);
       const requestedAmount = paymentMode === 'partial'
         ? Math.min(parsedPartial, total)
         : paymentMode === 'split'
           ? Number((total / Math.max(1, splitPeople)).toFixed(2))
           : total;
-      const remaining = Math.max(0, Number((total - requestedAmount).toFixed(2)));
-      body.payment_amount = requestedAmount;
-      body.split_people = splitPeople;
-      body.split_mode = paymentMode === 'partial' ? 'custom' : paymentMode;
+      const body = {
+        vendor_id: vendorId,
+        order_id: orderPreview.order_id,
+        amount: requestedAmount,
+        payment_method: paymentMethod,
+        payer_name: payerName || 'Cliente',
+        note: notes,
+        idempotency_key: crypto.randomUUID(),
+      };
 
-      if (searchType === 'umbrella') {
-        body.umbrella_id = searchInput;
-      } else {
-        body.customer_phone = searchInput;
-      }
-
-      const paymentNote = paymentMode === 'split'
-        ? `Divisao solicitada no painel: ${splitPeople} pessoas - R$ ${requestedAmount.toFixed(2)} por pessoa.`
-        : paymentMode === 'partial'
-          ? `Pagamento parcial informado no painel: R$ ${requestedAmount.toFixed(2)}. Saldo restante antes do fechamento: R$ ${remaining.toFixed(2)}.`
-          : '';
-      body.notes = [notes, paymentNote].filter(Boolean).join('\n') || undefined;
-
-      const response = await fetch('/api/close-account', {
+      const response = await fetch('/api/account-payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -123,11 +127,19 @@ export default function CloseAccountModal() {
       }
 
       setSuccess(true);
-      setMessage(result.message || 'Conta fechada com sucesso!');
-      setOrderPreview(null);
-      setSearchInput('');
-      setPartialAmount('');
-      setPaymentMode('full');
+      if (result.closed) {
+        setMessage('Conta totalmente recebida e guarda-sol liberado.');
+        setOrderPreview(null);
+        setAccountSummary(null);
+        setSearchInput('');
+        setPartialAmount('');
+        setPaymentMode('full');
+      } else {
+        const summaryResponse = await fetch(`/api/account-payments?vendor_id=${encodeURIComponent(vendorId)}&order_id=${encodeURIComponent(orderPreview.order_id)}`);
+        if (summaryResponse.ok) setAccountSummary(await summaryResponse.json());
+        setMessage(`Pagamento registrado. Ainda faltam R$ ${Number(result.remaining_amount || 0).toFixed(2).replace('.', ',')}.`);
+        setPartialAmount('');
+      }
 
       // Limpar após 2 segundos
       setTimeout(() => {
@@ -146,7 +158,7 @@ export default function CloseAccountModal() {
         (Date.now() - new Date(orderPreview.opened_at).getTime()) / 60000
       )
     : 0;
-  const previewTotal = Number(orderPreview?.total || 0);
+  const previewTotal = Number(accountSummary?.remaining_amount ?? orderPreview?.total ?? 0);
   const parsedPartial = Math.max(0, Number(partialAmount.replace(',', '.')) || 0);
   const paymentAmount = paymentMode === 'partial'
     ? Math.min(parsedPartial, previewTotal)
@@ -257,7 +269,7 @@ export default function CloseAccountModal() {
             </div>
             <div>
               <p className="text-sm text-gray-500">Guarda-sol</p>
-              <p className="text-lg font-bold text-gray-900">#{orderPreview.umbrella_id}</p>
+              <p className="text-lg font-bold text-gray-900">#{orderPreview.umbrella_number || orderPreview.umbrella_id}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Tempo Aberto</p>
@@ -267,13 +279,18 @@ export default function CloseAccountModal() {
 
           {/* Total */}
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-300 rounded-lg p-4">
-            <p className="text-sm text-blue-600 font-medium">TOTAL A PAGAR</p>
+            <p className="text-sm text-blue-600 font-medium">SALDO A RECEBER</p>
             <p className="text-4xl font-bold text-blue-900 mt-1">
-              R$ {orderPreview.total.toFixed(2)}
+              R$ {previewTotal.toFixed(2)}
             </p>
             <p className="text-xs text-blue-600 mt-2">
-              {orderPreview.items_count} itens na conta
+              Consumo: R$ {Number(accountSummary?.base_total ?? orderPreview.total ?? 0).toFixed(2)} · Serviço: R$ {Number(accountSummary?.service_fee_amount || 0).toFixed(2)} · Já recebido: R$ {Number(accountSummary?.paid_amount || 0).toFixed(2)}
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nome de quem está pagando</label>
+            <input value={payerName} onChange={(event) => setPayerName(event.target.value)} maxLength={100} className="w-full px-4 py-2 border border-gray-300 rounded-lg font-medium" placeholder="Ex.: Maria" />
           </div>
 
           {/* Método de Pagamento */}
@@ -370,6 +387,20 @@ export default function CloseAccountModal() {
             </div>
           </div>
 
+          {(accountSummary?.payments || []).length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="mb-2 text-sm font-bold text-gray-800">Pagamentos já registrados</p>
+              <div className="space-y-2">
+                {accountSummary!.payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-medium text-gray-700">{payment.payer_name}</span>
+                    <strong className="text-green-700">R$ {Number(payment.amount).toFixed(2)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Observações */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -398,7 +429,7 @@ export default function CloseAccountModal() {
             </button>
             <button
               onClick={handleCloseAccount}
-              disabled={confirming}
+              disabled={confirming || paymentAmount <= 0 || paymentAmount > previewTotal}
               className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:bg-gray-400 transition flex items-center justify-center gap-2"
             >
               {confirming ? (

@@ -10,6 +10,7 @@ export type SessionPayload = {
   customer_id?: string;
   umbrella_id?: string;
   user_id?: string;
+  user_role?: 'owner' | 'manager' | 'seller';
   tenant_id?: string;
   exp: number;
 };

@@ -1,0 +1,173 @@
+{
+  "run_id": "codex-load-20260716025002-ae2f31",
+  "generated_at": "2026-07-16T02:50:18.929Z",
+  "target": {
+    "registered_kiosks": 10,
+    "active_kiosks": 10,
+    "umbrellas_per_kiosk": 10,
+    "orders_per_umbrella": 5
+  },
+  "seeded": {
+    "tenants": 10,
+    "vendors": 10,
+    "umbrellas": 100,
+    "products": 80,
+    "customers": 100,
+    "open_cash_registers": 10
+  },
+  "metrics": [
+    {
+      "name": "500 pedidos / concorrência 500",
+      "requests": 500,
+      "success": 498,
+      "failed": 2,
+      "duration_ms": 12414.88,
+      "throughput_rps": 40.27,
+      "latency_ms": {
+        "p50": 11149.83,
+        "p95": 12058.09,
+        "p99": 12291.45,
+        "max": 12334.67
+      },
+      "statuses": {
+        "201": 498,
+        "500": 2
+      }
+    }
+  ],
+  "integrity": {
+    "expected_order_requests": 500,
+    "successful_order_requests": 498,
+    "persisted_open_orders": 100,
+    "persisted_order_items": 498,
+    "orders_with_expected_total": 99,
+    "duplicate_open_accounts": 0,
+    "negative_totals": 0
+  },
+  "image_upload": {
+    "status": 200,
+    "body": {
+      "url": "https://yntsqyohnqtkpihwwgxq.supabase.co/storage/v1/object/public/product-images/b3b99054-bca4-4f66-bfbf-a4463ce9131a/1784170217362.png"
+    }
+  },
+  "registration_email_menu": {
+    "status": 201,
+    "body": {
+      "id": "982802ff-b56c-4186-9602-d5db1f081593",
+      "tenant_id": "ead4f458-15ee-44b1-a2ee-0c3034788200",
+      "beach_id": "84b50407-5a73-4ca3-9ee9-2668744cea78",
+      "name": "codex-load-20260716025002-ae2f31-cadastro-api",
+      "cnpj": "71784170217851",
+      "cpf": null,
+      "document_login": "codex-load-20260716025002-ae2f31-api",
+      "address": "codex-load-20260716025002-ae2f31",
+      "city": "Load Test",
+      "state": "SP",
+      "beach_name": "codex-load-20260716025002-ae2f31",
+      "owner_name": "Codex Cadastro Teste",
+      "owner_phone": "11999999999",
+      "owner_email": "delivered@resend.dev",
+      "logo_url": "/sandexpress-logo-fluid.png",
+      "primary_color": "#ff6b00",
+      "secondary_color": "#82533f",
+      "button_color": "#ff6b00",
+      "button_text_color": "#ffffff",
+      "password_needs_reset": false,
+      "owner_email_verified": true,
+      "owner_email_verified_at": null,
+      "subscription_status": "trial",
+      "trial_ends_at": "2026-07-19T02:50:18.089+00:00",
+      "plan_type": "trial",
+      "plan_expires_at": null,
+      "max_umbrellas": 100,
+      "pix_enabled": false,
+      "pix_key": null,
+      "pix_account_name": null,
+      "debit_card_fee_rate": 0,
+      "credit_card_fee_rate": 0,
+      "pix_fee_rate": 0,
+      "is_active": true,
+      "created_at": "2026-07-16T02:50:18.845473+00:00",
+      "updated_at": "2026-07-16T02:50:18.845473+00:00",
+      "plan_monthly_price": 499.99,
+      "plan_annual_monthly_price": 299.99,
+      "plan_quarterly_price": 499.99,
+      "plan_semester_price": 399.99,
+      "email_confirmation": {
+        "sent": true,
+        "reason": null
+      },
+      "new_vendor_alert": {
+        "sent": true,
+        "reason": null
+      },
+      "default_menu": {
+        "inserted": 12
+      },
+      "message": "Quiosque criado com senha definida pelo vendor."
+    }
+  },
+  "cleanup": {
+    "storage": {
+      "data": [
+        {
+          "name": "b3b99054-bca4-4f66-bfbf-a4463ce9131a/1784170217362.png",
+          "bucket_id": "product-images",
+          "owner": "",
+          "owner_id": "",
+          "version": "25dd0dbf-a8be-42dc-8a85-6feff234f12c",
+          "id": "1012fb30-6593-4995-bbda-4d3f4f552b60",
+          "updated_at": "2026-07-16T02:50:18.268Z",
+          "created_at": "2026-07-16T02:50:18.268Z",
+          "last_accessed_at": "2026-07-16T02:50:18.268Z",
+          "metadata": {
+            "eTag": "\"e44e7ecfec99356632c13cd3eaa3e250\"",
+            "size": 68,
+            "mimetype": "image/png",
+            "cacheControl": "max-age=3600",
+            "lastModified": "2026-07-16T02:50:19.000Z",
+            "contentLength": 68,
+            "httpStatusCode": 200
+          },
+          "user_metadata": {}
+        }
+      ],
+      "error": null
+    },
+    "tenants": {
+      "success": true,
+      "error": null,
+      "data": null,
+      "count": null,
+      "status": 204,
+      "statusText": "No Content"
+    },
+    "beaches": {
+      "success": true,
+      "error": null,
+      "data": null,
+      "count": null,
+      "status": 204,
+      "statusText": "No Content"
+    },
+    "rate_limit": {
+      "success": true,
+      "error": null,
+      "data": null,
+      "count": null,
+      "status": 204,
+      "statusText": "No Content"
+    },
+    "remaining": {
+      "tenants": 0,
+      "vendors": 0,
+      "umbrellas": 0,
+      "customers": 0,
+      "products": 0,
+      "orders": 0,
+      "order_items": 0,
+      "daily_closings": 0,
+      "beaches": 0
+    }
+  }
+}

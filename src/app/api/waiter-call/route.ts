@@ -34,10 +34,13 @@ type WaiterCallBody = {
 
 type OpenOrder = {
   id: string;
+  tenant_id?: string;
   customer_id: string;
   notes: string | null;
   status: string | null;
 };
+
+const ACTIVE_CALL_MARKERS = Object.values(SERVICE_REQUESTS).map(request => request.marker);
 
 export async function POST(req: NextRequest) {
   try {
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const { data: openOrders, error: openErr } = await supabaseAdmin
       .from('orders')
-      .select('id, customer_id, notes, status')
+      .select('id, tenant_id, customer_id, notes, status')
       .eq('vendor_id', vendor_id)
       .eq('umbrella_id', umbrella_id)
       .eq('paid', false)
@@ -102,11 +105,23 @@ export async function POST(req: NextRequest) {
 
     if (openErr) throw openErr;
 
-    const requestNote = `${serviceRequest.marker} ${serviceRequest.note} em ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    const requestedAt = new Date();
+    const requestTime = requestedAt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+    const requestNote = `${serviceRequest.marker} ${serviceRequest.note} em ${requestTime}`;
     let order = openOrders?.[0] as OpenOrder | undefined;
 
     if (order && order.customer_id !== customer_id) {
       return NextResponse.json({ error: 'Este guarda-sol esta em uso por outro cliente.' }, { status: 409 });
+    }
+
+    if (order) {
+      const activeMarker = ACTIVE_CALL_MARKERS.find(marker => String(order?.notes || '').includes(marker));
+      if (activeMarker === serviceRequest.marker) {
+        return NextResponse.json({ success: true, duplicate: true, order, request_type: request_type || 'waiter_call', message: 'Este chamado já está na fila do atendimento.' });
+      }
+      if (activeMarker) {
+        return NextResponse.json({ error: 'Já existe um chamado aguardando atendimento neste guarda-sol.' }, { status: 409 });
+      }
     }
 
     if (order) {
@@ -148,6 +163,16 @@ export async function POST(req: NextRequest) {
       .update({ is_occupied: true, current_order_id: order.id } as never)
       .eq('id', umbrella_id)
       .eq('vendor_id', vendor_id);
+
+    await supabaseAdmin.from('analytics_events').insert({
+      tenant_id: order.tenant_id || umbrella.tenant_id,
+      vendor_id,
+      customer_id,
+      umbrella_id,
+      event_type: 'waiter_call_created',
+      metadata: { order_id: order.id, call_marker: serviceRequest.marker, request_type: request_type || 'waiter_call' },
+      payload: { requested_at: requestedAt.toISOString() },
+    } as any);
 
     return NextResponse.json({
       success: true,

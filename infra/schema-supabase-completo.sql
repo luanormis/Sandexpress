@@ -136,7 +136,7 @@ CREATE TABLE vendors (
   plan_quarterly_price NUMERIC(10,2) NOT NULL DEFAULT 499.99 CHECK (plan_quarterly_price >= 0),
   plan_semester_price NUMERIC(10,2) NOT NULL DEFAULT 399.99 CHECK (plan_semester_price >= 0),
   plan_annual_monthly_price NUMERIC(10,2) NOT NULL DEFAULT 299.99 CHECK (plan_annual_monthly_price >= 0),
-  max_umbrellas INTEGER NOT NULL DEFAULT 50 CHECK (max_umbrellas BETWEEN 1 AND 50),
+  max_umbrellas INTEGER NOT NULL DEFAULT 100 CHECK (max_umbrellas BETWEEN 1 AND 120),
   pix_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   pix_key TEXT,
   pix_account_name TEXT,
@@ -1267,9 +1267,9 @@ INSERT INTO platform_settings (key, value, description) VALUES
     "trial_days": 3,
     "monthly_price": 499.99,
     "annual_monthly_price": 299.99,
-    "max_umbrellas": 50
+    "max_umbrellas": 100
   }'::jsonb,
-  'Planos comerciais atuais: trial de 3 dias, mensal e anual ate 50 guarda-sois.'
+  'Planos comerciais atuais: trial de 3 dias, trimestral, semestral e anual ate 100 guarda-sois.'
 ),
 (
   'default.vendor',

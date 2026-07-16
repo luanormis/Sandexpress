@@ -105,20 +105,10 @@ export async function GET(
       return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
     }
 
-    const { data: tenant } = await (supabaseAdmin.from('tenants') as any)
-      .select('id, primary_color, secondary_color, button_color, button_text_color, logo_url')
-      .eq('id', vendor.tenant_id)
-      .single();
-
-    let { data: rateRows, error: rateError } = await (supabaseAdmin.from('payment_method_rates') as any)
+    const { data: rateRows, error: rateError } = await (supabaseAdmin.from('payment_method_rates') as any)
       .select('payment_method, fee_rate, fee_type, fixed_fee_amount, payout_delay_days, active, api_enabled')
       .eq('vendor_id', id);
-    if (rateError) {
-      const fallback = await (supabaseAdmin.from('payment_method_rates') as any)
-        .select('payment_method, fee_rate, payout_delay_days, active')
-        .eq('vendor_id', id);
-      rateRows = fallback.data;
-    }
+    if (rateError) throw rateError;
     const rates = ((rateRows || []) as any[]).reduce((acc, row) => {
       acc[row.payment_method] = row;
       return acc;
@@ -126,11 +116,11 @@ export async function GET(
 
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
-      primary_color: tenant?.primary_color || vendor.primary_color,
-      secondary_color: tenant?.secondary_color || vendor.secondary_color,
-      button_color: tenant?.button_color || (vendor as any).button_color,
-      button_text_color: tenant?.button_text_color || (vendor as any).button_text_color,
-      logo_url: tenant?.logo_url || vendor.logo_url,
+      primary_color: vendor.primary_color,
+      secondary_color: vendor.secondary_color,
+      button_color: (vendor as any).button_color,
+      button_text_color: (vendor as any).button_text_color,
+      logo_url: vendor.logo_url,
       cash_fee_rate: Number(rates.cash?.fee_rate ?? 0),
       cash_fee_type: rates.cash?.fee_type || 'percent',
       cash_fixed_fee_amount: Number(rates.cash?.fixed_fee_amount ?? 0),
@@ -250,22 +240,8 @@ export async function PATCH(
         api_enabled: paymentSettings[config.method].apiEnabled,
         updated_at: new Date().toISOString(),
       }));
-    let { error: ratesError } = await (supabaseAdmin.from('payment_method_rates') as any)
+    const { error: ratesError } = await (supabaseAdmin.from('payment_method_rates') as any)
       .upsert(paymentRatesPayload, { onConflict: 'vendor_id,payment_method' });
-    if (ratesError) {
-      const legacyPayload = paymentRatesPayload.map((row) => ({
-        tenant_id: row.tenant_id,
-        vendor_id: row.vendor_id,
-        payment_method: row.payment_method,
-        fee_rate: row.fee_rate,
-        payout_delay_days: row.payout_delay_days,
-        active: row.active,
-        updated_at: row.updated_at,
-      }));
-      const fallback = await (supabaseAdmin.from('payment_method_rates') as any)
-        .upsert(legacyPayload, { onConflict: 'vendor_id,payment_method' });
-      ratesError = fallback.error;
-    }
     if (ratesError) throw ratesError;
 
     const { data: savedVendor } = await supabaseAdmin

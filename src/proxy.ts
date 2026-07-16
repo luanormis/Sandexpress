@@ -15,6 +15,7 @@ const PUBLIC_API_PATHS = new Set([
   '/api/otp/verify',
   '/api/vendors/register',
   '/api/vendors/verify-email',
+  '/api/promotions',
 ]);
 
 const SENSITIVE_PUBLIC_PATHS = new Set([
@@ -93,8 +94,9 @@ function isRateLimited(req: NextRequest, pathname: string) {
   if (!sensitive && !mutating) return false;
 
   const now = Date.now();
-  const windowMs = sensitive ? 60_000 : 10_000;
-  const max = sensitive ? 20 : 80;
+  const orderBurst = pathname === '/api/orders' && req.method === 'POST';
+  const windowMs = orderBurst || sensitive ? 60_000 : 10_000;
+  const max = orderBurst ? 1_000 : sensitive ? 20 : 80;
   const key = `${getClientIp(req)}:${pathname}:${req.method}`;
   const current = rateBuckets.get(key);
 
@@ -151,6 +153,7 @@ export function proxy(req: NextRequest) {
       (pathname.startsWith('/vendor/') &&
         pathname !== '/vendor/login' &&
         pathname !== '/vendor/reset-password');
+    const isWaiterPage = pathname === '/garcom';
 
     if (isAdminPage && session?.role !== 'admin') {
       const loginUrl = new URL('/admin', req.url);
@@ -162,6 +165,12 @@ export function proxy(req: NextRequest) {
       const loginUrl = new URL('/vendor/login', req.url);
       loginUrl.searchParams.set('next', pathname);
       return securityHeaders(NextResponse.redirect(loginUrl));
+    }
+    if (isVendorPage && session?.user_role === 'seller') {
+      return securityHeaders(NextResponse.redirect(new URL('/garcom', req.url)));
+    }
+    if (isWaiterPage && session?.role !== 'admin' && !(session?.role === 'vendor' && session.user_role === 'seller')) {
+      return securityHeaders(NextResponse.redirect(new URL('/garcom/login', req.url)));
     }
 
     return securityHeaders(NextResponse.next());
@@ -187,5 +196,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/admin/:path*', '/kiosk-config', '/vendor/:path*'],
+  matcher: ['/api/:path*', '/admin/:path*', '/kiosk-config', '/vendor/:path*', '/garcom'],
 };

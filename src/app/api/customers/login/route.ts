@@ -6,6 +6,7 @@ import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { normalizeBrazilPhoneWithDdd } from '@/lib/phone';
 import { OPEN_ACCOUNT_STATUSES } from '@/lib/order-account';
 import { touchKioskSession } from '@/lib/kiosk-session';
+import { businessDate, cashControlBlock, getCashControl } from '@/lib/cash-control';
 
 async function ensureOpenAccount({
   tenantId,
@@ -90,6 +91,9 @@ export async function POST(req: NextRequest) {
     if (!await vendorFeatureEnabled(vendor_id, 'beach_umbrellas')) {
       return NextResponse.json(featureDisabledResponse('beach_umbrellas'), { status: 403 });
     }
+
+    const cashBlock = cashControlBlock(await getCashControl(vendor_id));
+    if (cashBlock) return NextResponse.json({ ...cashBlock, business_date: businessDate() }, { status: 409 });
 
     let cleanPhone = '';
     try {

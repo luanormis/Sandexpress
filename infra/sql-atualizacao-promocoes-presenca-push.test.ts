@@ -27,8 +27,9 @@ describe('sql-atualizacao-promocoes-presenca-push', () => {
     expect(sql).toContain('CREATE OR REPLACE FUNCTION fechar_sessoes_quiosque');
     expect(sql).toContain('CREATE OR REPLACE FUNCTION listar_push_promocao_ativa');
     expect(sql).toContain('CREATE OR REPLACE FUNCTION enfileirar_push_promocao');
-    expect(sql).toContain('AND (hora_inicio IS NULL OR NOW()::TIME >= hora_inicio)');
-    expect(sql).toContain('AND (hora_fim IS NULL OR NOW()::TIME <= hora_fim)');
+    expect(sql).toContain("EXTRACT(DOW FROM (p_momento AT TIME ZONE 'America/Sao_Paulo'))");
+    expect(sql).toContain("AND (hora_inicio IS NULL OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME >= hora_inicio)");
+    expect(sql).toContain("AND (hora_fim IS NULL OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME <= hora_fim)");
   });
 
   it('keeps Supabase service role grants explicit', () => {

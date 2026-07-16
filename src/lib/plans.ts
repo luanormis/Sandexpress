@@ -1,5 +1,8 @@
 export const TRIAL_DAYS = 3;
-export const PLAN_UMBRELLA_LIMIT = 50;
+export const PLAN_UMBRELLA_LIMIT = 100;
+// Limite fisico da plataforma. Acima do padrao comercial, somente o admin
+// pode autorizar individualmente no cadastro do quiosque.
+export const ADMIN_UMBRELLA_LIMIT = 120;
 
 export const PLAN_PRICES = {
   quarterly: 499.99,

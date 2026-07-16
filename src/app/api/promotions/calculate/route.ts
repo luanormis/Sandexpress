@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { isOptionalPromotionSchemaError } from '@/lib/kiosk-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isCanonicalUuid } from '@/lib/uuid';
 
@@ -45,18 +44,7 @@ export async function POST(req: NextRequest) {
       p_momento: new Date().toISOString(),
     });
 
-    if (error) {
-      if (isOptionalPromotionSchemaError(error)) {
-        return NextResponse.json({
-          subtotal: null,
-          discount_total: 0,
-          total: null,
-          applied_promotions: [],
-          unavailable: true,
-        });
-      }
-      throw error;
-    }
+    if (error) throw error;
 
     return NextResponse.json(data);
   } catch (err) {

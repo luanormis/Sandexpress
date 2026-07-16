@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createSessionToken(
-      { role: 'vendor', vendor_id: user.vendor_id, tenant_id: user.tenant_id, user_id: user.id },
+      { role: 'vendor', vendor_id: user.vendor_id, tenant_id: user.tenant_id, user_id: user.id, user_role: user.role },
       12 * 60 * 60
     );
     const response = NextResponse.json({
@@ -89,6 +89,8 @@ export async function POST(req: NextRequest) {
       vendor_name: linkedVendor.name,
       owner_name: user.name,
       user_role: user.role,
+      user_id: user.id,
+      user_name: user.name,
       must_change_password: user.password_needs_reset ?? false,
     });
     setVendorCookie(response, token);

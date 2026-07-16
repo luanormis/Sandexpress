@@ -3,6 +3,12 @@ import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { hashPassword } from '@/lib/vendor-password';
 
+function canManageTeam(session: ReturnType<typeof getRequestSession>, vendorId: string) {
+  if (!canAccessVendor(session, vendorId)) return false;
+  if (session?.role === 'admin') return true;
+  return !session?.user_id || session.user_role === 'owner' || session.user_role === 'manager';
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -10,7 +16,7 @@ export async function GET(req: NextRequest) {
     if (!vendorId) return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
 
     const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendorId)) {
+    if (!canManageTeam(session, vendorId)) {
       return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
     }
 
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     const session = getRequestSession(req);
-    if (!canAccessVendor(session, vendor_id)) {
+    if (!canManageTeam(session, vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
     }
 
@@ -94,8 +100,9 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    const commissionType = ['percent', 'fixed'].includes(body.commission_type) ? body.commission_type : 'none';
-    const commissionValue = Math.max(0, Number(body.commission_value || 0));
+    const commissionType = data.role === 'seller' && ['percent', 'fixed'].includes(body.commission_type) ? body.commission_type : 'none';
+    const rawCommissionValue = Math.max(0, Number(body.commission_value || 0));
+    const commissionValue = commissionType === 'percent' ? Math.min(100, rawCommissionValue) : rawCommissionValue;
     if (commissionType !== 'none') {
       await supabaseAdmin.from('analytics_events').insert({
         tenant_id: vendor.tenant_id,
@@ -110,5 +117,41 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Vendor users POST error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const vendorId = String(body.vendor_id || '');
+    const userId = String(body.user_id || '');
+    const session = getRequestSession(req);
+    if (!vendorId || !userId || !canManageTeam(session, vendorId)) {
+      return NextResponse.json({ error: 'Nao autorizado para alterar a equipe.' }, { status: 403 });
+    }
+
+    const { data: user, error: userError } = await supabaseAdmin.from('vendor_users')
+      .select('id, tenant_id, vendor_id, name, role, active').eq('id', userId).eq('vendor_id', vendorId).maybeSingle();
+    if (userError) throw userError;
+    if (!user) return NextResponse.json({ error: 'Usuario nao encontrado.' }, { status: 404 });
+    if (user.role !== 'seller') return NextResponse.json({ error: 'Comissao disponivel somente para Garcom / Vendedor.' }, { status: 400 });
+
+    const commissionType = ['percent', 'fixed'].includes(String(body.commission_type)) ? String(body.commission_type) : 'none';
+    const rawValue = Number(body.commission_value || 0);
+    if (!Number.isFinite(rawValue) || rawValue < 0) return NextResponse.json({ error: 'Valor de comissao invalido.' }, { status: 400 });
+    const commissionValue = commissionType === 'percent' ? Math.min(100, rawValue) : rawValue;
+    const { error } = await supabaseAdmin.from('analytics_events').insert({
+      tenant_id: user.tenant_id,
+      vendor_id: vendorId,
+      event_type: 'staff_commission_config',
+      metadata: { user_id: user.id, commission_type: commissionType, commission_value: commissionValue },
+      payload: { staff_name: user.name, role: user.role, updated_by: session?.user_id || session?.role || 'vendor' },
+    } as any);
+    if (error) throw error;
+
+    return NextResponse.json({ user_id: user.id, commission_type: commissionType, commission_value: commissionValue });
+  } catch (err) {
+    console.error('Vendor users PATCH error:', err);
+    return NextResponse.json({ error: 'Erro ao atualizar comissao.' }, { status: 500 });
   }
 }

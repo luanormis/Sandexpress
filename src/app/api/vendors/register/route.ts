@@ -96,8 +96,8 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
 
-    if (beachError && !['42P01', 'PGRST205'].includes(beachError.code)) throw beachError;
-    const beachId = beachError ? null : beach?.id || null;
+    if (beachError) throw beachError;
+    const beachId = beach?.id || null;
 
     const tenantPayload: Record<string, unknown> = {
       name: cleanName,
@@ -155,19 +155,10 @@ export async function POST(req: NextRequest) {
       };
     if (beachId) vendorPayload.beach_id = beachId;
 
-    let { data: vendor, error: vendorError } = await (supabaseAdmin.from('vendors') as any)
+    const { data: vendor, error: vendorError } = await (supabaseAdmin.from('vendors') as any)
       .insert(vendorPayload)
       .select()
       .single();
-
-    if (vendorError && ['42703', 'PGRST204'].includes(vendorError.code || '')) {
-      const legacyPayload = { ...vendorPayload };
-      delete legacyPayload.plan_quarterly_price;
-      delete legacyPayload.plan_semester_price;
-      const retry = await (supabaseAdmin.from('vendors') as any).insert(legacyPayload).select().single();
-      vendor = retry.data;
-      vendorError = retry.error;
-    }
 
     if (vendorError) throw vendorError;
 
@@ -181,12 +172,12 @@ export async function POST(req: NextRequest) {
     const { error: termsError } = await supabaseAdmin
       .from('terms_acceptances')
       .insert(termsAcceptance);
-    if (termsError && !['42P01', 'PGRST205', '42703'].includes(termsError.code)) throw termsError;
+    if (termsError) throw termsError;
 
     const { error: featuresError } = await supabaseAdmin
       .from('tenant_features')
       .insert(buildTenantFeatureRows(tenant.id));
-    if (featuresError && !['42P01', 'PGRST205'].includes(featuresError.code)) throw featuresError;
+    if (featuresError) throw featuresError;
 
     const defaultMenu = await seedDefaultMenuForVendor(tenant.id, vendor.id);
 

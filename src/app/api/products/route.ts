@@ -17,13 +17,13 @@ function normalizeText(value: unknown, max = 120) {
 
 function normalizeOptions(value: unknown) {
   if (Array.isArray(value)) {
-    return value.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 30);
+    return value.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 50);
   }
   return String(value || '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-    .slice(0, 30);
+    .slice(0, 50);
 }
 
 function productErrorResponse(error: any) {

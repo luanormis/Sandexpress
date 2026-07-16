@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
+import { UserRound } from "lucide-react";
 
 export default function VendorLogin() {
   const [document_login, setDocumentLogin] = useState("");
@@ -58,6 +60,11 @@ export default function VendorLogin() {
       sessionStorage.setItem('vendor_id', result.vendor_id);
       localStorage.setItem('vendor_id', result.vendor_id);
       localStorage.setItem('vendor_name', result.vendor_name);
+      if (result.user_role === 'seller') {
+        sessionStorage.setItem('waiter_vendor_id', result.vendor_id);
+        sessionStorage.setItem('waiter_id', result.user_id || '');
+        sessionStorage.setItem('waiter_name', result.user_name || 'Garcom');
+      }
       router.push('/vendor/dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -134,6 +141,9 @@ export default function VendorLogin() {
           {isLoading ? 'Conectando...' : 'Entrar no Painel'}
         </button>
       </form>
+      <Link href="/garcom/login" className="mt-5 flex w-full max-w-sm items-center justify-center gap-2 rounded-xl border-2 border-[#7a2b00] bg-[#fff8f3] py-3 font-black text-[#572000] hover:border-[#FF6B00] hover:text-[#FF6B00]">
+        <UserRound size={19} /> Acesso do garcom
+      </Link>
       <form onSubmit={handleRecovery} className="mt-6 w-full max-w-sm rounded-2xl border border-[#e2bfb0] bg-white/70 p-4 text-left">
         <p className="mb-3 text-sm font-black text-[#572000]">Esqueci minha senha</p>
         <input

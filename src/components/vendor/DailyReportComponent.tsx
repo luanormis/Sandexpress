@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertCircle, Award, BarChart3, Clock, Download, Loader, PackageCheck, Search, ShoppingBag, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Award, Banknote, BarChart3, Clock, Download, Loader, PackageCheck, Search, ShoppingBag, TrendingUp, Users } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface DailyReportData {
@@ -16,6 +16,7 @@ interface DailyReportData {
     total_gross_revenue?: number;
     total_payment_fees?: number;
     total_net_revenue?: number;
+    total_service_fees?: number;
     payment_methods: Record<string, { count: number; total: number; gross?: number; fees?: number; net?: number }>;
   };
   orders: Array<{
@@ -34,6 +35,17 @@ interface DailyReportData {
   category_performance?: Array<{ category: string; quantity: number; revenue: number }>;
   low_stock_alerts?: Array<{ name: string; category: string; quantity: number; blocked: boolean }>;
   hourly_breakdown: Array<{ hour: string; orders: number; revenue: number }>;
+  cash_control?: {
+    status: 'open' | 'closed';
+    opened_at: string;
+    opening_cash: number;
+    expected_cash?: number;
+    counted_cash?: number;
+    difference?: number;
+    difference_reason?: string;
+    notes?: string;
+    closed_at?: string;
+  } | null;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -44,6 +56,31 @@ const PAYMENT_LABELS: Record<string, string> = {
   card: 'Cartao',
 };
 
+const CASH_REASON_LABELS: Record<string, string> = {
+  no_difference: 'Sem diferença',
+  discount: 'Desconto concedido',
+  loss: 'Perda ou quebra',
+  typing_error: 'Erro de digitação',
+  change_error: 'Erro de troco',
+  payment_method_error: 'Forma de pagamento registrada incorretamente',
+  unregistered_expense: 'Despesa não registrada',
+  cash_withdrawal: 'Sangria ou retirada',
+  cash_deposit: 'Suprimento ou entrada não registrada',
+  other: 'Outro motivo',
+};
+
+function cashReasonLabel(reason?: string) {
+  return CASH_REASON_LABELS[String(reason || '')] || reason || 'Não informado';
+}
+
+function formatDateTime(value?: string) {
+  return value ? new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—';
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] || character);
+}
+
 function formatDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR');
 }
@@ -53,7 +90,9 @@ function paymentLabel(method: string) {
 }
 
 export default function DailyReportComponent() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  );
   const [report, setReport] = useState<DailyReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -90,6 +129,15 @@ export default function DailyReportComponent() {
 
   const handleExportPDF = () => {
     if (!report) return;
+    const cash = report.cash_control;
+    const cashControlHtml = !cash ? '<p>Caixa não aberto nesta data.</p>' : `
+      <table><tbody>
+        <tr><th>Status</th><td>${cash.status === 'closed' ? 'Fechado' : 'Aberto'}</td><th>Abertura</th><td>${formatDateTime(cash.opened_at)}</td></tr>
+        <tr><th>Fundo inicial</th><td>${formatCurrency(Number(cash.opening_cash || 0))}</td><th>Dinheiro esperado</th><td>${cash.expected_cash == null ? '—' : formatCurrency(Number(cash.expected_cash))}</td></tr>
+        <tr><th>Valor contado</th><td>${cash.counted_cash == null ? '—' : formatCurrency(Number(cash.counted_cash))}</td><th>Diferença</th><td>${cash.difference == null ? '—' : formatCurrency(Number(cash.difference))}</td></tr>
+        <tr><th>Justificativa</th><td>${escapeHtml(cashReasonLabel(cash.difference_reason))}</td><th>Fechamento</th><td>${formatDateTime(cash.closed_at)}</td></tr>
+        <tr><th>Observação</th><td colspan="3">${escapeHtml(cash.notes || 'Sem observação')}</td></tr>
+      </tbody></table>`;
 
     const paymentRows = Object.entries(report.summary.payment_methods || {})
       .map(([method, data]) => `
@@ -190,10 +238,14 @@ export default function DailyReportComponent() {
 
           <section class="summary">
             <div class="box"><span>Faturamento</span><strong>${formatCurrency(report.summary.total_revenue)}</strong></div>
+            <div class="box"><span>Taxa de serviço</span><strong>${formatCurrency(Number(report.summary.total_service_fees || 0))}</strong></div>
             <div class="box"><span>Pedidos pagos</span><strong>${report.summary.total_orders}</strong></div>
             <div class="box"><span>Clientes</span><strong>${report.summary.unique_customers}</strong></div>
             <div class="box"><span>Ticket medio</span><strong>${formatCurrency(report.summary.avg_ticket)}</strong></div>
           </section>
+
+          <h2>Auditoria do caixa</h2>
+          ${cashControlHtml}
 
           <h2>Meios de pagamento</h2>
           <table><thead><tr><th>Metodo</th><th>Contas</th><th>Bruto</th><th>Taxas</th><th>Liquido</th></tr></thead><tbody>${paymentRows || '<tr><td colspan="5">Sem pagamentos no dia.</td></tr>'}</tbody></table>
@@ -288,12 +340,39 @@ export default function DailyReportComponent() {
         </div>
       ) : report ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             <SummaryCard title="Faturamento" value={formatCurrency(report.summary.total_revenue)} icon={<TrendingUp />} />
+            <SummaryCard title="Taxa de serviço" value={formatCurrency(Number(report.summary.total_service_fees || 0))} icon={<Banknote />} />
             <SummaryCard title="Pedidos pagos" value={String(report.summary.total_orders)} icon={<ShoppingBag />} />
             <SummaryCard title="Clientes unicos" value={String(report.summary.unique_customers)} icon={<Users />} />
             <SummaryCard title="Ticket medio" value={formatCurrency(report.summary.avg_ticket)} icon={<BarChart3 />} />
           </div>
+
+          <ReportCard title="Auditoria do caixa" icon={<Banknote />}>
+            {!report.cash_control ? (
+              <EmptyText>O caixa não foi aberto nesta data.</EmptyText>
+            ) : (
+              <div>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <span className={`rounded-full px-3 py-1 text-xs font-black ${report.cash_control.status === 'closed' ? 'bg-slate-100 text-slate-800' : 'bg-green-100 text-green-800'}`}>
+                    {report.cash_control.status === 'closed' ? 'Caixa fechado' : 'Caixa aberto'}
+                  </span>
+                  <span className="text-xs font-bold text-[#5a2d1d]">Aberto em {formatDateTime(report.cash_control.opened_at)}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <CashMetric label="Fundo inicial" value={formatCurrency(Number(report.cash_control.opening_cash || 0))} />
+                  <CashMetric label="Dinheiro esperado" value={report.cash_control.expected_cash == null ? '—' : formatCurrency(Number(report.cash_control.expected_cash))} />
+                  <CashMetric label="Valor contado" value={report.cash_control.counted_cash == null ? '—' : formatCurrency(Number(report.cash_control.counted_cash))} />
+                  <CashMetric label="Diferença" value={report.cash_control.difference == null ? '—' : formatCurrency(Number(report.cash_control.difference))} alert={Math.abs(Number(report.cash_control.difference || 0)) >= 0.01} />
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-[#e5c2ae] bg-[#fffaf6] p-3"><p className="text-xs font-black uppercase text-[#5a2d1d]">Justificativa</p><p className="mt-1 font-black text-[#2d1b14]">{cashReasonLabel(report.cash_control.difference_reason)}</p></div>
+                  <div className="rounded-xl border border-[#e5c2ae] bg-[#fffaf6] p-3"><p className="text-xs font-black uppercase text-[#5a2d1d]">Observação</p><p className="mt-1 whitespace-pre-wrap font-bold text-[#2d1b14]">{report.cash_control.notes || 'Sem observação'}</p></div>
+                </div>
+                {report.cash_control.closed_at && <p className="mt-3 text-xs font-bold text-[#5a2d1d]">Fechado em {formatDateTime(report.cash_control.closed_at)}</p>}
+              </div>
+            )}
+          </ReportCard>
 
           <div className="grid gap-4 lg:grid-cols-3">
             <ReportCard title="Como analisar" icon={<BarChart3 />}>
@@ -406,6 +485,15 @@ function SummaryCard({ title, value, icon }: { title: string; value: string; ico
           {icon}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CashMetric({ label, value, alert = false }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 ${alert ? 'border-red-200 bg-red-50' : 'border-[#e5c2ae] bg-[#fffaf6]'}`}>
+      <p className={`text-xs font-black uppercase ${alert ? 'text-red-700' : 'text-[#5a2d1d]'}`}>{label}</p>
+      <p className={`mt-1 text-lg font-black ${alert ? 'text-red-800' : 'text-[#2d1b14]'}`}>{value}</p>
     </div>
   );
 }

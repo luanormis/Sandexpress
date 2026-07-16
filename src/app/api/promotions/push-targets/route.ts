@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
-import { isOptionalPromotionSchemaError } from '@/lib/kiosk-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isCanonicalUuid } from '@/lib/uuid';
 
@@ -22,12 +21,7 @@ export async function POST(req: NextRequest) {
       .eq('id', promotionId)
       .single();
 
-    if (promotionError) {
-      if (isOptionalPromotionSchemaError(promotionError)) {
-        return NextResponse.json({ targets: [], unavailable: true });
-      }
-      throw promotionError;
-    }
+    if (promotionError) throw promotionError;
     if (!promotion) return NextResponse.json({ error: 'Promocao nao encontrada.' }, { status: 404 });
     if (!canAccessVendor(session, promotion.vendor_id)) {
       return NextResponse.json({ error: 'Nao autorizado para este quiosque.' }, { status: 403 });
@@ -37,12 +31,7 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabaseAdmin.rpc('enfileirar_push_promocao', {
         p_promocao_id: promotionId,
       });
-      if (error) {
-        if (isOptionalPromotionSchemaError(error)) {
-          return NextResponse.json({ queued: 0, unavailable: true });
-        }
-        throw error;
-      }
+      if (error) throw error;
       return NextResponse.json({ queued: Number(data || 0) });
     }
 
@@ -50,12 +39,7 @@ export async function POST(req: NextRequest) {
       p_promocao_id: promotionId,
     });
 
-    if (error) {
-      if (isOptionalPromotionSchemaError(error)) {
-        return NextResponse.json({ targets: [], unavailable: true });
-      }
-      throw error;
-    }
+    if (error) throw error;
 
     return NextResponse.json({ targets: data || [] });
   } catch (err) {

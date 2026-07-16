@@ -1,5 +1,13 @@
 # Banco do zero - SandExpress
 
+## Atualizar um banco que ja esta em uso
+
+Para preservar tabelas e dados existentes e aplicar o limite de 100 guarda-sois, indices de escala, protecao concorrente e idempotencia de pedidos, execute no SQL Editor o arquivo `infra/sql-atualizacao-escala-1000-quiosques.sql`.
+
+Esse update usa `ALTER TABLE`, `CREATE ... IF NOT EXISTS` e `UPDATE`. Ele nao possui `DROP TABLE` nem `TRUNCATE` e pode ser executado novamente com seguranca.
+
+Se o banco ja recebeu essa migracao e o limite de 100, execute depois `infra/sql-atualizacao-limite-admin-120.sql`. Ele mantem 100 como padrao, amplia apenas o teto tecnico para 120 e deixa a liberacao individual sob controle do administrador.
+
 Use este fluxo quando for iniciar ou recriar o Supabase do projeto.
 
 ## 1. Rodar o schema completo

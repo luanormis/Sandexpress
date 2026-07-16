@@ -1259,22 +1259,26 @@ input[type="number"] {
 .customer-list:has(.customer-product-row) {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  border-top: 0.0625rem solid rgba(226, 191, 176, 0.5);
+  gap: 0.7rem;
+  border-top: 0;
 }
 
 .customer-product-row {
-  min-height: 4.95rem;
+  box-sizing: border-box;
+  width: 100%;
+  height: 10.75rem;
+  min-height: 10.75rem;
+  max-height: 10.75rem;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  border: 0;
-  border-bottom: 0.0625rem solid rgba(226, 191, 176, 0.5);
-  border-radius: 0;
-  background: transparent;
-  padding: 0.55rem 0;
+  border: 0.1rem solid rgba(181, 111, 78, 0.48);
+  border-radius: 1rem;
+  background: #ffffff;
+  padding: 0.7rem;
+  overflow: hidden;
   box-shadow: none;
   transition: background-color 160ms ease;
 }
@@ -1318,6 +1322,13 @@ input[type="number"] {
 .customer-cart-info,
 .customer-order-info {
   width: 100%;
+}
+
+.customer-product-info {
+  min-width: 0;
+  max-height: 100%;
+  flex: 1 1 0;
+  overflow: hidden;
 }
 
 .customer-product-side {
@@ -1391,8 +1402,12 @@ input[type="number"] {
 }
 
 .customer-product-name {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: 1rem;
   line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .customer-product-description {
@@ -1897,6 +1912,22 @@ input[type="number"] {
   border-color: #d5a58c !important;
 }
 
+/* Dark Kanban columns and beach map always use bright, outdoor-readable labels. */
+.vendor-ops-shell .vendor-kanban-column > div:first-child h3,
+.vendor-ops-shell .vendor-kanban-column > div:first-child span,
+.vendor-ops-shell .vendor-kanban-column .text-gray-300,
+.vendor-ops-shell .vendor-beach-map :where(h3, .text-gray-400, .text-gray-500) {
+  color: #fff7ed !important;
+}
+
+.vendor-ops-shell .vendor-kanban-column > div:nth-child(2) > div:not(.vendor-order-card) :where(p, svg) {
+  color: #ffe4d6 !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.text-\[\#FF6B00\] {
+  color: #ffb17a !important;
+}
+
 .vendor-sales-surface {
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.4), 0 1.5rem 3rem rgba(61, 26, 10, 0.12);
 }
@@ -2134,8 +2165,112 @@ input[type="number"] {
   text-transform: uppercase;
 }
 
+.customer-upsell-card {
+  margin: 0.75rem 0;
+  border: 0.125rem solid color-mix(in srgb, var(--customer-primary) 42%, white);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--customer-primary) 9%, var(--customer-surface));
+  padding: 1rem;
+}
+
+.customer-upsell-card > p {
+  margin-bottom: 0.7rem;
+  color: var(--customer-text);
+  font-weight: 900;
+}
+
+.customer-upsell-card > div {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.customer-upsell-card button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 0.8rem;
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 800;
+}
+
+.customer-upsell-card button svg,
+.customer-upsell-card button strong {
+  color: var(--customer-primary);
+}
+
+.customer-offers { margin-bottom: 1rem; }
+.customer-offers__title { display: flex; align-items: center; gap: .45rem; margin-bottom: .65rem; color: #166534; font-weight: 900; }
+.customer-offers__rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(16rem, 82%); gap: .75rem; overflow-x: auto; padding-bottom: .4rem; scroll-snap-type: x mandatory; }
+.customer-offer-card { scroll-snap-align: start; border: 2px solid #86efac; border-radius: 1.1rem; background: linear-gradient(135deg, #f0fdf4, #fff); padding: 1rem; color: #17221a; box-shadow: 0 10px 25px rgba(22, 101, 52, .08); }
+.customer-offer-card > span { display: inline-block; border-radius: 999px; background: #15803d; padding: .3rem .65rem; color: #fff; font-size: .72rem; font-weight: 900; text-transform: uppercase; }
+.customer-offer-card h2 { margin-top: .55rem; font-size: 1.05rem; font-weight: 900; color: #102a18; }
+.customer-offer-card p, .customer-offer-card small { display: block; margin-top: .3rem; color: #34543d; font-weight: 700; line-height: 1.35; }
+.customer-offer-card button { display: flex; width: 100%; min-height: 2.75rem; align-items: center; justify-content: center; gap: .35rem; margin-top: .75rem; border-radius: .75rem; background: #16a34a; color: #fff; font-weight: 900; }
+@media (min-width: 640px) { .customer-offers__rail { grid-auto-columns: minmax(17rem, 40%); } }
+
 .customer-option-group {
   margin-top: 0.45rem;
+}
+
+.customer-options-trigger {
+  margin-top: 0.55rem;
+  border: 0.1rem solid color-mix(in srgb, var(--customer-primary) 42%, #ffffff);
+  border-radius: 0.7rem;
+  background: #fff7ed;
+  color: var(--customer-primary);
+  padding: 0.48rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.customer-option-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(18, 10, 7, 0.7);
+  padding: 0.7rem;
+}
+
+.customer-option-modal {
+  width: min(100%, 32rem);
+  max-height: 90dvh;
+  overflow-y: auto;
+  border-radius: 1.5rem 1.5rem 1rem 1rem;
+  background: #ffffff;
+  color: #24150f;
+  padding: 1.1rem;
+  box-shadow: 0 1.4rem 4rem rgba(31, 14, 7, 0.3);
+}
+
+.customer-option-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.customer-option-modal__header small { color: var(--customer-primary); font-weight: 950; text-transform: uppercase; }
+.customer-option-modal__header h2 { margin: 0.2rem 0 0; font-size: 1.45rem; font-weight: 950; }
+.customer-option-modal__header p { margin: 0.25rem 0 0; color: #66483b; font-size: 0.85rem; font-weight: 750; }
+.customer-option-modal__header > button { width: 2.7rem; min-height: 2.7rem; border-radius: 999rem; background: #f5e7e0; color: #4b2a1e; font-size: 1.5rem; font-weight: 900; }
+.customer-option-modal__groups { margin-top: 1rem; display: grid; gap: 0.8rem; }
+.customer-option-modal__groups .customer-option-group { margin: 0; border: 0.1rem solid #ead2c7; border-radius: 1rem; background: #fffaf7; padding: 0.85rem; }
+.customer-option-modal__groups .customer-option-group p { color: #3d241a; font-size: 0.9rem; }
+.customer-option-modal__footer { position: sticky; bottom: -1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1rem -1.1rem -1.1rem; border-top: 0.1rem solid #ead2c7; background: #ffffff; padding: 0.9rem 1.1rem calc(0.9rem + env(safe-area-inset-bottom)); }
+.customer-option-modal__footer small { display: block; color: #765447; font-size: 0.72rem; font-weight: 800; }
+.customer-option-modal__footer strong { color: var(--customer-primary); font-size: 1.15rem; font-weight: 950; }
+.customer-option-modal__footer > button { min-height: 3rem; border-radius: 0.9rem; background: var(--customer-button); color: var(--customer-button-text); padding: 0 1rem; font-weight: 950; }
+
+@media (min-width: 640px) {
+  .customer-option-modal-backdrop { align-items: center; }
+  .customer-option-modal { border-radius: 1.5rem; }
 }
 
 .customer-option-group p {
@@ -2173,3 +2308,76 @@ input[type="number"] {
   font-weight: 800;
   margin-top: 0.15rem;
 }
+
+/* Production contrast guard for the operational Kanban and beach map. */
+.vendor-ops-shell .vendor-kanban-column,
+.vendor-ops-shell .vendor-beach-map {
+  background: linear-gradient(155deg, #3a1a0d 0%, #24130d 100%) !important;
+  border-color: rgba(255, 139, 72, 0.58) !important;
+  color: #fff8f3 !important;
+}
+
+.vendor-ops-shell .vendor-kanban-column > div:first-child :where(h3, span),
+.vendor-ops-shell .vendor-beach-map :where(h3, p),
+.vendor-ops-shell .vendor-beach-map > div:first-child > div:last-child span {
+  color: #fff8f3 !important;
+}
+
+.vendor-ops-shell .vendor-kanban-count {
+  background: #ff6b00 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.35);
+}
+
+.vendor-ops-shell .vendor-order-card {
+  box-shadow: 0 .55rem 1.25rem rgba(15, 7, 3, .22) !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.is-free {
+  background: #eaf8ef !important;
+  border-color: #62b77a !important;
+  color: #135f2e !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.is-occupied {
+  background: #fff1f1 !important;
+  border-color: #e57373 !important;
+  color: #8f1d1d !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.is-closing {
+  background: #fff4d6 !important;
+  border-color: #f2a93b !important;
+  color: #7a3d00 !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.is-service {
+  background: #b42318 !important;
+  border-color: #fecaca !important;
+  color: #ffffff !important;
+}
+
+.vendor-ops-shell .vendor-umbrella-tile.is-inactive {
+  background: #e7e1de !important;
+  border-color: #b9aaa3 !important;
+  color: #57443c !important;
+}
+
+.vendor-ops-shell .vendor-beach-map .vendor-umbrella-tile span {
+  color: inherit !important;
+}
+/* High-contrast operational states and summary controls. */
+.vendor-ops-shell .vendor-today-summary { color: #fff8f3 !important; }
+.vendor-ops-shell .vendor-today-summary :where(h3, .text-gray-900, .text-gray-950) { color: #ffffff !important; }
+.vendor-ops-shell .vendor-today-summary :where(.text-gray-600, .text-gray-700) { color: #ffe2d3 !important; }
+.vendor-ops-shell .vendor-summary-metric { background: rgba(116, 61, 38, 0.92) !important; border: 1px solid rgba(255, 206, 181, 0.2); }
+.vendor-ops-shell .vendor-summary-metric p:first-child { color: #ffe8dc !important; }
+.vendor-ops-shell .vendor-summary-metric p:last-child { color: #ffffff !important; }
+.vendor-ops-shell .vendor-daily-goal-button { background: #8b3f16 !important; border-color: #cf7a42 !important; color: #fff4e8 !important; }
+.vendor-ops-shell .vendor-sound-button { background: #244f8f !important; color: #f2f7ff !important; }
+.vendor-ops-shell .vendor-cash-button { background: #17613b !important; color: #f0fff6 !important; }
+.vendor-ops-shell .vendor-beach-legend .is-free { color: #86efac !important; }
+.vendor-ops-shell .vendor-beach-legend .is-occupied { color: #fca5a5 !important; }
+.vendor-ops-shell .vendor-beach-legend .is-closing { color: #fcd34d !important; }
+.vendor-ops-shell .vendor-umbrella-tile { border-width: 2px !important; }
+.vendor-ops-shell .vendor-umbrella-tile .vendor-umbrella-status { color: inherit !important; }

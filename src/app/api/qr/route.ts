@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
+import { createBrandedQrSvg, svgToDataUrl } from '@/lib/branded-qr';
 
 /**
  * GET /api/qr?umbrella_id=xxx&format=svg|png
@@ -68,7 +69,19 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const svg = await QRCode.toString(targetUrl, { type: 'svg', margin: 2 });
+    const svg = await createBrandedQrSvg(targetUrl);
+    if (format === 'json') {
+      return NextResponse.json({
+        umbrella_id: umbrella.id,
+        tenant_id: umbrella.tenant_id,
+        vendor_id: umbrella.vendor_id,
+        number: umbrella.number,
+        target_url: targetUrl,
+        target_path: targetPath,
+        qr_image_url: svgToDataUrl(svg),
+        format: 'svg',
+      });
+    }
     return new NextResponse(svg, {
       headers: { 'Content-Type': 'image/svg+xml' },
     });

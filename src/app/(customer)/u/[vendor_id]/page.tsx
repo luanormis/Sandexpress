@@ -37,6 +37,25 @@ type CartItem = {
   option?: string | null;
 };
 
+type ProductOptionGroup = { name: string; options: string[] };
+
+function getProductOptionGroups(product: Product): ProductOptionGroup[] {
+  const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
+  if (values.length === 0) return [];
+  if (!values.some(value => value.includes('::'))) return [{ name: product.option_group_name || 'Opcao', options: values }];
+  const groups = new Map<string, string[]>();
+  values.forEach(value => {
+    const [rawGroup, ...parts] = value.split('::');
+    const group = rawGroup.trim() || 'Opcao';
+    const option = parts.join('::').trim();
+    if (option) groups.set(group, [...(groups.get(group) || []), option]);
+  });
+  return Array.from(groups, ([name, options]) => ({ name, options: Array.from(new Set(options)) }));
+}
+
+type UpsellRule = { trigger_product_id: string; suggested_product_ids: string[]; message: string };
+type FlexiblePromotion = { id: string; titulo: string; descricao?: string | null; desconto_tipo: string; desconto_valor: number; promocao_itens?: Array<{ product_id: string; quantidade: number; products?: { name?: string } }> };
+
 type PromotionPreview = {
   subtotal: number | null;
   discount_total: number;
@@ -76,6 +95,7 @@ type CustomerVendor = {
 type FeatureFlags = Record<string, boolean>;
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
+  offline_pending: "Aguardando internet",
   received: "Pedido recebido",
   preparing: "Em preparo",
   delivering: "Saiu para entrega",
@@ -85,6 +105,18 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 };
 
 const BILLABLE_STATUSES = new Set(["completed", "closing_requested"]);
+
+type CustomerOfflineOrder = {
+  id: string;
+  body: { vendor_id: string; customer_id: string; umbrella_id: string; items: Array<{ product_id: string; quantity: number }>; notes: string; idempotency_key: string };
+  total: number;
+  created_at: string;
+};
+
+function customerCacheKey(vendorId: string, umbrellaId: string) { return `sandexpress_customer_cache_${vendorId}_${umbrellaId}`; }
+function customerQueueKey(vendorId: string, umbrellaId: string) { return `sandexpress_customer_queue_${vendorId}_${umbrellaId}`; }
+function readCustomerQueue(vendorId: string, umbrellaId: string): CustomerOfflineOrder[] { try { return JSON.parse(localStorage.getItem(customerQueueKey(vendorId, umbrellaId)) || "[]"); } catch { return []; } }
+function writeCustomerQueue(vendorId: string, umbrellaId: string, queue: CustomerOfflineOrder[]) { localStorage.setItem(customerQueueKey(vendorId, umbrellaId), JSON.stringify(queue)); }
 
 export default function CustomerApp() {
   const params = useParams();
@@ -108,6 +140,7 @@ export default function CustomerApp() {
   const [partySize, setPartySize] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [optionMenuProduct, setOptionMenuProduct] = useState<Product | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [notes, setNotes] = useState("");
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
@@ -127,6 +160,12 @@ export default function CustomerApp() {
   const [features, setFeatures] = useState<FeatureFlags>({});
   const [promotionPreview, setPromotionPreview] = useState<PromotionPreview | null>(null);
   const [promotionLoading, setPromotionLoading] = useState(false);
+  const [upsellRules, setUpsellRules] = useState<UpsellRule[]>([]);
+  const [flexiblePromotions, setFlexiblePromotions] = useState<FlexiblePromotion[]>([]);
+  const [online, setOnline] = useState(true);
+  const [pendingSync, setPendingSync] = useState(0);
+  const [offlineOrders, setOfflineOrders] = useState<CustomerOfflineOrder[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
   const visibleProducts = useMemo(() => {
     const now = Date.now();
@@ -146,6 +185,12 @@ export default function CustomerApp() {
   const discountedCartTotal = typeof promotionPreview?.total === "number" ? Number(promotionPreview.total) : cartTotal;
   const appliedPromotions = promotionPreview?.applied_promotions || [];
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const upsellSuggestions = useMemo(() => {
+    const cartIds = new Set(cart.map(item => item.product.id));
+    const rule = upsellRules.find(item => cartIds.has(item.trigger_product_id));
+    if (!rule) return null;
+    return { message: rule.message, products: rule.suggested_product_ids.filter(id => !cartIds.has(id)).map(id => products.find(product => product.id === id)).filter(Boolean) as Product[] };
+  }, [cart, products, upsellRules]);
   const ordersTotal = orders
     .filter((order) => BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
@@ -220,9 +265,13 @@ export default function CustomerApp() {
 
   async function loadCustomerOrders(nextCustomerId: string, nextVendorId: string) {
     if (!nextCustomerId || !nextVendorId) return;
-    const res = await fetch(`/api/customers/${encodeURIComponent(nextCustomerId)}/orders?vendor_id=${encodeURIComponent(nextVendorId)}`, {
-      credentials: "include",
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/customers/${encodeURIComponent(nextCustomerId)}/orders?vendor_id=${encodeURIComponent(nextVendorId)}`, { credentials: "include" });
+    } catch {
+      setOnline(false);
+      return;
+    }
     const data = await res.json().catch(() => []);
     if (res.status === 401 || res.status === 403) {
       resetExpiredCustomerSession();
@@ -239,7 +288,13 @@ export default function CustomerApp() {
       account_status: order.account_status,
       created_at: order.created_at || new Date().toISOString(),
     }));
-    setOrders(mapped);
+    const queued = readCustomerQueue(nextVendorId, umbrellaId);
+    setOfflineOrders(queued);
+    setPendingSync(queued.length);
+    setOrders([
+      ...queued.map((order) => ({ id: order.id, total: order.total, status: "offline_pending", created_at: order.created_at })),
+      ...mapped,
+    ]);
     if (mapped[0]?.account_id || mapped[0]?.id) setCurrentOrderId(mapped[0].account_id || mapped[0].id);
   }
 
@@ -262,6 +317,15 @@ export default function CustomerApp() {
         setVendor(data.vendor);
         setProducts(data.products || []);
         setFeatures(data.features || {});
+        localStorage.setItem(customerCacheKey(data.vendor?.id || routeVendorId, umbrellaId), JSON.stringify({ umbrella: data.umbrella, vendor: data.vendor, products: data.products || [], features: data.features || {}, saved_at: new Date().toISOString() }));
+        fetch(`/api/upsell-settings?vendor_id=${encodeURIComponent(data.vendor?.id || routeVendorId)}`)
+          .then(response => response.json())
+          .then(settings => setUpsellRules(settings.rules || []))
+          .catch(() => undefined);
+        fetch(`/api/promotions?vendor_id=${encodeURIComponent(data.vendor?.id || routeVendorId)}`)
+          .then(response => response.ok ? response.json() : { promotions: [] })
+          .then(result => setFlexiblePromotions(result.promotions || []))
+          .catch(() => undefined);
 
         const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
         if (saved) {
@@ -272,7 +336,17 @@ export default function CustomerApp() {
           loadCustomerOrders(parsed.customer_id || "", data.vendor?.id || routeVendorId);
         }
       } catch {
-        setError("Erro de rede ao carregar o cardápio.");
+        const cacheKeys = [customerCacheKey(routeVendorId, umbrellaId), ...Object.keys(localStorage).filter(key => key.startsWith('sandexpress_customer_cache_') && key.endsWith(`_${umbrellaId}`))];
+        const cachedText = cacheKeys.map(key => localStorage.getItem(key)).find(Boolean);
+        if (cachedText) {
+          try {
+            const cached = JSON.parse(cachedText);
+            setUmbrella(cached.umbrella); setVendor(cached.vendor); setProducts(cached.products || []); setFeatures(cached.features || {});
+            setOnline(false); setWelcomeMessage("Internet indisponível. Cardápio salvo carregado no modo offline.");
+            const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
+            if (saved) { const parsed = JSON.parse(saved); setCustomerId(parsed.customer_id || ""); setCustomerName(parsed.name || ""); setStep("menu"); }
+          } catch { setError("Não foi possível abrir o cardápio salvo."); }
+        } else setError("Erro de rede ao carregar o cardápio. Conecte-se uma vez para salvá-lo neste aparelho.");
       }
     }
 
@@ -280,11 +354,72 @@ export default function CustomerApp() {
   }, [umbrellaId, routeVendorId]);
 
   useEffect(() => {
+    if (!vendor?.id) return;
+    const vendorId = vendor.id;
+    let cancelled = false;
+    const refreshTheme = async () => {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      const response = await fetch(`/api/public/theme/${encodeURIComponent(vendorId)}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const nextTheme = await response.json();
+      if (!cancelled) setVendor(current => current?.id === vendorId ? { ...current, ...nextTheme } : current);
+    };
+    const timer = window.setInterval(() => void refreshTheme(), 60000);
+    const onVisibility = () => { if (document.visibilityState === "visible") void refreshTheme(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    void refreshTheme();
+    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [vendor?.id]);
+
+  useEffect(() => {
+    if (!vendor?.id || !umbrellaId || !customerId) return;
+    const vendorId = vendor.id;
+    const updatePending = () => {
+      const queued = readCustomerQueue(vendorId, umbrellaId);
+      setOfflineOrders(queued);
+      setPendingSync(queued.length);
+    };
+    const syncQueue = async () => {
+      if (!navigator.onLine) { setOnline(false); updatePending(); return; }
+      setOnline(true);
+      const remaining = [...readCustomerQueue(vendorId, umbrellaId)];
+      if (remaining.length === 0) { setPendingSync(0); return; }
+      setSyncing(true);
+      while (remaining.length > 0) {
+        const queued = remaining[0];
+        try {
+          const response = await fetch('/api/orders', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(queued.body) });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) { setError(data.error || 'Um pedido offline precisa de revisão.'); break; }
+          remaining.shift(); writeCustomerQueue(vendorId, umbrellaId, remaining); setOfflineOrders([...remaining]); setPendingSync(remaining.length);
+        } catch { setOnline(false); break; }
+      }
+      setSyncing(false);
+      if (remaining.length === 0) { setWelcomeMessage('Internet restabelecida. Pedidos sincronizados com o quiosque.'); await loadCustomerOrders(customerId, vendorId); }
+    };
+    const connected = () => { setOnline(true); void syncQueue(); };
+    const disconnected = () => { setOnline(false); updatePending(); };
+    setOnline(navigator.onLine); updatePending();
+    if (navigator.onLine) void syncQueue();
+    window.addEventListener('online', connected); window.addEventListener('offline', disconnected);
+    return () => { window.removeEventListener('online', connected); window.removeEventListener('offline', disconnected); };
+  }, [vendor?.id, umbrellaId, customerId]);
+
+  useEffect(() => {
     if (!customerId || !vendor?.id) return;
-    const timer = window.setInterval(() => {
-      loadCustomerOrders(customerId, vendor.id);
-    }, 5000);
-    return () => window.clearInterval(timer);
+    let loading = false;
+    const refresh = async () => {
+      if (loading || !navigator.onLine || document.visibilityState !== 'visible') return;
+      loading = true;
+      try { await loadCustomerOrders(customerId, vendor.id); } finally { loading = false; }
+    };
+    const timer = window.setInterval(() => void refresh(), 15000);
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') void refresh(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [customerId, vendor?.id]);
 
   useEffect(() => {
@@ -440,8 +575,9 @@ export default function CustomerApp() {
   }
 
   function addToCart(product: Product) {
-    const options = Array.isArray(product.option_values) ? product.option_values.filter(Boolean) : [];
-    const option = options.length > 0 ? selectedOptions[product.id] || options[0] : null;
+    const groups = getProductOptionGroups(product);
+    const choices = groups.map(group => ({ name: group.name, value: selectedOptions[`${product.id}:${group.name}`] || group.options[0] })).filter(choice => choice.value);
+    const option = choices.length > 0 ? choices.map(choice => `${choice.name}: ${choice.value}`).join(' | ') : null;
     setLastAddedProductId(product.id);
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id && (item.option || null) === option);
@@ -451,6 +587,17 @@ export default function CustomerApp() {
       return [...prev, { product, quantity: 1, option }];
     });
     window.setTimeout(() => setLastAddedProductId((current) => current === product.id ? "" : current), 1400);
+  }
+
+  function addPromotionToCart(promotion: FlexiblePromotion) {
+    let added = 0;
+    (promotion.promocao_itens || []).forEach(item => {
+      const product = products.find(current => current.id === item.product_id);
+      if (!product) return;
+      for (let index = 0; index < Math.max(1, Number(item.quantidade || 1)); index += 1) addToCart(product);
+      added += Math.max(1, Number(item.quantidade || 1));
+    });
+    if (added > 0) setWelcomeMessage(`Oferta “${promotion.titulo}” adicionada. O desconto aparece no carrinho.`);
   }
 
   function updateQuantity(productId: string, delta: number, option?: string | null) {
@@ -467,6 +614,7 @@ export default function CustomerApp() {
 
   async function createOrder() {
     if (!vendor || !customerId || cart.length === 0) return;
+    let offlineCandidate: CustomerOfflineOrder | null = null;
     setLoading(true);
     setError("");
     try {
@@ -475,17 +623,29 @@ export default function CustomerApp() {
         .map((item) => `${item.product.name}: ${item.option}`)
         .join("; ");
       const orderNotes = [notes.trim(), optionNotes ? `Opções escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
+      const idempotencyKey = crypto.randomUUID();
+      const orderBody = {
+        vendor_id: vendor.id,
+        customer_id: customerId,
+        umbrella_id: umbrellaId,
+        items: cart.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
+        notes: orderNotes,
+        idempotency_key: idempotencyKey,
+      };
+      offlineCandidate = { id: idempotencyKey, body: orderBody, total: discountedCartTotal, created_at: new Date().toISOString() };
+      const saveOffline = () => {
+        const queued = offlineCandidate!;
+        const queue = [...readCustomerQueue(vendor.id, umbrellaId), queued];
+        writeCustomerQueue(vendor.id, umbrellaId, queue); setOfflineOrders(queue); setPendingSync(queue.length); setOnline(false);
+        setOrders(prev => [{ id: idempotencyKey, total: discountedCartTotal, status: 'offline_pending', created_at: queued.created_at }, ...prev]);
+        setPromotionPreview(null); setCart([]); setNotes(''); setWelcomeMessage('Pedido salvo neste aparelho. Ele será enviado automaticamente quando a internet voltar.'); setStep('orders');
+      };
+      if (!navigator.onLine) { saveOffline(); return; }
       const res = await fetch("/api/orders", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vendor_id: vendor.id,
-          customer_id: customerId,
-          umbrella_id: umbrellaId,
-          items: cart.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
-          notes: orderNotes,
-        }),
+        body: JSON.stringify(orderBody),
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
@@ -516,6 +676,12 @@ export default function CustomerApp() {
       setCart([]);
       setNotes("");
       setStep("orders");
+    } catch (sendError) {
+      if (sendError instanceof TypeError && vendor && offlineCandidate) {
+        const queued = offlineCandidate;
+        const queue = [...readCustomerQueue(vendor.id, umbrellaId), queued]; writeCustomerQueue(vendor.id, umbrellaId, queue); setOfflineOrders(queue); setPendingSync(queue.length); setOnline(false);
+        setOrders(prev => [{ id: queued.id, total: queued.total, status: 'offline_pending', created_at: queued.created_at }, ...prev]); setCart([]); setNotes(''); setStep('orders'); setWelcomeMessage('Sinal caiu. Pedido protegido e aguardando sincronização.');
+      } else setError(sendError instanceof Error ? sendError.message : 'Erro ao enviar pedido.');
     } finally {
       setLoading(false);
     }
@@ -757,12 +923,12 @@ export default function CustomerApp() {
             </div>
           </div>
           <div className="customer-actions">
-            <button onClick={requestCloseAccount} disabled={loading} className="customer-icon-button customer-icon-button--secondary">
+            <button onClick={requestCloseAccount} disabled={loading || !online} title={!online ? 'A conta só pode ser solicitada com internet' : undefined} className="customer-icon-button customer-icon-button--secondary">
               Fechar conta
             </button>
             {featureEnabled("waiter_call") && (
-              <button onClick={callWaiter} className="customer-icon-button">
-                <Bell size="1.125rem" /> Atendente
+              <button onClick={callWaiter} disabled={!online || waiterCalled} title={!online ? 'O chamado precisa de internet' : waiterCalled ? 'Chamado já enviado ao atendimento' : undefined} className="customer-icon-button">
+                <Bell size="1.125rem" /> {waiterCalled ? 'Chamado enviado' : 'Atendente'}
               </button>
             )}
           </div>
@@ -781,8 +947,30 @@ export default function CustomerApp() {
         </div>
       </header>
 
+      {(!online || pendingSync > 0 || syncing) && (
+        <div className={`mx-4 mt-3 rounded-2xl border p-3 text-sm font-bold ${online ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`} role="status" aria-live="polite">
+          <p className="font-black">{syncing ? 'Sincronizando pedidos...' : online ? 'Pedidos aguardando sincronização' : 'Modo offline ativo'}</p>
+          <p className="mt-1">{pendingSync > 0 ? `${pendingSync} pedido(s) protegido(s) neste aparelho.` : 'O cardápio salvo continua disponível. Pedidos serão enviados quando o sinal voltar.'}</p>
+          {offlineOrders.length > 0 && (
+            <div className="mt-3 grid gap-2">
+              {offlineOrders.map((order, index) => (
+                <div key={order.id} className="flex items-center justify-between gap-3 rounded-xl border border-current/20 bg-white/70 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-black">Pedido offline {index + 1}</p>
+                    <p className="text-xs font-bold opacity-80">{new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {order.body.items.reduce((sum, item) => sum + item.quantity, 0)} item(ns)</p>
+                  </div>
+                  <strong className="whitespace-nowrap">{formatCurrency(order.total)}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          {pendingSync > 0 && !syncing && <button type="button" onClick={() => { if (!vendor || !confirm('Descartar os pedidos que ainda não foram enviados?')) return; writeCustomerQueue(vendor.id, umbrellaId, []); setOfflineOrders([]); setPendingSync(0); setOrders(current => current.filter(order => order.status !== 'offline_pending')); setWelcomeMessage('Pedidos offline descartados.'); }} className="mt-3 rounded-lg border border-current px-3 py-2 text-xs font-black">Descartar pendentes</button>}
+        </div>
+      )}
+
       {step === "menu" && (
         <section className="customer-content">
+          {flexiblePromotions.length > 0 && <div className="customer-offers"><div className="customer-offers__title"><Star size="1.1rem" /><span>Ofertas do quiosque</span></div><div className="customer-offers__rail">{flexiblePromotions.map(promotion => { const freeProduct = promotion.descricao?.startsWith('[PRODUTO_GRATIS]'); const description = String(promotion.descricao || '').replace(/^\[(PRODUTO_GRATIS|COMBO)\]\s*/, ''); const benefit = freeProduct ? 'Produto grátis' : promotion.desconto_tipo === 'percentual' ? `${promotion.desconto_valor}% OFF` : promotion.desconto_tipo === 'preco_fechado' ? `Combo ${formatCurrency(Number(promotion.desconto_valor))}` : `Economize ${formatCurrency(Number(promotion.desconto_valor))}`; return <article key={promotion.id} className="customer-offer-card"><span>{benefit}</span><h2>{promotion.titulo}</h2>{description && <p>{description}</p>}<small>{promotion.promocao_itens?.map(item => `${item.quantidade || 1}x ${item.products?.name || 'item'}`).join(' + ')}</small><button type="button" onClick={() => addPromotionToCart(promotion)}><Plus size="1rem" /> Adicionar oferta</button></article>; })}</div></div>}
           <div className="customer-category-rail">
             {CUSTOMER_MENU_CATEGORIES.map((category) => (
               <button
@@ -798,8 +986,8 @@ export default function CustomerApp() {
             {visibleProducts.length === 0 ? (
               <p className="customer-empty">Nenhum produto nesta categoria.</p>
             ) : visibleProducts.map((product) => {
-              const options = Array.isArray(product.option_values) ? product.option_values.filter(Boolean) : [];
-              const selectedOption = options.length > 0 ? selectedOptions[product.id] || options[0] : null;
+              const optionGroups = getProductOptionGroups(product);
+              const selectedOption = optionGroups.length > 0 ? optionGroups.map(group => `${group.name}: ${selectedOptions[`${product.id}:${group.name}`] || group.options[0]}`).join(' | ') : null;
               const quantity = getCartQuantity(product.id, selectedOption);
               const highlighted = Boolean(product.menu_highlight || product.is_combo || product.promotional_price);
               return (
@@ -815,23 +1003,7 @@ export default function CustomerApp() {
                     {highlighted && (
                       <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>
                     )}
-                    {options.length > 0 && (
-                      <div className="customer-option-group" aria-label={product.option_group_name || "Opções"}>
-                        <p>{product.option_group_name || "Escolha uma opção"}</p>
-                        <div>
-                          {options.map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={() => setSelectedOptions(prev => ({ ...prev, [product.id]: option }))}
-                              className={selectedOption === option ? "is-selected" : ""}
-                            >
-                              {option}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {optionGroups.length > 0 && <button type="button" onClick={() => setOptionMenuProduct(product)} className="customer-options-trigger">Escolher opções</button>}
                     <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
                   </div>
                   <div className="customer-product-side">
@@ -841,13 +1013,13 @@ export default function CustomerApp() {
                           <Minus size="1rem" />
                         </button>
                         <span>{quantity}</span>
-                        <button onClick={() => addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}>
+                        <button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}>
                           <Plus size="1rem" />
                         </button>
                       </div>
                     ) : (
                       <button
-                        onClick={() => addToCart(product)}
+                        onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)}
                         className="customer-add-button"
                         aria-label={`Adicionar ${product.name} ao carrinho`}
                       >
@@ -891,6 +1063,12 @@ export default function CustomerApp() {
               </article>
             ))}
           </div>
+          {upsellSuggestions && upsellSuggestions.products.length > 0 && (
+            <div className="customer-upsell-card">
+              <p>{upsellSuggestions.message}</p>
+              <div>{upsellSuggestions.products.map(product => <button key={product.id} type="button" onClick={() => addToCart(product)}><Plus size="1rem" /><span>{product.name}</span><strong>{formatCurrency(Number(product.promotional_price ?? product.price))}</strong></button>)}</div>
+            </div>
+          )}
           {cart.length > 0 && (
             <div className="customer-bill-panel">
               <div className="customer-bill-row">
@@ -1066,6 +1244,11 @@ export default function CustomerApp() {
           </div>
         </section>
       )}
+
+      {optionMenuProduct && (() => {
+        const groups = getProductOptionGroups(optionMenuProduct);
+        return <div className="customer-option-modal-backdrop" onClick={() => setOptionMenuProduct(null)}><div className="customer-option-modal" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Opções de ${optionMenuProduct.name}`}><div className="customer-option-modal__header"><div><small>Monte do seu jeito</small><h2>{optionMenuProduct.name}</h2><p>Escolha uma opção em cada etapa.</p></div><button type="button" onClick={() => setOptionMenuProduct(null)} aria-label="Fechar opções">×</button></div><div className="customer-option-modal__groups">{groups.map(group => <div key={group.name} className="customer-option-group"><p>{group.name}</p><div>{group.options.map(option => <button key={option} type="button" onClick={() => setSelectedOptions(current => ({ ...current, [`${optionMenuProduct.id}:${group.name}`]: option }))} className={(selectedOptions[`${optionMenuProduct.id}:${group.name}`] || group.options[0]) === option ? 'is-selected' : ''}>{option}</button>)}</div></div>)}</div><div className="customer-option-modal__footer"><div><small>Preço</small><strong>{formatCurrency(Number(optionMenuProduct.promotional_price ?? optionMenuProduct.price))}</strong></div><button type="button" onClick={() => { addToCart(optionMenuProduct); setOptionMenuProduct(null); }}>Adicionar ao pedido</button></div></div></div>;
+      })()}
 
       <nav className="customer-tabbar" aria-label="Navegação do pedido">
         <button onClick={() => setStep("menu")} className={`customer-tab${step === "menu" ? " is-active" : ""}`}>

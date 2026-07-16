@@ -31,11 +31,11 @@ ALTER TABLE vendors
   ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '3 days'),
   ADD COLUMN IF NOT EXISTS plan_type TEXT DEFAULT 'trial',
   ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS max_umbrellas INTEGER NOT NULL DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS max_umbrellas INTEGER NOT NULL DEFAULT 100,
   ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
-UPDATE vendors SET max_umbrellas = 50 WHERE max_umbrellas IS NULL OR max_umbrellas > 50;
+UPDATE vendors SET max_umbrellas = CASE WHEN max_umbrellas > 120 THEN 120 ELSE 100 END WHERE max_umbrellas IS NULL OR max_umbrellas = 50 OR max_umbrellas > 120;
 UPDATE vendors SET trial_ends_at = COALESCE(trial_ends_at, NOW() + INTERVAL '3 days');
 
 DO $$

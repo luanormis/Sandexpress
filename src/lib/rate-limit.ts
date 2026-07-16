@@ -19,8 +19,6 @@ export async function isRateLimited(
   maxAttempts: number,
   windowMs: number
 ): Promise<boolean> {
-  const now = new Date();
-  const resetAt = new Date(Date.now() + windowMs).toISOString();
   const bucketKey = `${keyPrefix}:${getClientIp(req)}`;
   const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
 
@@ -30,33 +28,9 @@ export async function isRateLimited(
     p_window_seconds: windowSeconds,
   });
 
-  if (!rpcError && typeof limited === 'boolean') {
-    return limited;
+  if (rpcError) throw rpcError;
+  if (typeof limited !== 'boolean') {
+    throw new Error('consume_rate_limit retornou um resultado invalido.');
   }
-
-  if (rpcError && !['PGRST202', '42883'].includes(String((rpcError as any).code || ''))) {
-    console.error('Rate limit RPC error:', rpcError);
-  }
-
-  const { data: existing } = await supabaseAdmin
-    .from('rate_limit_buckets')
-    .select('count, reset_at')
-    .eq('key', bucketKey)
-    .single();
-
-  if (!existing || existing.reset_at < now.toISOString()) {
-    // Janela expirada ou novo bucket — upsert com count=1
-    await supabaseAdmin
-      .from('rate_limit_buckets')
-      .upsert({ key: bucketKey, count: 1, reset_at: resetAt }, { onConflict: 'key' });
-    return false;
-  }
-
-  const newCount = existing.count + 1;
-  await supabaseAdmin
-    .from('rate_limit_buckets')
-    .update({ count: newCount })
-    .eq('key', bucketKey);
-
-  return newCount > maxAttempts;
+  return limited;
 }

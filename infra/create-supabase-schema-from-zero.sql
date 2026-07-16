@@ -35,7 +35,7 @@ CREATE TABLE vendors (
   plan_type TEXT DEFAULT 'trial'
     CHECK (plan_type IN ('trial','monthly','annual','12months')),
   plan_expires_at TIMESTAMPTZ,
-  max_umbrellas INTEGER NOT NULL DEFAULT 50,
+  max_umbrellas INTEGER NOT NULL DEFAULT 100,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

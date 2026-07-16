@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
 import { getAdminPassword } from '@/lib/runtime-config';
 import { enforceTenantScope, getTenantIdFromRequest } from '@/lib/tenant-utils';
+import { ADMIN_UMBRELLA_LIMIT } from '@/lib/plans';
 
 const ALLOWED_VENDOR_FIELDS = new Set([
   'name',
@@ -100,6 +101,13 @@ export async function PATCH(
     const safeUpdate: Record<string, unknown> = {};
     for (const field of ALLOWED_VENDOR_FIELDS) {
       if (field in body) safeUpdate[field] = body[field];
+    }
+    if ('max_umbrellas' in safeUpdate) {
+      const maxUmbrellas = Number(safeUpdate.max_umbrellas);
+      if (!Number.isInteger(maxUmbrellas) || maxUmbrellas < 1 || maxUmbrellas > ADMIN_UMBRELLA_LIMIT) {
+        return NextResponse.json({ error: `O limite deve ficar entre 1 e ${ADMIN_UMBRELLA_LIMIT} guarda-sois.` }, { status: 400 });
+      }
+      safeUpdate.max_umbrellas = maxUmbrellas;
     }
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });

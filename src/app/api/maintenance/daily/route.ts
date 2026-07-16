@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { archivePaidOrders } from "@/lib/order-archive";
 import { cleanupOtpChallenges } from "@/lib/otp-cleanup";
+import { cleanupOrderIdempotencyKeys } from "@/lib/order-idempotency";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
     const before = searchParams.get("before") || startOfTodaySaoPaulo();
 
     await cleanupOtpChallenges(OTP_RETENTION_MINUTES);
+    const idempotencyCleanup = await cleanupOrderIdempotencyKeys(30);
 
     let archivedOrders = 0;
     let deletedOrders = 0;
@@ -70,6 +72,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       otp_cleanup_retention_minutes: OTP_RETENTION_MINUTES,
+      order_idempotency_cleanup: idempotencyCleanup,
       archive_before: before,
       batches,
       archived_orders: archivedOrders,

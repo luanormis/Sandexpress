@@ -20,7 +20,43 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const events = (data || []) as any[];
+    const productIds = [...new Set(events.map(event => String(event.metadata?.product_id || '')).filter(isCanonicalUuid))];
+    const userIds = [...new Set(events.map(event => String(event.metadata?.user_id || '')).filter(isCanonicalUuid))];
+    const [{ data: products }, { data: users }] = await Promise.all([
+      productIds.length ? supabaseAdmin.from('products').select('id, name, cost_price').eq('vendor_id', vendorId).in('id', productIds) : Promise.resolve({ data: [] as any[] }),
+      userIds.length ? supabaseAdmin.from('vendor_users').select('id, name').eq('vendor_id', vendorId).in('id', userIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const productById = new Map((products || []).map((product: any) => [String(product.id), product]));
+    const userById = new Map((users || []).map((user: any) => [String(user.id), String(user.name || 'Equipe')]));
+    const items = events.map(event => {
+      const metadata = event.metadata || {};
+      const product = productById.get(String(metadata.product_id || '')) as any;
+      const unitCost = Number(metadata.unit_cost ?? product?.cost_price ?? 0);
+      const quantity = Number(metadata.quantity || 0);
+      return {
+        id: event.id,
+        created_at: event.created_at,
+        product_id: metadata.product_id,
+        product_name: metadata.product_name || product?.name || 'Produto',
+        reason: metadata.reason || 'other',
+        location: metadata.location || 'beach',
+        quantity,
+        previous_quantity: Number(metadata.previous_quantity || 0),
+        next_quantity: Number(metadata.next_quantity || 0),
+        note: metadata.note || '',
+        user_name: userById.get(String(metadata.user_id || '')) || 'Responsavel do quiosque',
+        unit_cost: unitCost,
+        estimated_cost: Number(metadata.estimated_cost ?? unitCost * quantity),
+      };
+    });
+    const summary = items.reduce((acc: Record<string, { quantity: number; estimated_cost: number }>, item) => {
+      if (!acc[item.reason]) acc[item.reason] = { quantity: 0, estimated_cost: 0 };
+      acc[item.reason].quantity += item.quantity;
+      acc[item.reason].estimated_cost += item.estimated_cost;
+      return acc;
+    }, {});
+    return NextResponse.json({ items, summary, total_quantity: items.reduce((sum, item) => sum + item.quantity, 0), total_estimated_cost: items.reduce((sum, item) => sum + item.estimated_cost, 0) });
   } catch (error) {
     console.error('Stock adjustments GET error:', error);
     return NextResponse.json({ error: 'Erro ao consultar movimentacoes.' }, { status: 500 });
@@ -47,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     const { data: product, error: productError } = await supabaseAdmin
       .from('products')
-      .select('id, tenant_id, vendor_id, name, stock_tracking_enabled, physical_stock_quantity, beach_stock_quantity, stock_quantity')
+      .select('id, tenant_id, vendor_id, name, cost_price, stock_tracking_enabled, physical_stock_quantity, beach_stock_quantity, stock_quantity')
       .eq('id', productId)
       .eq('vendor_id', vendorId)
       .single();
@@ -69,7 +105,7 @@ export async function POST(req: NextRequest) {
       tenant_id: product.tenant_id,
       vendor_id: vendorId,
       event_type: 'stock_adjustment',
-      metadata: { product_id: productId, product_name: product.name, reason, location, quantity, previous_quantity: current, next_quantity: next, note, user_id: session?.user_id || null },
+      metadata: { product_id: productId, product_name: product.name, reason, location, quantity, previous_quantity: current, next_quantity: next, note, user_id: session?.user_id || null, unit_cost: Number(product.cost_price || 0), estimated_cost: Number(product.cost_price || 0) * quantity },
       payload: { source: 'vendor_dashboard' },
     } as any).select('id, metadata, created_at').single();
     if (eventError) throw eventError;

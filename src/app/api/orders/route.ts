@@ -5,6 +5,8 @@ import { featureDisabledResponse, vendorFeatureEnabled } from '@/lib/features';
 import { mapOrderForKanban, shouldShowOrderInKanban } from '@/lib/order-kanban';
 import { isCanonicalUuid } from '@/lib/uuid';
 import { touchKioskSession } from '@/lib/kiosk-session';
+import { businessDate, cashControlBlock, getCashControl } from '@/lib/cash-control';
+import crypto from 'crypto';
 
 const MAX_ORDER_ITEMS = 50;
 const MAX_ITEM_QUANTITY = 50;
@@ -28,6 +30,8 @@ function normalizeOrderItems(items: unknown): IncomingOrderItem[] | null {
     }
     merged.set(productId, (merged.get(productId) || 0) + quantity);
   }
+
+  if ([...merged.values()].some((quantity) => quantity > MAX_ITEM_QUANTITY)) return null;
 
   return Array.from(merged.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
 }
@@ -57,6 +61,12 @@ function orderRpcStatus(message: string) {
   return 500;
 }
 
+function buildOrdersRevision(rows: Array<{ id?: unknown; updated_at?: unknown; created_at?: unknown }>) {
+  return crypto.createHash('sha256')
+    .update(rows.map((row) => `${row.id}:${row.updated_at || row.created_at || ''}`).join('|'))
+    .digest('base64url');
+}
+
 /**
  * GET /api/orders?vendor_id=xxx&status=received
  * Lista pedidos de um vendor, filtravel por status.
@@ -71,6 +81,7 @@ export async function GET(req: NextRequest) {
     const vendor_id = searchParams.get('vendor_id');
     const status = searchParams.get('status');
     const includePaid = searchParams.get('include_paid') === 'true';
+    const revisionOnly = searchParams.get('mode') === 'revision';
 
     if (!vendor_id) {
       return NextResponse.json({ error: 'vendor_id obrigatorio.' }, { status: 400 });
@@ -84,13 +95,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('operational_dashboard'), { status: 403 });
     }
 
+    if (revisionOnly) {
+      let revisionQuery = supabaseAdmin
+        .from('orders')
+        .select('id, updated_at, created_at')
+        .eq('vendor_id', vendor_id)
+        .order('created_at', { ascending: false })
+        .limit(150);
+      if (!includePaid) revisionQuery = revisionQuery.eq('paid', false);
+      if (status) revisionQuery = revisionQuery.eq('status', status);
+      const { data: revisionRows, error: revisionError } = await revisionQuery;
+      if (revisionError) throw revisionError;
+      return NextResponse.json({ revision: buildOrdersRevision(revisionRows || []), count: revisionRows?.length || 0 });
+    }
+
     let query = supabaseAdmin
       .from('orders')
       .select(
         '*, order_items(id, order_request_id, quantity, unit_price, subtotal, product_id, cancelled, products(name)), customer_order_requests(id, sequence, subtotal, status, created_at), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
       )
       .eq('vendor_id', vendor_id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(150);
 
     if (!includePaid) {
       query = query.eq('paid', false);
@@ -114,7 +140,9 @@ export async function GET(req: NextRequest) {
           : order.created_at ? new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
       };
     });
-    return NextResponse.json(mapped);
+    return NextResponse.json(mapped, {
+      headers: { 'X-Orders-Revision': buildOrdersRevision(data || []) },
+    });
   } catch (err) {
     console.error('Orders GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -123,7 +151,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { vendor_id, customer_id, umbrella_id, items, notes } = await req.json();
+    const { vendor_id, customer_id, umbrella_id, items, notes, idempotency_key } = await req.json();
     const normalizedItems = normalizeOrderItems(items);
     const safeNotes = normalizeNotes(notes);
 
@@ -153,6 +181,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(featureDisabledResponse('orders'), { status: 403 });
     }
 
+    const cashControl = await getCashControl(vendor_id);
+    const cashBlock = cashControlBlock(cashControl);
+    if (cashBlock) return NextResponse.json({ ...cashBlock, business_date: businessDate() }, { status: 409 });
+
+    const idempotencyKey = isCanonicalUuid(String(idempotency_key || '')) ? String(idempotency_key) : null;
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'idempotency_key UUID e obrigatoria para criar pedidos.' }, { status: 400 });
+    }
+
     if (session.role === 'customer') {
       void touchKioskSession({
         vendorId: vendor_id,
@@ -162,13 +199,17 @@ export async function POST(req: NextRequest) {
       }).catch((error) => console.warn('Kiosk session touch deferred:', error));
     }
 
-    const { data: order, error: orderErr } = await supabaseAdmin.rpc('create_customer_order', {
+    const baseOrderParams = {
       p_vendor_id: vendor_id,
       p_customer_id: customer_id,
       p_umbrella_id: umbrella_id,
       p_items: normalizedItems,
       p_notes: safeNotes,
-    });
+    };
+    const { data: order, error: orderErr } = await supabaseAdmin.rpc('create_customer_order_idempotent', {
+      ...baseOrderParams,
+      p_idempotency_key: idempotencyKey,
+    } as any);
 
     if (orderErr) {
       const message = orderErr.message || 'Erro ao criar pedido.';
@@ -176,14 +217,22 @@ export async function POST(req: NextRequest) {
     }
 
     const createdOrderId = order && typeof order === 'object' ? String((order as any).id || (order as any).order_id || '') : '';
-    if (session.user_id && createdOrderId) {
+    const createdRequestId = order && typeof order === 'object' ? String((order as any).order_request_id || (order as any).request_id || '') : '';
+    const attributedRevenue = order && typeof order === 'object' ? Number((order as any).request_total ?? 0) : 0;
+    const duplicateOrder = Boolean(order && typeof order === 'object' && (order as any).duplicate);
+    if (session.user_id && createdOrderId && !duplicateOrder) {
       void supabaseAdmin.from('analytics_events').insert({
         tenant_id: session.tenant_id || null,
         vendor_id,
         customer_id,
         umbrella_id,
         event_type: 'staff_order_attribution',
-        metadata: { user_id: session.user_id, order_id: createdOrderId },
+        metadata: {
+          user_id: session.user_id,
+          order_id: createdOrderId,
+          request_id: isCanonicalUuid(createdRequestId) ? createdRequestId : null,
+          request_total: Number.isFinite(attributedRevenue) ? Math.max(0, attributedRevenue) : 0,
+        },
         payload: { item_count: normalizedItems.reduce((sum, item) => sum + item.quantity, 0) },
       } as any).then((result: any) => {
         if (result.error) console.warn('Staff order attribution failed:', result.error.message);
@@ -193,7 +242,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...(order && typeof order === 'object' ? order : { order }),
       promotion_preview: (order as any)?.promotion_preview || null,
-    }, { status: 201 });
+    }, { status: duplicateOrder ? 200 : 201 });
   } catch (err) {
     console.error('Orders POST error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

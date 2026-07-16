@@ -275,9 +275,9 @@ BEGIN
       AND ativa = TRUE
       AND (inicia_em IS NULL OR inicia_em <= p_momento)
       AND (termina_em IS NULL OR termina_em >= p_momento)
-      AND EXTRACT(DOW FROM p_momento)::INTEGER = ANY(dias_semana)
-      AND (hora_inicio IS NULL OR p_momento::TIME >= hora_inicio)
-      AND (hora_fim IS NULL OR p_momento::TIME <= hora_fim)
+      AND EXTRACT(DOW FROM (p_momento AT TIME ZONE 'America/Sao_Paulo'))::INTEGER = ANY(dias_semana)
+      AND (hora_inicio IS NULL OR (p_momento AT TIME ZONE 'America/Sao_Paulo')::TIME >= hora_inicio)
+      AND (hora_fim IS NULL OR (p_momento AT TIME ZONE 'America/Sao_Paulo')::TIME <= hora_fim)
     ORDER BY desconto_valor DESC, created_at ASC
   LOOP
     eligible_sets := NULL;
@@ -443,9 +443,9 @@ BEGIN
     AND disparar_push = TRUE
     AND (inicia_em IS NULL OR inicia_em <= NOW())
     AND (termina_em IS NULL OR termina_em >= NOW())
-    AND EXTRACT(DOW FROM NOW())::INTEGER = ANY(dias_semana)
-    AND (hora_inicio IS NULL OR NOW()::TIME >= hora_inicio)
-    AND (hora_fim IS NULL OR NOW()::TIME <= hora_fim);
+    AND EXTRACT(DOW FROM (NOW() AT TIME ZONE 'America/Sao_Paulo'))::INTEGER = ANY(dias_semana)
+    AND (hora_inicio IS NULL OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME >= hora_inicio)
+    AND (hora_fim IS NULL OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME <= hora_fim);
 
   RETURN affected;
 END;

@@ -93,10 +93,8 @@ export async function PATCH(
     const body = await req.json();
 
     const productLookup = await loadProductForWrite(req, id);
-    if (productLookup.error && ['42P01', 'PGRST205', '42703', 'PGRST204', '42501'].includes(productLookup.error.code || '')) {
-      return productWriteErrorResponse(productLookup.error);
-    }
-    if (productLookup.error || !productLookup.data) {
+    if (productLookup.error) throw productLookup.error;
+    if (!productLookup.data) {
       return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
     const accessError = assertProductAccess(session, productLookup.data);
@@ -139,10 +137,8 @@ export async function DELETE(
     const { id } = await params;
 
     const productLookup = await loadProductForWrite(req, id);
-    if (productLookup.error && ['42P01', 'PGRST205', '42703', 'PGRST204', '42501'].includes(productLookup.error.code || '')) {
-      return productWriteErrorResponse(productLookup.error);
-    }
-    if (productLookup.error || !productLookup.data) {
+    if (productLookup.error) throw productLookup.error;
+    if (!productLookup.data) {
       return NextResponse.json({ error: 'Produto nao encontrado.' }, { status: 404 });
     }
     const accessError = assertProductAccess(session, productLookup.data);

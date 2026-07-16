@@ -12,10 +12,6 @@ function slugify(value: string) {
     .slice(0, 80) || 'categoria';
 }
 
-function optionalSchemaError(error: any) {
-  return ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(error?.code || '');
-}
-
 export async function GET(req: NextRequest) {
   try {
     const vendorId = req.nextUrl.searchParams.get('vendor_id');
@@ -33,10 +29,7 @@ export async function GET(req: NextRequest) {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
 
-    if (error) {
-      if (optionalSchemaError(error)) return NextResponse.json([]);
-      throw error;
-    }
+    if (error) throw error;
 
     return NextResponse.json(data || []);
   } catch (err) {

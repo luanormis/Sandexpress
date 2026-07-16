@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSession } from '@/lib/auth-session';
-import { isOptionalPromotionSchemaError, touchKioskSession } from '@/lib/kiosk-session';
+import { touchKioskSession } from '@/lib/kiosk-session';
 import { isCanonicalUuid } from '@/lib/uuid';
 
 export async function POST(req: NextRequest) {
@@ -25,9 +25,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ active: true });
   } catch (err) {
-    if (isOptionalPromotionSchemaError(err)) {
-      return NextResponse.json({ active: false, unavailable: true });
-    }
     console.error('Kiosk session touch error:', err);
     return NextResponse.json({ error: 'Erro ao atualizar presenca.' }, { status: 500 });
   }

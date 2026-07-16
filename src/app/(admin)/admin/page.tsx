@@ -8,7 +8,7 @@ import {
   Upload, ImageIcon,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
+import { ADMIN_UMBRELLA_LIMIT, DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
 
 // ---------- TYPES ----------
 interface Vendor {
@@ -198,6 +198,9 @@ export default function AdminDashboard() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [vendorUmbrellaLimit, setVendorUmbrellaLimit] = useState("100");
+  const [selectedVendorFeatures, setSelectedVendorFeatures] = useState<Record<string, boolean>>({});
+  const [featureSaving, setFeatureSaving] = useState(false);
   const [platformReport, setPlatformReport] = useState<PlatformReport | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
@@ -258,6 +261,10 @@ export default function AdminDashboard() {
     setAdminPassword("");
     setAuthError("Sessão expirada. Entre novamente para carregar os dados.");
   };
+
+  useEffect(() => {
+    if (selectedVendor) setVendorUmbrellaLimit(String(selectedVendor.max_umbrellas || 100));
+  }, [selectedVendor]);
 
   useEffect(() => {
     if (isAuthenticated && (activeTab === "analytics" || activeTab === "overview")) {
@@ -622,6 +629,29 @@ export default function AdminDashboard() {
       is_active: newActive,
       subscription_status: newActive ? (vendor.subscription_status === "blocked" ? "active" : vendor.subscription_status) : "blocked",
     });
+  };
+
+  useEffect(() => {
+    if (!selectedVendor) { setSelectedVendorFeatures({}); return; }
+    fetch(`/api/features?vendor_id=${selectedVendor.id}`, { credentials: "include" })
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => setSelectedVendorFeatures(data?.features || {}))
+      .catch(() => setSelectedVendorFeatures({}));
+  }, [selectedVendor?.id]);
+
+  const toggleWaiterService = async () => {
+    if (!selectedVendor) return;
+    const enabled = selectedVendorFeatures.waiter_service !== true;
+    setFeatureSaving(true);
+    try {
+      const response = await fetch('/api/features', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: selectedVendor.id, feature_key: 'waiter_service', enabled }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return alert(data.error || 'Nao foi possivel atualizar o modulo.');
+      setSelectedVendorFeatures(current => ({ ...current, waiter_service: enabled }));
+    } finally { setFeatureSaving(false); }
   };
 
   const migrateVendorToPaid = async (vendor: Vendor) => {
@@ -1716,8 +1746,9 @@ export default function AdminDashboard() {
                     value={planForm.max_umbrellas}
                     onChange={e => setPlanForm(p => ({ ...p, max_umbrellas: e.target.value.replace(/\D/g, "") }))}
                     inputMode="numeric"
+                    max={100}
                     className="w-full bg-gray-700 border border-gray-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
-                    placeholder="50"
+                    placeholder="100"
                   />
                 </div>
               </div>
@@ -2083,13 +2114,50 @@ export default function AdminDashboard() {
                   </p>
                   <p className="mt-1 text-xs text-gray-500">{getVendorBillingSummary(selectedVendor)}</p>
                 </div>
-                <div className="bg-gray-700/50 p-4 rounded-xl">
-                  <p className="text-xs text-gray-400 font-bold mb-1">Máx. Guarda-Sóis</p>
-                  <p className="font-bold">{selectedVendor.max_umbrellas}</p>
+                <div className="bg-gray-700/50 p-4 rounded-xl sm:col-span-2">
+                  <label className="text-xs text-gray-300 font-bold mb-2 block">Limite autorizado de guarda-sóis</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={vendorUmbrellaLimit}
+                      onChange={event => setVendorUmbrellaLimit(event.target.value.replace(/\D/g, ""))}
+                      inputMode="numeric"
+                      min={1}
+                      max={ADMIN_UMBRELLA_LIMIT}
+                      className="min-h-11 w-28 rounded-xl border border-gray-500 bg-gray-900 px-3 text-lg font-black text-white outline-none focus:border-orange-400"
+                      aria-label="Limite autorizado de guarda-sois"
+                    />
+                    <button
+                      type="button"
+                      disabled={vendorActionLoading === selectedVendor.id}
+                      onClick={() => {
+                        const limit = Number(vendorUmbrellaLimit);
+                        if (!Number.isInteger(limit) || limit < 1 || limit > ADMIN_UMBRELLA_LIMIT) {
+                          alert(`Informe um limite entre 1 e ${ADMIN_UMBRELLA_LIMIT}.`);
+                          return;
+                        }
+                        updateVendor(selectedVendor.id, { max_umbrellas: limit });
+                      }}
+                      className="min-h-11 rounded-xl bg-[#FF6B00] px-4 font-black text-white hover:bg-[#E56000] disabled:opacity-50"
+                    >
+                      Autorizar limite
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-gray-300">Padrão: 100. O administrador pode liberar individualmente até {ADMIN_UMBRELLA_LIMIT}.</p>
                 </div>
               </div>
               <div className="text-sm text-gray-500">
                 Cadastrado em {new Date(selectedVendor.created_at).toLocaleDateString("pt-BR")}
+              </div>
+              <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-black text-blue-100">Modulo de atendimento do garcom</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-blue-200/80">Libera login exclusivo, mapa de mesas, abertura de comandas, lancamento de pedidos e chamados com som.</p>
+                  </div>
+                  <button onClick={toggleWaiterService} disabled={featureSaving} className={`min-w-24 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${selectedVendorFeatures.waiter_service ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    {featureSaving ? 'Salvando...' : selectedVendorFeatures.waiter_service ? 'Liberado' : 'Bloqueado'}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="p-6 border-t border-gray-700 flex gap-3">
