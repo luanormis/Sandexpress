@@ -4,7 +4,7 @@ import path from 'path';
 const sql = fs.readFileSync(
   path.join(process.cwd(), 'infra/sql-atualizacao-escala-1000-quiosques.sql'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 describe('sql-atualizacao-escala-1000-quiosques', () => {
   it('keeps 100 as default and allows an admin ceiling of 120 without recreating operational tables', () => {

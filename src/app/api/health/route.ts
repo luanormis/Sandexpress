@@ -65,7 +65,7 @@ export async function GET() {
   const blockingEnv = getBlockingReadinessIssues(readiness);
   const base = {
     timestamp: new Date().toISOString(),
-    env: process.env.NEXT_PUBLIC_ENV || 'development',
+    env: process.env.NEXT_PUBLIC_ENV || process.env.NODE_ENV || 'development',
     readiness,
   };
 
