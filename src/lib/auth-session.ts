@@ -62,11 +62,11 @@ export function verifySessionToken(token?: string | null): SessionPayload | null
 }
 
 export function getRequestSession(req: NextRequest): SessionPayload | null {
-  const vendorSession = verifySessionToken(req.cookies.get('vendor_session')?.value);
-  if (vendorSession) return vendorSession;
-
   const adminSession = verifySessionToken(req.cookies.get('admin_session')?.value);
   if (adminSession) return adminSession;
+
+  const vendorSession = verifySessionToken(req.cookies.get('vendor_session')?.value);
+  if (vendorSession) return vendorSession;
 
   const customerSession = verifySessionToken(req.cookies.get('customer_session')?.value);
   if (customerSession) return customerSession;

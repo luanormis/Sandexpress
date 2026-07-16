@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, getRequestSession } from '@/lib/auth-session';
+import { createSessionToken, verifySessionToken } from '@/lib/auth-session';
 import { getAdminPassword } from '@/lib/runtime-config';
 
 export async function GET(req: NextRequest) {
-  const session = getRequestSession(req);
+  const session = verifySessionToken(req.cookies.get('admin_session')?.value);
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }

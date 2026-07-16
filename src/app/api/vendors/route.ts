@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getRequestSession } from '@/lib/auth-session';
+import { DEFAULT_FEATURES } from '@/lib/features';
+import { fetchAllSupabaseRows } from '@/lib/supabase-pagination';
+
+type AdminVendorRow = Record<string, unknown> & { tenant_id?: string | null };
+type WaiterServiceFeatureRow = { tenant_id: string; enabled: boolean | null };
 
 /**
  * GET /api/vendors?status=active
@@ -24,7 +29,22 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json(data || []);
+
+    const { rows: waiterServiceRows } = await fetchAllSupabaseRows<WaiterServiceFeatureRow>(
+      (from, to) => supabaseAdmin
+        .from('tenant_features')
+        .select('tenant_id, enabled')
+        .eq('feature_key', 'waiter_service')
+        .range(from, to),
+      { maxRows: 10_000 },
+    );
+    const waiterServiceByTenant = new Map(
+      waiterServiceRows.map((row) => [row.tenant_id, Boolean(row.enabled)]),
+    );
+    return NextResponse.json(((data || []) as AdminVendorRow[]).map((vendor) => ({
+      ...vendor,
+      waiter_service_enabled: waiterServiceByTenant.get(String(vendor.tenant_id)) ?? DEFAULT_FEATURES.waiter_service,
+    })));
   } catch (err) {
     console.error('Vendors GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

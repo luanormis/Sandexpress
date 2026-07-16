@@ -33,6 +33,7 @@ interface Vendor {
   plan_annual_monthly_price?: number | null;
   is_active: boolean;
   max_umbrellas: number;
+  waiter_service_enabled: boolean;
   created_at: string;
 }
 
@@ -200,10 +201,11 @@ export default function AdminDashboard() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [vendorUmbrellaLimit, setVendorUmbrellaLimit] = useState("100");
   const [selectedVendorFeatures, setSelectedVendorFeatures] = useState<Record<string, boolean>>({});
-  const [featureSaving, setFeatureSaving] = useState(false);
+  const [featureSavingVendorId, setFeatureSavingVendorId] = useState<string | null>(null);
   const [platformReport, setPlatformReport] = useState<PlatformReport | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [adminDataError, setAdminDataError] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -279,6 +281,11 @@ export default function AdminDashboard() {
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    if (!adminPassword) {
+      setAuthError("Informe a senha do administrador.");
+      return;
+    }
+    setAuthLoading(true);
     try {
       const res = await fetch("/api/auth/admin", {
         method: "POST",
@@ -286,18 +293,27 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword }),
       });
-      if (res.ok) {
-        setIsAuthenticated(true);
-        setAdminDataError("");
-        sessionStorage.setItem("admin_token", "authenticated");
-        await loadVendors();
-        await loadPlatformReport();
-        await loadPlanSettings();
-      } else {
-        setAuthError("Senha incorreta.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAuthError(data.error || "Nao foi possivel entrar.");
+        return;
       }
+      const validation = await fetch("/api/auth/admin", { credentials: "include" });
+      if (!validation.ok) {
+        setAuthError("Login aceito, mas a sessao nao foi validada. Tente novamente.");
+        return;
+      }
+      setIsAuthenticated(true);
+      setAdminPassword("");
+      setAdminDataError("");
+      sessionStorage.setItem("admin_token", "authenticated");
+      await loadVendors();
+      await loadPlatformReport();
+      await loadPlanSettings();
     } catch {
       setAuthError("Erro ao conectar.");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -639,19 +655,35 @@ export default function AdminDashboard() {
       .catch(() => setSelectedVendorFeatures({}));
   }, [selectedVendor?.id]);
 
-  const toggleWaiterService = async () => {
-    if (!selectedVendor) return;
-    const enabled = selectedVendorFeatures.waiter_service !== true;
-    setFeatureSaving(true);
+  const toggleWaiterService = async (vendor: Vendor) => {
+    const enabled = vendor.waiter_service_enabled !== true;
+    setFeatureSavingVendorId(vendor.id);
     try {
       const response = await fetch('/api/features', {
         method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendor_id: selectedVendor.id, feature_key: 'waiter_service', enabled }),
+        body: JSON.stringify({ vendor_id: vendor.id, feature_key: 'waiter_service', enabled }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) return alert(data.error || 'Nao foi possivel atualizar o modulo.');
-      setSelectedVendorFeatures(current => ({ ...current, waiter_service: enabled }));
-    } finally { setFeatureSaving(false); }
+      if (!response.ok) {
+        alert(data.error || 'Nao foi possivel atualizar o modulo.');
+        return;
+      }
+      setVendors(current =>
+        current.map(item =>
+          item.id === vendor.id ? { ...item, waiter_service_enabled: enabled } : item
+        ),
+      );
+      setSelectedVendor(current =>
+        current?.id === vendor.id ? { ...current, waiter_service_enabled: enabled } : current
+      );
+      if (selectedVendor?.id === vendor.id) {
+        setSelectedVendorFeatures(current => ({ ...current, waiter_service: enabled }));
+      }
+    } catch {
+      alert('Erro de rede ao atualizar o perfil de garcom.');
+    } finally {
+      setFeatureSavingVendorId(null);
+    }
   };
 
   const migrateVendorToPaid = async (vendor: Vendor) => {
@@ -777,6 +809,7 @@ export default function AdminDashboard() {
           plan_annual_monthly_price: planSettings.annual_monthly_price,
           is_active: true,
           max_umbrellas: planSettings.max_umbrellas,
+          waiter_service_enabled: false,
           created_at: new Date().toISOString(),
         }, ...prev]);
         setRegSuccess(true);
@@ -827,12 +860,18 @@ export default function AdminDashboard() {
               type="password"
               value={adminPassword}
               onChange={e => setAdminPassword(e.target.value)}
+              autoComplete="current-password"
+              required
               placeholder="Senha do admin"
               className="w-full bg-gray-700 border-2 border-gray-600 rounded-xl p-4 text-white placeholder:text-gray-500 focus:border-blue-500 outline-none"
             />
             {authError && <p className="text-red-400 text-sm text-center">{authError}</p>}
-            <button type="submit" className="tap-target w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
-              Entrar
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="tap-target w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all disabled:cursor-wait disabled:opacity-60"
+            >
+              {authLoading ? "Validando..." : "Entrar"}
             </button>
           </form>
         </div>
@@ -998,7 +1037,7 @@ export default function AdminDashboard() {
 
             {/* Vendors table */}
             <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-x-auto">
-              <table className="min-w-[920px] w-full text-left">
+              <table className="min-w-[1060px] w-full text-left">
                 <thead className="bg-gray-950 text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="p-4">Quiosque</th>
@@ -1007,6 +1046,7 @@ export default function AdminDashboard() {
                     <th className="p-4">Plano</th>
                     <th className="p-4">Assinatura</th>
                     <th className="p-4">Status</th>
+                    <th className="p-4">Perfil garcom</th>
                     <th className="p-4">Ações</th>
                   </tr>
                 </thead>
@@ -1053,6 +1093,17 @@ export default function AdminDashboard() {
                         ) : (
                           <span className="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs font-bold">BLOQUEADO</span>
                         )}
+                      </td>
+                      <td className="p-4">
+                        <button
+                          type="button"
+                          onClick={() => toggleWaiterService(v)}
+                          disabled={featureSavingVendorId === v.id}
+                          title={v.waiter_service_enabled ? "Bloquear perfil de garcom" : "Liberar perfil de garcom"}
+                          className={`min-w-24 rounded-lg px-3 py-2 text-xs font-black text-white transition-colors disabled:cursor-wait disabled:opacity-60 ${v.waiter_service_enabled ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"}`}
+                        >
+                          {featureSavingVendorId === v.id ? "Salvando..." : v.waiter_service_enabled ? "Liberado" : "Bloqueado"}
+                        </button>
                       </td>
                       <td className="p-4">
                         <div className="flex gap-1">
@@ -2154,8 +2205,8 @@ export default function AdminDashboard() {
                     <p className="font-black text-blue-100">Modulo de atendimento do garcom</p>
                     <p className="mt-1 text-xs font-bold leading-5 text-blue-200/80">Libera login exclusivo, mapa de mesas, abertura de comandas, lancamento de pedidos e chamados com som.</p>
                   </div>
-                  <button onClick={toggleWaiterService} disabled={featureSaving} className={`min-w-24 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${selectedVendorFeatures.waiter_service ? 'bg-green-600' : 'bg-gray-600'}`}>
-                    {featureSaving ? 'Salvando...' : selectedVendorFeatures.waiter_service ? 'Liberado' : 'Bloqueado'}
+                  <button onClick={() => toggleWaiterService(selectedVendor)} disabled={featureSavingVendorId === selectedVendor.id} className={`min-w-24 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${selectedVendorFeatures.waiter_service ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    {featureSavingVendorId === selectedVendor.id ? 'Salvando...' : selectedVendorFeatures.waiter_service ? 'Liberado' : 'Bloqueado'}
                   </button>
                 </div>
               </div>
