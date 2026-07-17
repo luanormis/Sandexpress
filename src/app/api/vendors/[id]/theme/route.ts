@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 function normalizeColor(value: unknown): string | null {
@@ -145,7 +154,7 @@ export async function GET(
       pix_payout_days: Number(rates.pix?.payout_delay_days ?? 0),
       pix_active: rates.pix?.active ?? true,
       pix_api_enabled: rates.pix?.api_enabled ?? false,
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error('Vendor theme GET error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
@@ -244,16 +253,22 @@ export async function PATCH(
       .upsert(paymentRatesPayload, { onConflict: 'vendor_id,payment_method' });
     if (ratesError) throw ratesError;
 
-    const { data: savedVendor } = await supabaseAdmin
+    const { data: savedVendor, error: savedVendorError } = await supabaseAdmin
       .from('vendors')
-      .select('logo_url')
+      .select('primary_color, secondary_color, button_color, button_text_color, logo_url, updated_at')
       .eq('id', id)
       .single();
+    if (savedVendorError || !savedVendor) throw savedVendorError || new Error('Tema salvo nao encontrado.');
 
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
       ...themeUpdate,
-      logo_url: (savedVendor as any)?.logo_url || requestedLogoUrl,
+      primary_color: savedVendor.primary_color,
+      secondary_color: savedVendor.secondary_color,
+      button_color: (savedVendor as any).button_color,
+      button_text_color: (savedVendor as any).button_text_color,
+      logo_url: savedVendor.logo_url,
+      updated_at: (savedVendor as any).updated_at,
       ...paymentFeeUpdate,
       ...payoutDays,
       cash_fee_rate: paymentSettings.cash.feeRate,
@@ -273,7 +288,7 @@ export async function PATCH(
       pix_fixed_fee_amount: paymentSettings.pix.fixedFeeAmount,
       pix_active: paymentSettings.pix.active,
       pix_api_enabled: paymentSettings.pix.apiEnabled,
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error('Vendor theme PATCH error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });

@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
 const THEME_SELECT = 'id, name, primary_color, secondary_color, button_color, button_text_color, logo_url, is_active, subscription_status, updated_at';
 
 export async function GET(
@@ -29,7 +38,7 @@ export async function GET(
       button_text_color: (vendor as any).button_text_color,
       logo_url: vendor.logo_url,
       updated_at: (vendor as any).updated_at,
-    }, { headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } });
+    }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Public theme error:', error);
     return NextResponse.json({ error: 'Erro ao carregar personalizacao.' }, { status: 500 });

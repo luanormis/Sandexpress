@@ -359,15 +359,18 @@ export default function CustomerApp() {
     let cancelled = false;
     const refreshTheme = async () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
-      const response = await fetch(`/api/public/theme/${encodeURIComponent(vendorId)}`, { cache: "no-store" });
+      const response = await fetch(`/api/public/theme/${encodeURIComponent(vendorId)}?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!response.ok) return;
       const nextTheme = await response.json();
       if (!cancelled) setVendor(current => current?.id === vendorId ? { ...current, ...nextTheme } : current);
     };
-    const timer = window.setInterval(() => void refreshTheme(), 60000);
-    const onVisibility = () => { if (document.visibilityState === "visible") void refreshTheme(); };
+    const timer = window.setInterval(() => void refreshTheme().catch(() => undefined), 15000);
+    const onVisibility = () => { if (document.visibilityState === "visible") void refreshTheme().catch(() => undefined); };
     document.addEventListener("visibilitychange", onVisibility);
-    void refreshTheme();
+    void refreshTheme().catch(() => undefined);
     return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [vendor?.id]);
 
