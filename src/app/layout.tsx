@@ -16,8 +16,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SandExpress | Encomende no seu guarda-sol",
-  description: "Faça seu pedido diretamente da areia, sem enfrentar filas.",
+  title: "SandExpress | Peça direto do seu guarda-sol",
+  description: "Peça direto do seu guarda-sol pelo QR Code, sem filas e sem esperar atendimento para fazer o pedido.",
   manifest: "/manifest.json",
   icons: {
     icon: "/sandexpress-logo-fluid.png",
