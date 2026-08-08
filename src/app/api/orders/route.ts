@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     let query = supabaseAdmin
       .from('orders')
       .select(
-        '*, order_items(id, order_request_id, quantity, unit_price, subtotal, product_id, cancelled, products(name)), customer_order_requests(id, sequence, subtotal, status, created_at), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
+        '*, order_items(id, order_request_id, quantity, unit_price, subtotal, product_id, cancelled, products(name, category)), customer_order_requests(id, sequence, subtotal, status, created_at), customers(name, phone), umbrellas!orders_umbrella_id_fkey(number)'
       )
       .eq('vendor_id', vendor_id)
       .order('created_at', { ascending: false })

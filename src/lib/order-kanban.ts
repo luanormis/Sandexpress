@@ -14,7 +14,7 @@ type OrderItemRecord = {
   quantity?: number | null;
   subtotal?: number | null;
   cancelled?: boolean | null;
-  products?: { name?: string | null } | null;
+  products?: { name?: string | null; category?: string | null } | null;
 };
 
 type KanbanOrderRecord = {
@@ -53,6 +53,7 @@ export function mapOrderForKanban(order: KanbanOrderRecord) {
     order_request_id: item.order_request_id,
     q: item.quantity,
     n: item.products?.name || 'Produto',
+    category: item.products?.category || 'Geral',
     subtotal: Number(item.subtotal || 0),
     cancelled: Boolean(item.cancelled),
   }));
