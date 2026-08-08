@@ -14,7 +14,7 @@ function money(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-async function buildIntelligence(vendorId: string) {
+export async function buildIntelligence(vendorId: string) {
   const { data: vendor } = await supabaseAdmin.from('vendors').select('city, state, beach_name').eq('id', vendorId).maybeSingle();
   const since = startOfDay(56);
   const { data: orders, error } = await supabaseAdmin

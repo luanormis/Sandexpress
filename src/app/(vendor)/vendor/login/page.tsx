@@ -58,6 +58,7 @@ export default function VendorLogin() {
       }
 
       sessionStorage.setItem('vendor_id', result.vendor_id);
+      sessionStorage.setItem('user_role', result.user_role || 'seller');
       localStorage.setItem('vendor_id', result.vendor_id);
       localStorage.setItem('vendor_name', result.vendor_name);
       if (result.user_role === 'seller') {
@@ -65,7 +66,7 @@ export default function VendorLogin() {
         sessionStorage.setItem('waiter_id', result.user_id || '');
         sessionStorage.setItem('waiter_name', result.user_name || 'Garcom');
       }
-      router.push('/vendor/dashboard');
+      router.push(result.user_role === 'owner' ? '/vendor/master' : '/vendor/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       setError('Erro ao conectar ao servidor.');

@@ -43,11 +43,12 @@ export function useVendorAuth(): UseVendorAuthReturn {
 
         sessionStorage.setItem("vendor_id", result.vendor_id);
         sessionStorage.setItem("vendor_name", result.vendor_name);
+        sessionStorage.setItem("user_role", result.user_role || "seller");
 
         if (result.must_change_password) {
           router.push("/vendor/change-password");
         } else {
-          router.push("/vendor/dashboard");
+          router.push(result.user_role === "owner" ? "/vendor/master" : "/vendor/dashboard");
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erro ao conectar";
@@ -62,6 +63,7 @@ export function useVendorAuth(): UseVendorAuthReturn {
   const logout = useCallback(() => {
     sessionStorage.removeItem("vendor_id");
     sessionStorage.removeItem("vendor_name");
+    sessionStorage.removeItem("user_role");
     router.push("/vendor/login");
   }, [router]);
 
@@ -74,4 +76,3 @@ export function useVendorAuth(): UseVendorAuthReturn {
     isAuthenticated,
   };
 }
-
