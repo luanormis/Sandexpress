@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import {
   ShoppingBag, QrCode, BarChart3, Users, Plus, Utensils, Download,
   Search, Clock, Trash2, Pencil, X, Upload, ImageIcon,
@@ -523,6 +524,10 @@ const TABS = [
 // MAIN COMPONENT
 // =========================================================
 export default function VendorDashboard() {
+  const pathname = usePathname();
+  const isBeachOperations = pathname.startsWith("/vendor/operations");
+  const visibleTabs = isBeachOperations ? TABS.filter(tab => ["orders", "stock", "reports", "printers"].includes(tab.id)) : TABS;
+  const [beachAccess, setBeachAccess] = useState<boolean | null>(isBeachOperations ? null : true);
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -879,6 +884,12 @@ export default function VendorDashboard() {
     const vid = sessionStorage.getItem("vendor_id");
     if (vid) {
       setVendorId(vid);
+      if (isBeachOperations) {
+        fetch(`/api/features?vendor_id=${vid}`, { cache: "no-store" })
+          .then(async response => ({ ok: response.ok, data: await response.json().catch(() => ({})) }))
+          .then(({ ok, data }) => setBeachAccess(Boolean(ok && data.features?.beach_operations)))
+          .catch(() => setBeachAccess(false));
+      }
       // Load initial data
       loadOrders(vid);
       loadProducts(vid);
@@ -2021,7 +2032,7 @@ export default function VendorDashboard() {
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          {TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
@@ -2056,7 +2067,7 @@ export default function VendorDashboard() {
               <Menu size={20} />
             </button>
             <h2 className="truncate text-xl sm:text-2xl font-bold font-display text-gray-800">
-            {TABS.find(t => t.id === activeTab)?.label}
+            {visibleTabs.find(t => t.id === activeTab)?.label}
             </h2>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
@@ -3423,7 +3434,7 @@ export default function VendorDashboard() {
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
         <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-          {TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
@@ -4536,6 +4547,9 @@ function ProductModal({
 // =========================================================
 function CustomerModal({ customer, onClose }: { customer: Customer; onClose: () => void }) {
   const avgTicket = customer.visit_count > 0 ? customer.total_spent / customer.visit_count : 0;
+
+  if (isBeachOperations && beachAccess === null) return <main className="grid min-h-screen place-items-center bg-gray-50 font-black">Validando liberação...</main>;
+  if (isBeachOperations && beachAccess === false) return <main className="grid min-h-screen place-items-center bg-gray-50 p-6 text-center"><div><h1 className="text-2xl font-black">Módulo ainda não liberado</h1><p className="mt-2 text-gray-600">Solicite ao administrador a versão simplificada para barraca.</p></div></main>;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
