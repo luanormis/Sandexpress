@@ -882,6 +882,10 @@ export default function VendorDashboard() {
   // Load vendor ID and initial data
   useEffect(() => {
     const vid = sessionStorage.getItem("vendor_id");
+    if (!vid) {
+      window.location.replace("/vendor/login");
+      return;
+    }
     if (vid) {
       setVendorId(vid);
       if (isBeachOperations) {
