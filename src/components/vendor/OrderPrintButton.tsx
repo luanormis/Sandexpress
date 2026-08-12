@@ -26,6 +26,25 @@ export default function OrderPrintButton({ vendorId, order }: { vendorId: string
     if (!jobs.length) return alert('Nenhuma impressora ativa atende aos itens deste pedido.');
     jobs.forEach((printer: KioskPrinter, index) => {
       const items = routed[printer.route];
+      if (printer.connection === 'network' && printer.host) {
+        const text = [
+          'SAND EXPRESS',
+          printer.route === 'cashier' ? 'CAIXA - PEDIDO COMPLETO' : printer.route === 'food' ? 'COZINHA - ALIMENTOS' : 'BAR - BEBIDAS',
+          `GUARDA-SOL: ${order.umbrella}`,
+          `PEDIDO: ${order.active_request?.sequence || '-'}`,
+          `CLIENTE: ${order.customer}`,
+          `HORARIO: ${order.time}`,
+          '--------------------------------',
+          ...items.map(item => `${item.q}x ${item.n}${printer.route === 'cashier' ? `  ${money(Number(item.subtotal || 0))}` : ''}`),
+          printer.route === 'cashier' ? `TOTAL: ${money(order.total)}` : '',
+          order.notes ? `OBSERVACOES: ${order.notes}` : '',
+          '\n\n\n',
+        ].filter(Boolean).join('\n');
+        void fetch('http://127.0.0.1:17891/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: printer.host, port: printer.port || 9100, text }) })
+          .then(async response => { if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Falha na impressora.'); })
+          .catch(error => alert(error instanceof Error ? error.message : 'Falha ao imprimir pela rede.'));
+        return;
+      }
       const popup = window.open('', `_sand_print_${index}`, 'width=420,height=720');
       if (!popup) return;
       popup.document.write(`<!doctype html><html><head><title>${escapeHtml(printer.name)}</title><style>body{font-family:monospace;width:72mm;margin:4mm;color:#000}h1,h2,p{margin:0 0 8px}h1{font-size:20px}h2{font-size:15px;border-bottom:1px dashed #000;padding-bottom:8px}.item{display:flex;justify-content:space-between;gap:8px;margin:7px 0}.total{border-top:1px dashed #000;margin-top:10px;padding-top:10px;font-size:18px;font-weight:bold}@media print{button{display:none}}</style></head><body><h1>${printer.route === 'cashier' ? 'CAIXA · PEDIDO COMPLETO' : printer.route === 'food' ? 'COZINHA · ALIMENTOS' : 'BAR · BEBIDAS'}</h1><h2>Impressora: ${escapeHtml(printer.name)}</h2><p><b>Guarda-sol:</b> ${order.umbrella}</p><p><b>Cliente:</b> ${escapeHtml(order.customer)}</p><p><b>Pedido:</b> ${order.active_request?.sequence || '-'} · ${escapeHtml(order.time)}</p><hr>${items.map(item => `<div class="item"><b>${item.q}x ${escapeHtml(item.n)}</b>${printer.route === 'cashier' ? `<span>${money(Number(item.subtotal || 0))}</span>` : ''}</div>`).join('')}${order.notes ? `<hr><p><b>Obs.:</b> ${escapeHtml(order.notes)}</p>` : ''}${printer.route === 'cashier' ? `<p class="total">TOTAL DA CONTA: ${money(order.total)}</p>` : ''}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
