@@ -36,6 +36,25 @@ export default function PrinterManager({ vendorId }: { vendorId: string }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar.'); }
     finally { setSaving(false); }
   };
+  const discoverNetwork = async () => {
+    setMessage('Procurando impressoras térmicas na rede local...');
+    try {
+      const response = await fetch('http://127.0.0.1:17891/printers', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Agente indisponível.');
+      const found: KioskPrinter[] = (Array.isArray(data.printers) ? data.printers : []).map((printer: any) => ({
+        id: `network-${String(printer.host)}-${Number(printer.port || 9100)}-${route}`,
+        name: String(printer.name || `Térmica ${printer.host}`).slice(0, 80),
+        route, active: true, connection: 'network', host: String(printer.host), port: Number(printer.port || 9100),
+      }));
+      const merged = [...printers];
+      found.forEach(printer => { if (!merged.some(item => item.id === printer.id)) merged.push(printer); });
+      if (found.length) await persist(merged);
+      setMessage(found.length ? `${found.length} impressora(s) de rede encontrada(s).` : 'Nenhuma impressora respondeu na rede.');
+    } catch {
+      setMessage('Execute o Agente de Impressão SandExpress neste desktop para buscar impressoras Wi‑Fi.');
+    }
+  };
   const add = () => {
     const safeName = name.trim();
     if (!safeName) return setMessage('Informe o nome exibido pela impressora no computador ou tablet.');
@@ -50,13 +69,14 @@ export default function PrinterManager({ vendorId }: { vendorId: string }) {
     </section>
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <h2 className="flex items-center gap-2 text-xl font-black text-gray-950"><Printer /> Impressoras do quiosque</h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px_auto]">
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
         <input value={name} onChange={event => setName(event.target.value)} maxLength={80} placeholder="Ex.: EPSON Cozinha" className="min-h-12 rounded-xl border-2 border-gray-200 px-4 font-bold outline-none focus:border-[#FF6B00]" />
         <select value={route} onChange={event => setRoute(event.target.value as PrinterRoute)} className="min-h-12 rounded-xl border-2 border-gray-200 bg-white px-3 font-bold outline-none focus:border-[#FF6B00]">{ROUTES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <button disabled={saving} onClick={() => void discoverNetwork()} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-black text-white disabled:opacity-50"><Search size={18}/> Buscar Wi‑Fi</button>
         <button disabled={saving} onClick={add} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-5 font-black text-white disabled:opacity-50"><Plus size={18}/> Adicionar</button>
       </div>
       <div className="relative mt-5"><Search className="absolute left-3 top-3.5 text-gray-400" size={18}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar impressora cadastrada" className="min-h-12 w-full rounded-xl border-2 border-gray-200 pl-10 pr-4 font-bold outline-none focus:border-[#FF6B00]" /></div>
-      <div className="mt-4 space-y-2">{visible.map(printer => { const target = ROUTES.find(item => item.id === printer.route)!; return <article key={printer.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-gray-950">{printer.name}</p><p className="text-sm font-bold text-gray-600">{target.label} · {target.help}</p></div><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-sm font-black"><input type="checkbox" checked={printer.active} onChange={event => void persist(printers.map(item => item.id === printer.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label><button aria-label={`Excluir ${printer.name}`} onClick={() => void persist(printers.filter(item => item.id !== printer.id))} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 size={18}/></button></div></article>; })}{visible.length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhuma impressora encontrada.</p>}</div>
+      <div className="mt-4 space-y-2">{visible.map(printer => { const target = ROUTES.find(item => item.id === printer.route)!; return <article key={printer.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-gray-950">{printer.name}</p><p className="text-xs font-black uppercase text-emerald-700">{printer.connection === 'network' ? `Rede ${printer.host}:${printer.port || 9100}` : 'Navegador'}</p><p className="text-sm font-bold text-gray-600">{target.label} · {target.help}</p></div><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-sm font-black"><input type="checkbox" checked={printer.active} onChange={event => void persist(printers.map(item => item.id === printer.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label><button aria-label={`Excluir ${printer.name}`} onClick={() => void persist(printers.filter(item => item.id !== printer.id))} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 size={18}/></button></div></article>; })}{visible.length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhuma impressora encontrada.</p>}</div>
       {message && <p className="mt-4 rounded-xl bg-orange-50 p-3 text-sm font-black text-[#8A3E22]">{message}</p>}
     </section>
   </div>;
