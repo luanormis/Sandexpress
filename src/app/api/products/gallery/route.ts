@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
             image.name,
             image.description,
             ...(Array.isArray(image.tags) ? image.tags : []),
-          ].join(" "));
+          ].join(" ");
           return normalizeImageSearch(haystack).includes(search);
         })
       : categoryImages;
