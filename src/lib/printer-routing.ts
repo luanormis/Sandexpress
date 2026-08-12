@@ -5,6 +5,9 @@ export type KioskPrinter = {
   name: string;
   route: PrinterRoute;
   active: boolean;
+  connection?: 'browser' | 'network';
+  host?: string;
+  port?: number;
 };
 
 export type PrintableOrderItem = { q: number; n: string; category?: string | null; subtotal?: number };
@@ -31,6 +34,9 @@ export function normalizePrinters(value: unknown): KioskPrinter[] {
     const name = String(item.name || '').trim().slice(0, 80);
     const route = item.route;
     if (!id || !name || !['food', 'beverage', 'cashier'].includes(String(route))) return [];
-    return [{ id, name, route: route as PrinterRoute, active: item.active !== false }];
+    const host = typeof item.host === 'string' ? item.host.trim() : undefined;
+    const port = Number(item.port || 9100);
+    const connection = item.connection === 'network' && host ? 'network' as const : 'browser' as const;
+    return [{ id, name, route: route as PrinterRoute, active: item.active !== false, connection, host, port: connection === 'network' && Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined }];
   });
 }
