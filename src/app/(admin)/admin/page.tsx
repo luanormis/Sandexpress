@@ -686,6 +686,24 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleBeachOperations = async (vendor: Vendor) => {
+    const enabled = !selectedVendorFeatures.beach_operations;
+    setFeatureSavingVendorId(vendor.id);
+    try {
+      const response = await fetch('/api/features', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendor.id, feature_key: 'beach_operations', enabled }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return alert(data.error || 'Nao foi possivel atualizar o modulo.');
+      setSelectedVendorFeatures(current => ({ ...current, beach_operations: enabled }));
+    } catch {
+      alert('Erro de rede ao atualizar a operacao simplificada.');
+    } finally {
+      setFeatureSavingVendorId(null);
+    }
+  };
+
   const migrateVendorToPaid = async (vendor: Vendor) => {
     await updateVendor(vendor.id, {
       is_active: true,
@@ -2198,6 +2216,17 @@ export default function AdminDashboard() {
               </div>
               <div className="text-sm text-gray-500">
                 Cadastrado em {new Date(selectedVendor.created_at).toLocaleDateString("pt-BR")}
+              </div>
+              <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-black text-orange-100">Versao simplificada para barraca</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-orange-200/80">Libera apenas Kanban, estoque, fechamento do caixa e impressoras em /vendor/operations.</p>
+                  </div>
+                  <button onClick={() => toggleBeachOperations(selectedVendor)} disabled={featureSavingVendorId === selectedVendor.id} className={`min-w-24 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${selectedVendorFeatures.beach_operations ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    {featureSavingVendorId === selectedVendor.id ? 'Salvando...' : selectedVendorFeatures.beach_operations ? 'Liberado' : 'Bloqueado'}
+                  </button>
+                </div>
               </div>
               <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
                 <div className="flex items-center justify-between gap-4">
