@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 import { getSessionSecret } from './runtime-config';
 
-export type SessionRole = 'admin' | 'vendor' | 'customer' | 'user';
+export type SessionRole = 'admin' | 'vendor' | 'owner_sales' | 'customer' | 'user';
 
 export type SessionPayload = {
   role: SessionRole;
@@ -72,6 +72,11 @@ export function getRequestSession(req: NextRequest): SessionPayload | null {
   if (customerSession) return customerSession;
 
   return null;
+}
+
+export function getOwnerSalesSession(req: NextRequest): SessionPayload | null {
+  const session = verifySessionToken(req.cookies.get('owner_sales_session')?.value);
+  return session?.role === 'owner_sales' && session.vendor_id ? session : null;
 }
 
 export function resolveTenantIdFromSession(session: SessionPayload | null): string | null {
