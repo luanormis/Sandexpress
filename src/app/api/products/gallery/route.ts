@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { categoryKey } from "@/lib/default-product-images";
 import { catalogImageProxyUrl } from "@/lib/product-image-url";
+import { normalizeImageSearch } from "@/lib/product-image-processing";
 
 function galleryResponse(images: any[]) {
   const renderableImages = images.map((image) => ({
@@ -38,7 +39,7 @@ function galleryResponse(images: any[]) {
 export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category");
-    const search = String(request.nextUrl.searchParams.get("q") || "").trim().toLowerCase();
+    const search = normalizeImageSearch(request.nextUrl.searchParams.get("q"));
     const planType = request.nextUrl.searchParams.get("planType") || "free";
     const requestedCategoryKey = category ? categoryKey(category) : null;
 
@@ -64,8 +65,8 @@ export async function GET(request: NextRequest) {
             image.name,
             image.description,
             ...(Array.isArray(image.tags) ? image.tags : []),
-          ].join(" ").toLowerCase();
-          return haystack.includes(search);
+          ].join(" "));
+          return normalizeImageSearch(haystack).includes(search);
         })
       : categoryImages;
 
