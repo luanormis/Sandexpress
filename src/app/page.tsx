@@ -13,16 +13,12 @@ export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
-  const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean; verificationUrl?: string } | null>(null);
+  const [regCredentials, setRegCredentials] = useState<{ login: string; emailSent?: boolean } | null>(null);
   const [form, setForm] = useState({
     name: "", owner_name: "", owner_phone: "", owner_email: "", cpf: "", cnpj: "", beach_name: "", city: "", state: "", password: "", password_confirm: "", terms_accepted: false,
   });
   const [loading, setLoading] = useState(false);
   const [registerError, setRegisterError] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpChallengeId, setOtpChallengeId] = useState("");
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otpMessage, setOtpMessage] = useState("");
   const [planSettings, setPlanSettings] = useState(DEFAULT_PLATFORM_PLAN_SETTINGS);
 
   useEffect(() => {
@@ -42,7 +38,7 @@ export default function LandingPage() {
     e.preventDefault();
     const hasDocument = form.cpf.replace(/\D/g, "") || form.cnpj.replace(/\D/g, "");
     if (!form.name || !form.owner_name || !form.owner_phone || !form.owner_email || !form.beach_name || !form.city || !form.state || !hasDocument) {
-      setRegisterError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, responsavel, praia, cidade e estado.");
+      setRegisterError("Preencha telefone, email, CPF ou CNPJ, nome do quiosque, respons√°vel, praia, cidade e estado.");
       return;
     }
     if (!form.password || form.password.length < 8) {
@@ -50,15 +46,11 @@ export default function LandingPage() {
       return;
     }
     if (form.password !== form.password_confirm) {
-      setRegisterError("A senha e a confirmacao nao conferem.");
+      setRegisterError("A senha e a confirma√ß√£o n√£o conferem.");
       return;
     }
     if (!form.terms_accepted) {
-      setRegisterError("Marque que voce leu e concorda com os Termos de Uso para concluir o cadastro.");
-      return;
-    }
-    if (!otpVerified || !otpChallengeId) {
-      setRegisterError("Valide o WhatsApp do responsavel antes de concluir o cadastro.");
+      setRegisterError("Marque que voc√™ leu e concorda com os Termos de Uso para concluir o cadastro.");
       return;
     }
     setLoading(true);
@@ -67,88 +59,24 @@ export default function LandingPage() {
       const res = await fetch("/api/vendors/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, otp_challenge_id: otpChallengeId }),
+        body: JSON.stringify(form),
       });
       if (res.ok) {
         const data = await res.json();
         setRegCredentials({
           login: data.document_login || form.cnpj || form.cpf || form.owner_phone,
-          emailSent: Boolean(data.email_verification?.sent),
-          verificationUrl: data.email_verification?.verification_url,
+          emailSent: Boolean(data.email_confirmation?.sent),
         });
         setRegSuccess(true);
       } else {
         const data = await res.json().catch(() => ({}));
-        setRegisterError(data.error || "Nao foi possivel finalizar o cadastro. Tente novamente.");
+        setRegisterError(data.error || "N√£o foi poss√≠vel finalizar o cadastro. Tente novamente.");
       }
     } catch (err) {
       console.error(err);
-      setRegisterError("Falha de conexao ao criar cadastro. Confira a internet e tente novamente.");
+      setRegisterError("Falha de conex√£o ao criar cadastro. Confira a internet e tente novamente.");
     }
     setLoading(false);
-  };
-
-  const sendRegisterOtp = async () => {
-    if (!form.owner_phone || form.owner_phone.replace(/\D/g, "").length < 10) {
-      setRegisterError("Informe um WhatsApp valido para enviar o codigo.");
-      return;
-    }
-    setLoading(true);
-    setRegisterError("");
-    setOtpMessage("");
-    setOtpVerified(false);
-    try {
-      const res = await fetch("/api/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: form.owner_phone,
-          purpose: "vendor_register",
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setRegisterError(data.error || "Nao foi possivel enviar o codigo.");
-        return;
-      }
-      setOtpChallengeId(data.challenge_id || "");
-      setOtpMessage("Codigo enviado pelo WhatsApp.");
-    } catch {
-      setRegisterError("Erro de rede ao enviar codigo.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyRegisterOtp = async () => {
-    if (!otpChallengeId || otpCode.replace(/\D/g, "").length !== 6) {
-      setRegisterError("Informe o codigo de 6 digitos recebido no WhatsApp.");
-      return;
-    }
-    setLoading(true);
-    setRegisterError("");
-    setOtpMessage("");
-    try {
-      const res = await fetch("/api/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          challenge_id: otpChallengeId,
-          code: otpCode.replace(/\D/g, ""),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setRegisterError(data.error || "Codigo invalido.");
-        return;
-      }
-      setOtpVerified(true);
-      setOtpMessage("WhatsApp validado.");
-    } catch {
-      setRegisterError("Erro de rede ao validar codigo.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const openModal = () => {
@@ -156,31 +84,40 @@ export default function LandingPage() {
     setRegSuccess(false);
     setRegCredentials(null);
     setRegisterError("");
-    setOtpCode("");
-    setOtpChallengeId("");
-    setOtpVerified(false);
-    setOtpMessage("");
   };
 
   return (
-    <div className="min-h-screen bg-[#fff8f6] font-sans text-[#261812] overflow-x-hidden">
+    <div className="landing-shell relative isolate min-h-screen bg-[#2d1b14] font-sans text-[#fff8f6] overflow-x-hidden">
+      <div className="landing-beach-carousel" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 w-full bg-[#fff8f6]/85 backdrop-blur-md z-50 border-b border-[#e2bfb0]/70">
+      <nav className="fixed top-0 left-0 w-full bg-[#2d1b14]/78 backdrop-blur-xl z-50 border-b border-[#ff8a2b]/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 text-[#FF6B00]">
-              <Image src="/logo-sandexpress.png" alt="SandExpress" width={104} height={59} priority className="h-12 w-auto object-contain sm:h-14" />
-              <span className="font-display font-bold text-xl sm:text-2xl text-[#261812]">SandExpress</span>
+              <Image src="/sandexpress-logo-fluid.png" alt="SandExpress" width={72} height={69} priority className="h-11 w-auto object-contain sm:h-12" />
+              <span className="hidden font-display text-2xl font-black text-[#fff8f6] sm:inline">
+                Sand<span className="text-[#ff7a18]">Express</span>
+              </span>
             </div>
+          </div>
+          <div className="hidden items-center gap-7 text-xs font-black text-[#ffe7dc] lg:flex">
+            <a href="#como-funciona" className="hover:text-[#ff8a2b]">Como funciona</a>
+            <a href="#beneficios" className="hover:text-[#ff8a2b]">Recursos</a>
+            <a href="#planos" className="hover:text-[#ff8a2b]">Planos</a>
+            <Link href="/vendor/login" className="hover:text-[#ff8a2b]">Entrar</Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
              <button onClick={openModal} className="bg-[#FF6B00] text-white px-4 sm:px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-[#E56000] transition-all active:scale-95 text-xs sm:text-sm whitespace-nowrap">
-                Cadastrar gratis
+                Cadastrar gr√°tis
              </button>
              <button
                type="button"
                onClick={() => setMenuOpen(true)}
-               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e2bfb0] bg-white text-[#572000] shadow-sm hover:border-[#FF6B00]"
+               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ff8a2b]/45 bg-[#4b2a1e] text-[#fff8f6] shadow-sm hover:border-[#FF6B00] lg:hidden"
                aria-label="Abrir menu"
              >
                <Menu size={20} />
@@ -191,52 +128,79 @@ export default function LandingPage() {
 
       {menuOpen && (
         <div className="fixed inset-0 z-[90] bg-black/40" onClick={() => setMenuOpen(false)}>
-          <aside className="ml-auto flex h-full w-[min(84vw,320px)] flex-col bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#e2bfb0] p-5">
-              <span className="font-display text-xl font-bold text-[#261812]">Menu</span>
-              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar menu">
+          <aside className="ml-auto flex h-full w-[min(84vw,320px)] flex-col bg-[#301107] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#ff6b00]/30 p-5">
+              <span className="font-display text-xl font-bold text-[#fff8f6]">Menu</span>
+              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-2 text-[#f4d6c8] hover:bg-[#451704]" aria-label="Fechar menu">
                 <X size={22} />
               </button>
             </div>
-            <nav className="flex flex-col gap-2 p-5 text-sm font-black text-gray-700">
-              <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Como funciona</a>
-              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Beneficios</a>
-              <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Planos</a>
-              <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Painel do quiosque</Link>
-              <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#fff1eb] hover:text-[#FF6B00]">Admin</Link>
+            <nav className="flex flex-col gap-2 p-5 text-sm font-black text-[#f4d6c8]">
+              <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Como funciona</a>
+              <a href="#beneficios" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Benef√≠cios</a>
+              <a href="#planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Planos</a>
+              <Link href="/vendor/login" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Painel do quiosque</Link>
+              <Link href="/admin" className="rounded-xl px-4 py-3 hover:bg-[#451704] hover:text-[#FF6B00]">Admin</Link>
             </nav>
           </aside>
         </div>
       )}
 
       {/* Hero Section */}
-      <section className="pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 bg-[#fff1eb] text-center text-[#261812] relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[34rem] bg-gradient-to-br from-[#ff6b00] via-[#ffb693] to-[#fff8f6]" />
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/sand.png')] opacity-10 mix-blend-overlay"></div>
-        <div className="max-w-4xl mx-auto relative z-10 pt-10 sm:pt-16">
-          <Image src="/logo-sandexpress.png" alt="" width={220} height={124} priority className="mx-auto mb-6 h-28 w-auto object-contain sm:h-36" />
-          <span className="bg-white/45 text-[#572000] px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md uppercase mb-8 inline-block shadow-sm">Para Quiosques e Barracas</span>
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold tracking-tight mb-6 leading-[1.1]">
-            Seu quiosque vendendo mais, sem esfor√ßo.
+      <section className="landing-hero relative overflow-hidden px-4 pb-12 pt-20 text-white sm:px-6 sm:pb-16 sm:pt-24">
+        <div className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-[#3a2118] via-[#2d1b14] to-[#3a2118]" />
+        <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 pt-4 sm:pt-6 lg:min-h-[610px] lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="max-w-2xl text-left">
+          <p className="mb-5 inline-flex rounded-full border border-[#ff8a2b]/35 bg-[#fff2e8]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-[#ffd8c5]">
+            Sistema de pedidos para quiosques de praia
+          </p>
+          <h1 className="mb-6 font-display text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl md:text-7xl">
+            Mais controle.<br />
+            Mais lucro.<br />
+            <span className="text-[#ff7a18]">Mais efici√™ncia.</span>
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-[#572000] mb-10 sm:mb-12 max-w-2xl mx-auto font-sans leading-relaxed">
+          <h2 className="sr-only">
+            Tudo o que seu quiosque precisa para vender mais todos os dias.
+          </h2>
+          <p className="mb-8 max-w-xl font-sans text-lg leading-relaxed text-[#ffe7dc] sm:text-xl">
+            Organize pedidos, acompanhe suas vendas em tempo real, evite perdas e agilize o atendimento. Tudo o que seu quiosque precisa para vender mais todos os dias.
+          </p>
+          <p className="sr-only">
             Elimine filas, reduza erros de pedidos e deixe seus clientes pedirem direto do guarda-sol usando apenas um QR Code.
           </p>
-          <div className="flex items-center justify-center">
-            <button onClick={openModal} className="w-full sm:w-auto bg-white text-[#FF6B00] px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl transition-all active:scale-95">
-              Cadastrar gratis
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button onClick={openModal} className="bg-[#FF6B00] px-8 py-4 text-base font-black text-white shadow-xl transition-all hover:bg-[#E56000] hover:shadow-2xl active:scale-95 rounded-xl">
+              Cadastrar gr√°tis
             </button>
+            <a href="#planos" className="inline-flex items-center justify-center rounded-xl border-2 border-[#ff8a2b] px-8 py-4 text-base font-black text-[#fff8f6] hover:bg-[#ff8a2b] hover:text-[#2d1b14]">
+              Ver planos
+            </a>
+          </div>
+          <div className="mt-8 hidden gap-3 text-xs font-black text-[#ffe7dc] sm:grid sm:max-w-xl sm:grid-cols-3">
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">3 dias gr√°tis</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">At√© {planSettings.max_umbrellas} guarda-s√≥is</span>
+            <span className="rounded-2xl border border-[#ff8a2b]/25 bg-white/8 p-3">Pedidos em tempo real</span>
           </div>
         </div>
-        
+          <div className="landing-hero-media relative z-10">
+            <Image
+              src="/sandexpress-beach-hero.png"
+              alt="Tablet com painel SandExpress em uma mesa de quiosque na praia"
+              width={1200}
+              height={760}
+              priority
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
       </section>
 
       {/* Como Funciona */}
-      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#fff8f6] border-b border-[#e2bfb0]/70">
+      <section id="como-funciona" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#3a2118] border-y border-[#ff8a2b]/18">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-               <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Em 4 passos simples</h2>
-               <p className="text-xl text-gray-500">O fluxo perfeito para o seu cliente pedir sem complica√ß√£o.</p>
+               <h2 className="text-4xl font-display font-bold text-white mb-4">Em 4 passos simples</h2>
+               <p className="text-xl text-white/85">O fluxo perfeito para o seu cliente pedir sem complica√ß√£o.</p>
             </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-8">
@@ -250,11 +214,11 @@ export default function LandingPage() {
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FF6B00] text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
                       {idx + 1}
                     </div>
-                    <div className="w-16 h-16 bg-[#ffeae1] rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
+                    <div className="w-16 h-16 bg-[#fff0e4] border border-[#ff8a2b]/35 rounded-2xl flex items-center justify-center mx-auto mb-6 mt-2">
                       <step.i size={32} className="text-[#FF6B00]" />
                     </div>
                     <h3 className="font-bold text-xl mb-2">{step.t}</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed">{step.d}</p>
+                    <p className="text-[#f4d6c8] text-sm leading-relaxed">{step.d}</p>
                  </div>
                ))}
             </div>
@@ -262,11 +226,11 @@ export default function LandingPage() {
       </section>
 
       {/* Benef√≠cios */}
-      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-white">
+      <section id="beneficios" className="py-16 sm:py-24 px-4 sm:px-6 bg-[#f9e2cf] text-[#2d1b14]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">Tudo que voc√™ precisa</h2>
-            <p className="text-xl text-gray-500">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
+            <h2 className="text-4xl font-display font-bold text-[#2d1b14] mb-4">Tudo que voc√™ precisa</h2>
+            <p className="text-xl text-[#6b3a28]">Funcionalidades pensadas para maximizar suas vendas na praia.</p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
@@ -278,10 +242,279 @@ export default function LandingPage() {
               { icon: TrendingUp, title: "Relat√≥rios Completos", desc: "Faturamento, ticket m√©dio, produtos mais vendidos, melhores clientes. Tudo em um clique." },
               { icon: Gift, title: "Promo√ß√µes e Combos", desc: "Crie combos, pre√ßos promocionais e destaque itens especiais para aumentar o ticket m√©dio." },
             ].map((b, idx) => (
-              <div key={idx} className="bg-[#fff8f6] p-8 rounded-[40px] border border-[#e2bfb0]/70 transition-all hover:shadow-lg hover:border-[#FF6B00]/30 hover:-translate-y-1 group">
-                <div className="w-14 h-14 bg-[#FF6B00]/10 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
+              <div key={idx} className="bg-[#fff8f3] p-8 rounded-[32px] border border-[#dfb799] shadow-[0_18px_45px_rgba(93,45,25,0.12)] transition-all hover:shadow-lg hover:border-[#FF6B00] hover:-translate-y-1 group">
+                <div className="w-14 h-14 bg-[#ffe6d2] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#FF6B00] group-hover:text-white transition-all">
                   <b.icon size={28} className="text-[#FF6B00] group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="font-bold text-lg mb-2 text-gray-900">{b.title}</h3>
-                <p className="◊oz∂âûÀk∫wµÁx4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ’∞Åç±ÖÕÕ9ÖµîÙâÕ¡Öçîµ‰¥ÃÅµà¥‡à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±§Åç±ÖÕÕ9ÖµîÙâô±ï‡ÅùÖ¿¥»Å—ï·–µù…Ö‰¥Ã¿¿à¯Ò°ïç≠•…ç±î»Åç±ÖÕÕ9ÖµîÙâ—ï·–µlçŸ¿¡tÅÕ°…•π¨¥¿àº¯Å”§ÅÌ¡±ÖπMï——•πùÃπµÖ·}’µâ…ï±±ÖÕÙÅù’Ö…ëÑµœÕ•ÃΩ±§¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±§Åç±ÖÕÕ9ÖµîÙâô±ï‡ÅùÖ¿¥»Å—ï·–µù…Ö‰¥Ã¿¿à¯Ò°ïç≠•…ç±î»Åç±ÖÕÕ9ÖµîÙâ—ï·–µlçŸ¿¡tÅÕ°…•π¨¥¿àº¯ÅAïë•ëΩÃÅ•±•µ•—ÖëΩÃΩ±§¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±§Åç±ÖÕÕ9ÖµîÙâô±ï‡ÅùÖ¿¥»Å—ï·–µù…Ö‰¥Ã¿¿à¯Ò°ïç≠•…ç±î»Åç±ÖÕÕ9ÖµîÙâ—ï·–µlçŸ¿¡tÅÕ°…•π¨¥¿àº¯ÅEHÅçΩëïÃÅ¡ï…ÕΩπÖ±•ÈÖëΩÃΩ±§¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩ’∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏ÅΩπ±•ç¨ıÌΩ¡ïπ5ΩëÖ±ÙÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞Å¡‰¥–ÅâúµlçŸ¿¡tÅ—ï·–µ›°•—îÅ…Ω’πëïêµ·∞ÅôΩπ–µâΩ±êÅÕ°ÖëΩ‹µµêÅ°ΩŸï»Èâúµlç‘ÿ¿¿¡tÅ—…ÖπÕ•—•Ω∏µçΩ±Ω…Ãà˘ÖëÖÕ—…Ö»Åù…Ö—•ÃΩâ’——Ω∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄΩÕïç—•Ω∏¯4(4(ÄÄÄÄÄÅÏº®ÅQÅMïç’πìÖ…•ºÄ®ΩÙ4(ÄÄÄÄÄÄÒÕïç—•Ω∏Åç±ÖÕÕ9ÖµîÙââúµù…Öë•ïπ–µ—ºµ»Åô…Ω¥µlåÕ≈¡tÅ—ºµù…Ö‰¥‰¿¿Å¡‰¥ƒÿÅÕ¥È¡‰¥»¿Å¡‡¥–ÅÕ¥È¡‡¥ÿÅ—ï·–µçïπ—ï»Å—ï·–µ›°•—îà¯4(ÄÄÄÄÄÄÄÄÒ†»Åç±ÖÕÕ9ÖµîÙâ—ï·–¥—·∞ÅôΩπ–µë•Õ¡±Ö‰ÅôΩπ–µâΩ±êÅµà¥ÿà˘A…Ωπ—ºÅ¡Ö…ÑÅ—…ÖπÕôΩ…µÖ»ÅÕï‘ÅÖ—ïπë•µïπ—º¸Ω†»¯4(ÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâ—ï·–µ·∞Å—ï·–µù…Ö‰¥–¿¿Åµà¥ƒ¿ÅµÖ‡µ‹¥…·∞Åµ‡µÖ’—ºà˘ΩµïçîÅÖùΩ…ÑÅçΩ¥ÅÌ¡±ÖπMï——•πùÃπ—…•Ö±}ëÖÂÕÙÅë•ÖÃÅùÀÖ—•Ã∏Å;çºÅ¡…ïç•ÕÑÅçÖ…”çºÅëîÅçÀ•ë•—º∏Ω¿¯4(ÄÄÄÄÄÄÄÄÒâ’——Ω∏ÅΩπ±•ç¨ıÌΩ¡ïπ5ΩëÖ±ÙÅç±ÖÕÕ9ÖµîÙââúµlçŸ¿¡tÅ—ï·–µ›°•—îÅ¡‡¥ƒ¿Å¡‰¥‘Å…Ω’πëïêµô’±∞ÅôΩπ–µâΩ±êÅ—ï·–µ·∞ÅÕ°ÖëΩ‹µ·∞Å°ΩŸï»Èâúµlç‘ÿ¿¿¡tÅÖç—•ŸîÈÕçÖ±î¥‰‘Å—…ÖπÕ•—•Ω∏µÖ±∞à¯4(ÄÄÄÄÄÄÄÄÄÄÅÖëÖÕ—…Ö»Åù…Ö—•Ã4(ÄÄÄÄÄÄÄÄΩâ’——Ω∏¯4(ÄÄÄÄÄÄΩÕïç—•Ω∏¯4(4(ÄÄÄÄÄÄÒôΩΩ—ï»Åç±ÖÕÕ9ÖµîÙââúµù…Ö‰¥‘¿Å¡‰¥ƒ»Å—ï·–µçïπ—ï»Å—ï·–µù…Ö‰¥‘¿¿Å—ï·–µÕ¥ÅôΩπ–µÕïµ•âΩ±êÅâΩ…ëï»µ–ÅâΩ…ëï»µù…Ö‰¥»¿¿à¯4(ÄÄÄÄÄÄÄÄÄÒ¿˚
-§ÅÌπï‹ÅÖ—î†§πùï—’±±eïÖ»†•ÙÅMÖπë·¡…ïÕÃ∏ÅQΩëΩÃÅΩÃÅë•…ï•—ΩÃÅ…ïÕï…ŸÖëΩÃ∏Ω¿¯4(ÄÄÄÄÄÄΩôΩΩ—ï»¯4(4(ÄÄÄÄÄÅÏº®ÄÙÙÙÙÙÙÙÙÙÙÅ5=0ÅÅMQI<ÄÙÙÙÙÙÙÙÙÙÙÄ®ΩÙ4(ÄÄÄÄÄÅÌÕ°Ω›5ΩëÖ∞ÄòòÄ†4(ÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâô•·ïêÅ•πÕï–¥¿Åâúµâ±Öç¨º‘¿ÅËµlƒ¿¡tÅô±ï‡Å•—ïµÃµçïπ—ï»Å©’Õ—•ô‰µçïπ—ï»Å¿¥–àÅΩπ±•ç¨ıÏ†§ÄÙ¯ÅÕï—M°Ω›5ΩëÖ∞°ôÖ±Õî•Ù¯4(ÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙââúµ›°•—îÅ…Ω’πëïê¥…·∞ÅµÖ‡µ‹µµêÅ‹µô’±∞ÅµÖ‡µ†µl‰¡Ÿ°tÅΩŸï…ô±Ω‹µ‰µÖ’—ºÅÕ°ÖëΩ‹¥…·∞àÅΩπ±•ç¨ıÌîÄÙ¯ÅîπÕ—Ω¡A…Ω¡ÖùÖ—•Ω∏†•Ù¯4(ÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïùM’ççïÕÃÄ¸Ä†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâ¿¥‡Å—ï·–µçïπ—ï»à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâ‹¥ƒÿÅ†¥ƒÿÅâúµù…ïï∏¥ƒ¿¿Å…Ω’πëïêµô’±∞Åô±ï‡Å•—ïµÃµçïπ—ï»Å©’Õ—•ô‰µçïπ—ï»Åµ‡µÖ’—ºÅµà¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ°ïç≠•…ç±î»ÅÕ•ÈîıÏÃ…ÙÅç±ÖÕÕ9ÖµîÙâ—ï·–µù…ïï∏¥ÿ¿¿àÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ†ÃÅç±ÖÕÕ9ÖµîÙâ—ï·–¥…·∞ÅôΩπ–µë•Õ¡±Ö‰ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‰¿¿Åµà¥»à˘ÖëÖÕ—…ºÅ…ïÖ±•ÈÖëºÑΩ†Ã¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâ—ï·–µù…Ö‰¥‘¿¿Åµà¥ÿà˘Mï‘Å≈’•ΩÕ≈’îÅôΩ§Åç…•ÖëºÅçΩ¥ÅÌ¡±ÖπMï——•πùÃπ—…•Ö±}ëÖÂÕÙÅë•ÖÃÅùÀÖ—•Ã∏ÅçïÕÕîÅºÅ¡Ö•πï∞Å¡Ö…ÑÅçΩπô•ù’…Ö»ÅÕï‘ÅçÖ…ìÖ¡•º∏Ω¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïù…ïëïπ—•Ö±ÃÄòòÄ†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâµà¥ÿÅ…Ω’πëïêµ·∞ÅâΩ…ëï»ÅâΩ…ëï»µlçî…âôà¡tÅâúµlçôôò·òŸtÅ¿¥–Å—ï·–µ±ïô–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâ—ï·–µÕ¥ÅôΩπ–µâ±Öç¨Å—ï·–µlå‘‹»¿¿¡tà˘ÖëΩÃÅëîÅÖçïÕÕºÅëºÅ≈’•ΩÕ≈’îΩ¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâµ–¥»Å—ï·–µÕ¥Å—ï·–µù…Ö‰¥‹¿¿à˘UÕ’Ö…•ºËÄÒÕ—…Ωπú˘Ì…ïù…ïëïπ—•Ö±Ãπ±Ωù•πÙΩÕ—…Ωπú¯Ω¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâ—ï·–µÕ¥Å—ï·–µù…Ö‰¥‹¿¿à˘Mïπ°ÑËÄÒÕ—…Ωπú˘ÑÅÕïπ°ÑÅ≈’îÅŸΩçîÅÖçÖâΩ‘ÅëîÅç…•Ö»ΩÕ—…Ωπú¯Ω¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâµ–¥ÃÅ—ï·–µÕ¥Å—ï·–µù…Ö‰¥‹¿¿à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïù…ïëïπ—•Ö±ÃπïµÖ•±Mïπ–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¸ÄâπŸ•ÖµΩÃÅ’¥ÅïµÖ•∞Å¡Ö…ÑÅŸÖ±•ëÖ»ÅºÅçÖëÖÕ—…º∏à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄËÄâµÖ•∞ÅëîÅŸÖ±•ëÖçÖºÅπÖºÅïπŸ•Öëº∏ÅΩπô•ù’…îÅIM9}A%}-dÅ¡Ö…ÑÅë•Õ¡Ö…ΩÃÅ…ïÖ•Ã∏âÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩ¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïù…ïëïπ—•Ö±ÃπŸï…•ô•çÖ—•ΩπU…∞ÄòòÄ†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâµ–¥»Åâ…ïÖ¨µ›Ω…ëÃÅ—ï·–µ·ÃÅôΩπ–µâΩ±êÅ—ï·–µlçŸ¿¡tà˘1•π¨Å±ΩçÖ∞ÅëîÅŸï…•ô•çÖçÖºËÅÌ…ïù…ïëïπ—•Ö±ÃπŸï…•ô•çÖ—•ΩπU…±ÙΩ¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ1•π¨4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ°…ïòÙàΩŸïπëΩ»Ω±Ωù•∏à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ•π±•πîµô±ï‡Å•—ïµÃµçïπ—ï»ÅùÖ¿¥»ÅâúµlçŸ¿¡tÅ—ï·–µ›°•—îÅ¡‡¥‡Å¡‰¥–Å…Ω’πëïêµô’±∞ÅôΩπ–µâΩ±êÅ—ï·–µ±úÅÕ°ÖëΩ‹µµêÅ°ΩŸï»Èâúµlç‘ÿ¿¿¡tÅÖç—•ŸîÈÕçÖ±î¥‰‘Å—…ÖπÕ•—•Ω∏µÖ±∞à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅçïÕÕÖ»ÅAÖ•πï∞ÄÒ°ïŸ…ΩπI•ù°–ÅÕ•ÈîıÏ»¡ÙÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩ1•π¨¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄ§ÄËÄ†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâô±ï‡Å©’Õ—•ô‰µâï—›ïï∏Å•—ïµÃµçïπ—ï»Å¿¥ÿÅâΩ…ëï»µàÅâΩ…ëï»µù…Ö‰¥ƒ¿¿à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ†ÃÅç±ÖÕÕ9ÖµîÙâ—ï·–µ·∞ÅôΩπ–µë•Õ¡±Ö‰ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‰¿¿à˘QïÕ—îÅÀÖ—•ÃÅÌ¡±ÖπMï——•πùÃπ—…•Ö±}ëÖÂÕÙÅë•ÖÃΩ†Ã¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¿Åç±ÖÕÕ9ÖµîÙâ—ï·–µÕ¥Å—ï·–µù…Ö‰¥‘¿¿à˘Mï¥ÅçÖ…”çºÅëîÅçÀ•ë•—ºΩ¿¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏ÅΩπ±•ç¨ıÏ†§ÄÙ¯ÅÕï—M°Ω›5ΩëÖ∞°ôÖ±Õî•ÙÅç±ÖÕÕ9ÖµîÙâ—ï·–µù…Ö‰¥–¿¿Å°ΩŸï»È—ï·–µù…Ö‰¥ÿ¿¿à¯Ò`ÅÕ•ÈîıÏ»—ÙÄº¯Ωâ’——Ω∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒôΩ…¥ÅΩπM’âµ•–ıÌ°Öπë±ïIïù•Õ—ï…ÙÅç±ÖÕÕ9ÖµîÙâ¿¥ÿÅÕ¡Öçîµ‰¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘9ΩµîÅëºÅIïÕ¡ΩπœÖŸï∞Ä®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πΩ›πï…}πÖµïÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅΩ›πï…}πÖµîËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâMï‘ÅπΩµîÅçΩµ¡±ï—ºà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘]°Ö—Õ¡¿Ä®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï∞àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πΩ›πï…}¡°ΩπïÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÏ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅΩ›πï…}¡°ΩπîËÅîπ—Ö…ùï–πŸÖ±’îπ…ï¡±Öçî†ΩqΩú∞Äúú§ÅÙ§§Ï4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÕï—=—¡°Ö±±ïπùï%ê†àà§Ï4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÕï—=—¡Yï…•ô•ïê°ôÖ±Õî§Ï4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÕï—=—¡5ïÕÕÖùî†àà§Ï4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅıÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùà†ƒƒ§Ä‰‰‰‰‰¥‰‰‰‰à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâ…Ω’πëïêµ·∞ÅâΩ…ëï»ÅâΩ…ëï»µlçî…âôà¡tÅâúµlçôôò·òŸtÅ¿¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥»à˘YÖ±•ëÖçÖºÅ]°Ö—Õ¡¿Ä®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâù…•êÅù…•êµçΩ±Ã¥ƒÅÕ¥Èù…•êµçΩ±Ãµl≈ô…}Ö’—ΩtÅùÖ¿¥»à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ•π¡’—5ΩëîÙâπ’µï…•åà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌΩ—¡ΩëïÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—=—¡Ωëî°îπ—Ö…ùï–πŸÖ±’îπ…ï¡±Öçî†ΩqΩú∞Äúú§πÕ±•çî†¿∞Äÿ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîÅâúµ›°•—îà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâΩë•ùºÅëîÄÿÅë•ù•—ΩÃà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙââ’——Ω∏à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅë•ÕÖâ±ïêıÌ±ΩÖë•πùÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅΩπ±•ç¨ıÌÕïπëIïù•Õ—ï…=—¡Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ…Ω’πëïêµ·∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µlçŸ¿¡tÅ¡‡¥–Å¡‰¥ÃÅ—ï·–µÕ¥ÅôΩπ–µâ±Öç¨Å—ï·–µlçŸ¿¡tÅë•ÕÖâ±ïêÈΩ¡Öç•—‰¥‘¿à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅπŸ•Ö»4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙââ’——Ω∏à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅë•ÕÖâ±ïêıÌ±ΩÖë•πúÅÒÄÖΩ—¡°Ö±±ïπùï%ëÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅΩπ±•ç¨ıÌŸï…•ôÂIïù•Õ—ï…=—¡Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâµ–¥»Å‹µô’±∞Å…Ω’πëïêµ·∞ÅâúµlåÕê≈Ñ¡ÖtÅ¡‡¥–Å¡‰¥ÃÅ—ï·–µÕ¥ÅôΩπ–µâ±Öç¨Å—ï·–µ›°•—îÅë•ÕÖâ±ïêÈΩ¡Öç•—‰¥‘¿à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌΩ—¡Yï…•ô•ïêÄ¸Äâ]°Ö—Õ¡¿ÅŸÖ±•ëÖëºàÄËÄâYÖ±•ëÖ»ÅçΩë•ùºâÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌΩ—¡5ïÕÕÖùîÄòòÄÒ¿Åç±ÖÕÕ9ÖµîÙâµ–¥»Å—ï·–µ·ÃÅôΩπ–µâΩ±êÅ—ï·–µlå‘‹»¿¿¡tà˘ÌΩ—¡5ïÕÕÖùïÙΩ¿˘Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘µÖ•∞ÅëîÅIïç’¡ï…ÖçÖºÄ®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâïµÖ•∞àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πΩ›πï…}ïµÖ•±ÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅΩ›πï…}ïµÖ•∞ËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâŸΩçïïµÖ•∞πçΩ¥à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘9ΩµîÅëºÅE’•ΩÕ≈’îÄ®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥ππÖµïÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅπÖµîËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùâ‡ËÅE’•ΩÕ≈’îÅëºÅMΩ∞à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘A…Ö•ÑÄ®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πâïÖç°}πÖµïÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅâïÖç°}πÖµîËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùâ‡ËÅA…Ö•ÑÅëÖÃÅA•—Öπù’ï•…ÖÃà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâù…•êÅù…•êµçΩ±Ã¥ƒÅÕ¥Èù…•êµçΩ±Ã¥»ÅùÖ¿¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘AΩ±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πç¡ôÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Åç¡òËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùà¿¿¿∏¿¿¿∏¿¿¿¥¿¿à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘9A(Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πçπ¡©ÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Åçπ¡®ËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùà¿¿∏¿¿¿∏¿¿¿º¿¿¿ƒ¥¿¿à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâù…•êÅù…•êµçΩ±Ã¥ƒÅÕ¥Èù…•êµçΩ±Ã¥»ÅùÖ¿¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘•ëÖëîΩ±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–àÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πç•—ÂÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Åç•—‰ËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâMÖπ—ΩÃà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘Õ—ÖëºΩ±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ—ï·–àÅ…ï≈’•…ïêÅµÖ·1ïπù—†ıÏ…Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥πÕ—Ö—ïÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞ÅÕ—Ö—îËÅîπ—Ö…ùï–πŸÖ±’îπ—ΩU¡¡ï…ÖÕî†§ÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâM@à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâù…•êÅù…•êµçΩ±Ã¥ƒÅÕ¥Èù…•êµçΩ±Ã¥»ÅùÖ¿¥–à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘Mïπ°ÑÄ®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ¡ÖÕÕ›Ω…êàÅ…ï≈’•…ïêÅµ•π1ïπù—†ıÏ·Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥π¡ÖÕÕ›Ω…ëÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Å¡ÖÕÕ›Ω…êËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»Ùâ5•∏∏Ä‡ÅçÖ…Öç—ï…ïÃà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙââ±Ωç¨Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿Åµà¥ƒà˘Ωπô•…µÖ»ÅMïπ°ÑÄ®Ω±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâ¡ÖÕÕ›Ω…êàÅ…ï≈’•…ïêÅµ•π1ïπù—†ıÏ·Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅŸÖ±’îıÌôΩ…¥π¡ÖÕÕ›Ω…ë}çΩπô•…µÙÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Å¡ÖÕÕ›Ω…ë}çΩπô•…¥ËÅîπ—Ö…ùï–πŸÖ±’îÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâΩ…ëï»¥»ÅâΩ…ëï»µù…Ö‰¥»¿¿Å…Ω’πëïêµ·∞Å¿¥ÃÅôΩç’ÃÈâΩ…ëï»µlçŸ¿¡tÅΩ’—±•πîµπΩπîà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ¡±Öçï°Ω±ëï»ÙâIï¡•—ÑÅÑÅÕïπ°Ñà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ±Öâï∞Åç±ÖÕÕ9ÖµîÙâô±ï‡ÅùÖ¿¥ÃÅ…Ω’πëïêµ·∞ÅâΩ…ëï»ÅâΩ…ëï»µlçî…âôà¡tÅâúµlçôôò·òŸtÅ¿¥–Å—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µù…Ö‰¥‹¿¿à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•π¡’–4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâç°ïç≠âΩ‡à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ…ï≈’•…ïê4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç°ïç≠ïêıÌôΩ…¥π—ï…µÕ}Öççï¡—ïëÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅΩπ°ÖπùîıÌîÄÙ¯ÅÕï—Ω…¥°¿ÄÙ¯Ä°ÏÄ∏∏π¿∞Å—ï…µÕ}Öççï¡—ïêËÅîπ—Ö…ùï–πç°ïç≠ïêÅÙ§•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâµ–¥ƒÅ†¥–Å‹¥–ÅÕ°…•π¨¥¿ÅÖççïπ–µlçŸ¿¡tà4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒÕ¡Ö∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ1§ÅîÅÖçï•—ºÅΩÕÏàÄâÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ1•π¨Å°…ïòÙàΩ—ï…µΩÃµëîµ’ÕºàÅ—Ö…ùï–Ùâ}â±Öπ¨àÅç±ÖÕÕ9ÖµîÙâ—ï·–µlçŸ¿¡tÅ’πëï…±•πîÅ’πëï…±•πîµΩôôÕï–¥»à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅQï…µΩÃÅëîÅUÕºÅîÅÑÅAΩ±•—•çÑÅëîÅA…•ŸÖç•ëÖëîÅëºÅMÖπë·¡…ïÕÃ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩ1•π¨¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ∞Å•πç±’•πëºÅºÅ…ïù•Õ—…ºÅëºÅÖçï•—îÅçΩ¥ÅëÖ—ÑÅîÅ°Ω…ÑÅîÅºÅ’ÕºÅëΩÃÅëÖëΩÃÅëºÅçÖëÖÕ—…ºÅ¡Ö…ÑÅΩ¡ï…ÖçÖº∞Å¡ïë•ëΩÃ∞Å…ï±Ö—Ω…•ΩÃÅîÅÕ’¡Ω…—î∏4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩÕ¡Ö∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩ±Öâï∞¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïù•Õ—ï………Ω»ÄòòÄ†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâ…Ω’πëïêµ·∞ÅâΩ…ëï»ÅâΩ…ëï»µ…ïê¥»¿¿Åâúµ…ïê¥‘¿Å¡‡¥–Å¡‰¥ÃÅ—ï·–µÕ¥ÅôΩπ–µâΩ±êÅ—ï·–µ…ïê¥‹¿¿à¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ…ïù•Õ—ï………Ω…Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù4(4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅ—Â¡îÙâÕ’âµ•–à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅë•ÕÖâ±ïêıÌ±ΩÖë•πùÙ4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹µô’±∞ÅâúµlçŸ¿¡tÅ—ï·–µ›°•—îÅôΩπ–µâΩ±êÅ¡‰¥–Å…Ω’πëïêµ·∞Å—ï·–µ±úÅÕ°ÖëΩ‹µµêÅÖç—•ŸîÈÕçÖ±î¥‰‘Å—…ÖπÕ•—•Ω∏µÖ±∞Å°ΩŸï»Èâúµlç‘ÿ¿¿¡tÅë•ÕÖâ±ïêÈΩ¡Öç•—‰¥‘¿Åô±ï‡Å•—ïµÃµçïπ—ï»Å©’Õ—•ô‰µçïπ—ï»ÅùÖ¿¥»à4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÌ±ΩÖë•πúÄ¸Ä†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâ‹¥‘Å†¥‘ÅâΩ…ëï»¥»ÅâΩ…ëï»µ›°•—îÅâΩ…ëï»µ–µ—…ÖπÕ¡Ö…ïπ–Å…Ω’πëïêµô’±∞ÅÖπ•µÖ—îµÕ¡•∏àÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ§ÄËÄ†4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ˘…•Ö»ÅΩπ—ÑÅÀÖ—•ÃÄÒ°ïŸ…ΩπI•ù°–ÅÕ•ÈîıÏ»¡ÙÄº¯º¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩôΩ…¥¯4(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄº¯4(ÄÄÄÄÄÄÄÄÄÄÄÄ•Ù4(ÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄÄÄΩë•ÿ¯4(ÄÄÄÄÄÄ•Ù4(ÄÄÄÄΩë•ÿ¯4(ÄÄ§Ï4)Ù4(
+                <h3 className="font-bold text-lg mb-2 text-[#2d1b14]">{b.title}</h3>
+                <p className="text-[#6b3a28] text-sm leading-relaxed">{b.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Planos */}
+      <section id="planos" className="landing-pricing py-16 sm:py-24 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto text-center">
+           <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#ff6b00]">Planos SandExpress</p>
+           <h2 className="text-4xl font-display font-bold text-[#FFF8F6] mb-4">Escolha seu ponto de partida</h2>
+           <p className="text-xl text-[#f4d6c8] mb-16">Comece com {planSettings.trial_days} dias gr√°tis. Todos os planos incluem at√© {planSettings.max_umbrellas} guarda-s√≥is.</p>
+           
+           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-6xl mx-auto text-left">
+              {/* Trial */}
+              <div className="landing-plan-card p-7 sm:p-8 rounded-[40px]">
+                 <h3 className="text-2xl font-bold mb-2 text-[#fff8f6]">Trial</h3>
+                 <p className="text-[#f4d6c8] mb-6 font-semibold">Para conhecer a plataforma</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#FF6B00]">R$0</span><span className="landing-price-unit text-[#fff8f6]">/{planSettings.trial_days} dias</span></div>
+                 <ul className="space-y-3 mb-8">
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> At√© {planSettings.max_umbrellas} guarda-s√≥is</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Todas as funcionalidades</li>
+                 </ul>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gr√°tis</button>
+              </div>
+
+              {/* Trimestral */}
+              <div className="landing-plan-card landing-plan-card--featured p-7 sm:p-8 rounded-[40px]">
+                 <h3 className="text-2xl font-bold mb-2">Trimestral</h3>
+                 <p className="mb-6 font-black">Ideal para testar a temporada</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-white">{formatPlanPriceLabel(planSettings.quarterly_price)}</span><span className="landing-price-unit text-[#201411]">/M√™s</span></div>
+                 <ul className="space-y-3 mb-8">
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> At√© {planSettings.max_umbrellas} guarda-s√≥is</li>
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2"><CheckCircle2 className="shrink-0"/> Relat√≥rios completos</li>
+                 </ul>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold bg-[#451704] text-white hover:bg-[#301107] transition-colors">Cadastrar gr√°tis</button>
+              </div>
+
+              {/* Semestral */}
+              <div className="landing-plan-card p-7 sm:p-8 rounded-[40px]">
+                 <h3 className="text-2xl font-bold mb-2 text-[#fff8f6]">Semestral</h3>
+                 <p className="text-[#f4d6c8] mb-6 font-semibold">Para garantir sua temporada</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#FF6B00]">{formatPlanPriceLabel(planSettings.semester_price)}</span><span className="landing-price-unit text-[#fff8f6]">/M√™s</span></div>
+                 <ul className="space-y-3 mb-8">
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> At√© {planSettings.max_umbrellas} guarda-s√≥is</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Relat√≥rios completos</li>
+                 </ul>
+                 <button onClick={openModal} className="w-full py-4 rounded-xl font-bold border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">Cadastrar gr√°tis</button>
+              </div>
+
+              {/* Anual */}
+              <div className="landing-plan-card landing-plan-card--dark p-7 sm:p-8 rounded-[40px] text-[#fff8f6] relative scale-105">
+                 <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-1 rounded-full text-sm font-bold uppercase">Mais Escolhido</div>
+                 <h3 className="text-2xl font-bold mb-2">Anual</h3>
+                 <p className="text-[#ff9b50] mb-6 font-semibold">Para quem quer faturar o ano todo</p>
+                 <div className="landing-price-row mb-6"><span className="landing-price-value font-display text-[#fff8f6]">{formatPlanPriceLabel(planSettings.annual_monthly_price)}</span><span className="landing-price-unit text-[#fff8f6]">/M√™s</span></div>
+                 <ul className="space-y-3 mb-8">
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> At√© {planSettings.max_umbrellas} guarda-s√≥is</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> Pedidos ilimitados</li>
+                   <li className="flex gap-2 text-[#fff8f6]"><CheckCircle2 className="text-[#FF6B00] shrink-0"/> QR codes personalizados</li>
+                 </ul>
+                 <button onClick={openModal} className="w-full py-4 bg-[#FF6B00] text-white rounded-xl font-bold shadow-md hover:bg-[#d85a00] transition-colors">Cadastrar gr√°tis</button>
+              </div>
+           </div>
+        </div>
+      </section>
+
+      {/* CTA Secund√°rio */}
+      <section className="bg-gradient-to-r from-[#5d3323] via-[#3a2118] to-[#2d1b14] py-16 sm:py-20 px-4 sm:px-6 text-center text-white">
+        <h2 className="text-4xl font-display font-bold mb-6">Pronto para transformar seu atendimento?</h2>
+        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">Comece agora com {planSettings.trial_days} dias gr√°tis. N√£o precisa cart√£o de cr√©dito.</p>
+        <button onClick={openModal} className="bg-[#FF6B00] text-white px-10 py-5 rounded-full font-bold text-xl shadow-xl hover:bg-[#E56000] active:scale-95 transition-all">
+           Cadastrar gr√°tis
+        </button>
+      </section>
+
+      <footer className="bg-[#231916] py-12 text-center text-[#FFDBCB] text-sm font-semibold border-t border-[#3D1A0A]">
+         <p>¬© {new Date().getFullYear()} SandExpress. Todos os direitos reservados.</p>
+      </footer>
+
+      {/* ========== MODAL DE CADASTRO ========== */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            {regSuccess ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={32} className="text-green-600" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-gray-900 mb-2">Cadastro realizado!</h3>
+                <p className="text-gray-500 mb-6">Seu quiosque foi criado com {planSettings.trial_days} dias gr√°tis. Acesse o painel para configurar seu card√°pio.</p>
+                {regCredentials && (
+                  <div className="mb-6 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-left">
+                    <p className="text-sm font-black text-[#572000]">Dados de acesso do quiosque</p>
+                    <p className="mt-2 text-sm text-gray-700">Usu√°rio: <strong>{regCredentials.login}</strong></p>
+                    <p className="text-sm text-gray-700">Senha: <strong>a senha que voc√™ acabou de criar</strong></p>
+                    <p className="mt-3 text-sm text-gray-700">
+                      {regCredentials.emailSent
+                        ? "Enviamos um email confirmando o cadastro."
+                        : "Email de confirma√ß√£o n√£o enviado. Configure RESEND_API_KEY para disparos reais."}
+                    </p>
+                  </div>
+                )}
+                <Link
+                  href="/vendor/login"
+                  className="inline-flex items-center gap-2 bg-[#FF6B00] text-white px-8 py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#E56000] active:scale-95 transition-all"
+                >
+                  Acessar Painel <ChevronRight size={20} />
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center p-6 border-b border-gray-100">
+                  <div>
+                    <h3 className="text-xl font-display font-bold text-gray-900">Teste Gr√°tis {planSettings.trial_days} dias</h3>
+                    <p className="text-sm text-gray-500">Sem cart√£o de cr√©dito</p>
+                  </div>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                </div>
+                <form onSubmit={handleRegister} className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Nome do Respons√°vel *</label>
+                    <input
+                      type="text" required
+                      value={form.owner_name} onChange={e => setForm(p => ({ ...p, owner_name: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="Seu nome completo"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp *</label>
+                    <input
+                      type="tel" required
+                      value={form.owner_phone} onChange={e => setForm(p => ({ ...p, owner_phone: e.target.value.replace(/\D/g, '') }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Email de Recuperacao *</label>
+                    <input
+                      type="email" required
+                      value={form.owner_email} onChange={e => setForm(p => ({ ...p, owner_email: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="voc√™@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Nome do Quiosque *</label>
+                    <input
+                      type="text" required
+                      value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="Ex: Quiosque do Sol"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Praia *</label>
+                    <input
+                      type="text" required
+                      value={form.beach_name} onChange={e => setForm(p => ({ ...p, beach_name: e.target.value }))}
+                      className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                      placeholder="Ex: Praia das Pitangueiras"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">CPF</label>
+                      <input
+                        type="text"
+                        value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="000.000.000-00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">CNPJ</label>
+                      <input
+                        type="text"
+                        value={form.cnpj} onChange={e => setForm(p => ({ ...p, cnpj: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="00.000.000/0001-00"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Cidade</label>
+                      <input
+                        type="text" required
+                        value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Santos"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Estado</label>
+                      <input
+                        type="text" required maxLength={2}
+                        value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value.toUpperCase() }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="SP"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Min. 8 caracteres"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Confirmar Senha *</label>
+                      <input
+                        type="password" required minLength={8}
+                        value={form.password_confirm} onChange={e => setForm(p => ({ ...p, password_confirm: e.target.value }))}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
+                        placeholder="Repita a senha"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex gap-3 rounded-xl border border-[#e2bfb0] bg-[#fff8f6] p-4 text-sm font-bold text-gray-700">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={form.terms_accepted}
+                      onChange={e => setForm(p => ({ ...p, terms_accepted: e.target.checked }))}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[#FF6B00]"
+                    />
+                    <span>
+                      Li e aceito os{" "}
+                      <Link href="/termos-de-uso" target="_blank" className="text-[#FF6B00] underline underline-offset-2">
+                        Termos de Uso e a Pol√≠tica de Privacidade do SandExpress
+                      </Link>
+                      , incluindo o registro do aceite com data e hora e o uso dos dados do cadastro para opera√ß√£o, pedidos, relat√≥rios e suporte.
+                    </span>
+                  </label>
+                  {registerError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                      {registerError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-xl text-lg shadow-md active:scale-95 transition-all hover:bg-[#E56000] disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>Criar Conta Gr√°tis <ChevronRight size={20} /></>
+                    )}
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

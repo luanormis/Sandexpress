@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 import { getSessionSecret } from './runtime-config';
 
-export type SessionRole = 'admin' | 'vendor' | 'owner_sales' | 'customer' | 'user';
+export type SessionRole = 'admin' | 'vendor' | 'customer' | 'user';
 
 export type SessionPayload = {
   role: SessionRole;
@@ -10,6 +10,7 @@ export type SessionPayload = {
   customer_id?: string;
   umbrella_id?: string;
   user_id?: string;
+  user_role?: 'owner' | 'manager' | 'seller';
   tenant_id?: string;
   exp: number;
 };
@@ -61,21 +62,16 @@ export function verifySessionToken(token?: string | null): SessionPayload | null
 }
 
 export function getRequestSession(req: NextRequest): SessionPayload | null {
-  const vendorSession = verifySessionToken(req.cookies.get('vendor_session')?.value);
-  if (vendorSession) return vendorSession;
-
   const adminSession = verifySessionToken(req.cookies.get('admin_session')?.value);
   if (adminSession) return adminSession;
+
+  const vendorSession = verifySessionToken(req.cookies.get('vendor_session')?.value);
+  if (vendorSession) return vendorSession;
 
   const customerSession = verifySessionToken(req.cookies.get('customer_session')?.value);
   if (customerSession) return customerSession;
 
   return null;
-}
-
-export function getOwnerSalesSession(req: NextRequest): SessionPayload | null {
-  const session = verifySessionToken(req.cookies.get('owner_sales_session')?.value);
-  return session?.role === 'owner_sales' && session.vendor_id ? session : null;
 }
 
 export function resolveTenantIdFromSession(session: SessionPayload | null): string | null {

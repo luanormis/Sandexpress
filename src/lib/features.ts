@@ -16,10 +16,20 @@ export const CORE_FEATURE_KEYS = [
   'cleaning_request',
   'umbrella_transfer',
   'vip_areas',
-  'beach_operations',
+  'system_full',
+  'inventory',
+  'financial',
+  'menu_management',
+  'team_management',
+  'branding',
+  'printer_management',
+  'owner_master_dashboard',
+  'crm_customers',
+  'crm_promotions',
 ] as const;
 
 export const OPTIONAL_FEATURE_KEYS = [
+  'waiter_service',
   'restaurant',
   'internal_tables',
   'food_court',
@@ -42,6 +52,15 @@ type TenantFeatureRow = {
   enabled: boolean | null;
 };
 
+const FEATURE_CACHE_TTL_MS = 30_000;
+const vendorFeatureCache = new Map<string, { expiresAt: number; enabled: boolean }>();
+const vendorFeatureInFlight = new Map<string, Promise<boolean>>();
+
+export function clearVendorFeatureCache(vendorId: string, featureKey?: FeatureKey) {
+  if (featureKey) vendorFeatureCache.delete(`${vendorId}:${featureKey}`);
+  else for (const key of vendorFeatureCache.keys()) if (key.startsWith(`${vendorId}:`)) vendorFeatureCache.delete(key);
+}
+
 export const FEATURE_LABELS: Record<FeatureKey, string> = {
   login: 'Login',
   multi_tenant: 'Multi Tenant',
@@ -58,7 +77,17 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   cleaning_request: 'Solicitar Limpeza',
   umbrella_transfer: 'Troca de Guarda-Sol',
   vip_areas: 'Areas VIP',
-  beach_operations: 'Operação simplificada de barraca',
+  system_full: 'Sistema completo',
+  inventory: 'Estoque',
+  financial: 'Financeiro e relatorios',
+  menu_management: 'Gestao do cardapio',
+  team_management: 'Equipe',
+  branding: 'Personalizacao',
+  printer_management: 'Impressoras',
+  owner_master_dashboard: 'Dashboard Master do proprietario',
+  crm_customers: 'CRM de clientes',
+  crm_promotions: 'CRM de promocoes',
+  waiter_service: 'Atendimento exclusivo do garcom',
   restaurant: 'Restaurante Tradicional',
   internal_tables: 'Mesas Internas',
   food_court: 'Praca de Alimentacao',
@@ -77,9 +106,6 @@ export const DEFAULT_FEATURES = FEATURE_KEYS.reduce((acc, key) => {
   return acc;
 }, {} as FeatureMap);
 
-function isMissingFeatureTable(error: { code?: string; message?: string } | null | undefined) {
-  return error?.code === '42P01' || error?.code === 'PGRST205' || error?.message?.includes('tenant_features');
-}
 
 export function sanitizeFeatureKey(value: unknown): FeatureKey | null {
   const key = String(value || '').trim();
@@ -93,7 +119,8 @@ export async function getVendorTenantId(vendorId: string): Promise<string | null
     .eq('id', vendorId)
     .single();
 
-  if (error || !data?.tenant_id) return null;
+  if (error) throw error;
+  if (!data?.tenant_id) return null;
   return data.tenant_id;
 }
 
@@ -104,10 +131,7 @@ export async function getTenantFeatureMap(tenantId: string): Promise<FeatureMap>
     .select('feature_key, enabled')
     .eq('tenant_id', tenantId);
 
-  if (error) {
-    if (isMissingFeatureTable(error)) return features;
-    throw error;
-  }
+  if (error) throw error;
 
   ((data || []) as TenantFeatureRow[]).forEach((row) => {
     const key = sanitizeFeatureKey(row.feature_key);
@@ -123,9 +147,25 @@ export async function featureEnabled(tenantId: string, featureKey: FeatureKey): 
 }
 
 export async function vendorFeatureEnabled(vendorId: string, featureKey: FeatureKey): Promise<boolean> {
+  const cacheKey = `${vendorId}:${featureKey}`;
+  const cached = vendorFeatureCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.enabled;
+  const pending = vendorFeatureInFlight.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
   const tenantId = await getVendorTenantId(vendorId);
-  if (!tenantId) return false;
-  return featureEnabled(tenantId, featureKey);
+    if (!tenantId) return false;
+    return featureEnabled(tenantId, featureKey);
+  })();
+  vendorFeatureInFlight.set(cacheKey, request);
+  try {
+    const enabled = await request;
+    vendorFeatureCache.set(cacheKey, { enabled, expiresAt: Date.now() + FEATURE_CACHE_TTL_MS });
+    return enabled;
+  } finally {
+    vendorFeatureInFlight.delete(cacheKey);
+  }
 }
 
 export function featureDisabledResponse(featureKey: FeatureKey) {
