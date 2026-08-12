@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Product, ProductImage } from "@/types";
-import { Upload } from "lucide-react";
+import { Search, Upload } from "lucide-react";
 
 interface ProductImageManagerProps {
   product: Product;
@@ -18,18 +18,28 @@ export function ProductImageManager({
   const [defaultImages, setDefaultImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(product.image_url || "");
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState("");
+  void isPlusUser;
+
+  const visibleImages = useMemo(() => {
+    const query = search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    if (!query) return defaultImages;
+    return defaultImages.filter(image => `${image.name} ${image.title} ${image.category}`
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(query));
+  }, [defaultImages, search]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchDefaultImages() {
       try {
-        const response = await fetch(`/api/products/gallery?category=${encodeURIComponent(product.category)}&planType=free`);
+        const response = await fetch('/api/products/gallery?planType=free');
         const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error || "Erro ao carregar imagens padrão.");
+        if (!response.ok) throw new Error(data?.error || "Erro ao carregar imagens padrao.");
         if (!cancelled) setDefaultImages((data?.data?.images || []) as ProductImage[]);
       } catch (err) {
-        console.error("Erro ao carregar imagens padrão:", err);
+        console.error("Erro ao carregar imagens padrao:", err);
         if (!cancelled) setDefaultImages([]);
       }
     }
@@ -38,7 +48,7 @@ export function ProductImageManager({
     return () => {
       cancelled = true;
     };
-  }, [product.category]);
+  }, []);
 
   const handleSelectDefault = (imageUrl: string) => {
     setSelectedImage(imageUrl);
@@ -49,33 +59,28 @@ export function ProductImageManager({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!isPlusUser) {
-      alert("Upload de imagens personalizadas esta disponivel apenas no plano Plus");
-      return;
-    }
-
     setLoading(true);
+    setMessage("");
 
     try {
-      const { supabase } = await import("@/lib/supabase");
-      const fileName = `products/${product.vendor_id}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: publicUrl } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(data.path);
-
-      setSelectedImage(publicUrl.publicUrl);
-      onImageSelected(publicUrl.publicUrl);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("vendor_id", product.vendor_id);
+      formData.append("category", product.category);
+      formData.append("title", product.name || file.name.replace(/\.[^.]+$/, ""));
+      const response = await fetch('/api/products/upload', { method: 'POST', body: formData });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) throw new Error(data.error || 'Erro ao enviar imagem.');
+      setSelectedImage(data.url);
+      onImageSelected(data.url);
+      if (data.image) setDefaultImages(prev => [data.image, ...prev.filter(image => image.id !== data.image.id)]);
+      setMessage("Imagem convertida e adicionada a galeria geral.");
     } catch (err) {
       console.error("Erro ao fazer upload:", err);
-      alert("Erro ao fazer upload da imagem");
+      setMessage(err instanceof Error ? err.message : "Erro ao fazer upload da imagem.");
     } finally {
       setLoading(false);
+      e.target.value = "";
     }
   };
 
@@ -94,12 +99,17 @@ export function ProductImageManager({
       )}
 
       <div>
-        <p className="text-sm font-medium text-gray-600 mb-2">Imagens Padrao (Gratis)</p>
-        <div className="grid grid-cols-3 gap-2">
-          {defaultImages.map((img) => (
+        <label htmlFor="shared-image-search" className="text-sm font-medium text-gray-600 mb-2 block">Galeria geral</label>
+        <div className="relative mb-3">
+          <Search aria-hidden="true" size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input id="shared-image-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar imagem" className="w-full rounded-lg border-2 border-gray-200 py-2 pl-10 pr-3" />
+        </div>
+        <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto">
+          {visibleImages.map((img) => (
             <button
               key={img.id}
               type="button"
+              aria-pressed={selectedImage === img.image_url}
               onClick={() => handleSelectDefault(img.image_url)}
               className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${
                 selectedImage === img.image_url
@@ -110,6 +120,8 @@ export function ProductImageManager({
               <img
                 src={img.image_url}
                 alt={img.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
               {selectedImage === img.image_url && (
@@ -120,13 +132,11 @@ export function ProductImageManager({
             </button>
           ))}
         </div>
+        {visibleImages.length === 0 && <p className="mt-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">Nenhuma imagem encontrada.</p>}
       </div>
 
-      {isPlusUser && (
-        <div>
-          <p className="text-sm font-medium text-gray-600 mb-2">
-            Imagem Personalizada (Plano Plus)
-          </p>
+      <div>
+          <p className="text-sm font-medium text-gray-600 mb-2">Enviar para a galeria geral</p>
           <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#FF6B00] transition-colors">
             <input
               type="file"
@@ -142,16 +152,9 @@ export function ProductImageManager({
               </span>
             </div>
           </label>
-        </div>
-      )}
-
-      {!isPlusUser && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-700">
-            Atualize para o Plano Plus para enviar imagens personalizadas.
-          </p>
-        </div>
-      )}
+          {message && <p role="status" className="mt-2 rounded-lg bg-orange-50 p-3 text-sm font-bold text-orange-800">{message}</p>}
+      </div>
     </div>
   );
 }
+
