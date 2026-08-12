@@ -2015,6 +2015,9 @@ export default function VendorDashboard() {
     );
   };
 
+  if (isBeachOperations && beachAccess === null) return <main className="grid min-h-screen place-items-center bg-gray-50 font-black">Validando liberação...</main>;
+  if (isBeachOperations && beachAccess === false) return <main className="grid min-h-screen place-items-center bg-gray-50 p-6 text-center"><div><h1 className="text-2xl font-black">Módulo ainda não liberado</h1><p className="mt-2 text-gray-600">Solicite ao administrador a versão simplificada para barraca.</p></div></main>;
+
   return (
     <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans" style={panelThemeStyle}>
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
@@ -4548,8 +4551,6 @@ function ProductModal({
 function CustomerModal({ customer, onClose }: { customer: Customer; onClose: () => void }) {
   const avgTicket = customer.visit_count > 0 ? customer.total_spent / customer.visit_count : 0;
 
-  if (isBeachOperations && beachAccess === null) return <main className="grid min-h-screen place-items-center bg-gray-50 font-black">Validando liberação...</main>;
-  if (isBeachOperations && beachAccess === false) return <main className="grid min-h-screen place-items-center bg-gray-50 p-6 text-center"><div><h1 className="text-2xl font-black">Módulo ainda não liberado</h1><p className="mt-2 text-gray-600">Solicite ao administrador a versão simplificada para barraca.</p></div></main>;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
