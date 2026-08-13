@@ -9,6 +9,9 @@ export type KioskPrinter = {
   connection?: 'browser' | 'network';
   host?: string;
   port?: number;
+  paperWidth?: 58 | 80;
+  columns?: number;
+  autoCut?: boolean;
 };
 
 export type PrintableOrderItem = { q: number; n: string; category?: string | null; subtotal?: number };
@@ -44,7 +47,10 @@ export function normalizePrinters(value: unknown): KioskPrinter[] {
     const port = Number(item.port || 9100);
     const connection = item.connection === 'network' && host ? 'network' as const : 'browser' as const;
     const routes = [...new Set((Array.isArray(item.routes) ? item.routes : [route]).filter(value => ['food', 'beverage', 'cashier'].includes(String(value))))] as PrinterRoute[];
-    return [{ id, name, route: routes[0] || route as PrinterRoute, routes: routes.length ? routes : [route as PrinterRoute], active: item.active !== false, connection, host, port: connection === 'network' && Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined }];
+    const paperWidth = item.paperWidth === 58 ? 58 : 80;
+    const defaultColumns = paperWidth === 58 ? 32 : 42;
+    const columns = Math.max(24, Math.min(64, Number(item.columns) || defaultColumns));
+    return [{ id, name, route: routes[0] || route as PrinterRoute, routes: routes.length ? routes : [route as PrinterRoute], active: item.active !== false, connection, host, port: connection === 'network' && Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined, paperWidth, columns, autoCut: item.autoCut === true }];
   });
 }
 
