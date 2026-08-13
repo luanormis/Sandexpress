@@ -7,11 +7,14 @@ import {
   Search, Clock, Trash2, Pencil, X, Upload, ImageIcon,
   Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
   Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
-  Volume2, CircleCheck, DollarSign,
+  Volume2, CircleCheck, DollarSign, Printer,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
+import FinancialAccounts from "@/components/vendor/FinancialAccounts";
+import OrderPrintButton from "@/components/vendor/OrderPrintButton";
+import PrinterManager from "@/components/vendor/PrinterManager";
 import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithoutConsumption } from "@/lib/vendor-order-state";
 import { DEFAULT_DEVICE_ALERT_PREFERENCES, readDeviceAlertPreferences, saveDeviceAlertPreferences, vibrateDevice, type DeviceAlertPreferences } from "@/lib/device-alert-preferences";
 
@@ -52,6 +55,7 @@ interface OrderItem {
   n: string;
   subtotal?: number;
   cancelled?: boolean;
+  category?: string | null;
 }
 interface OrderRequest {
   id: string;
@@ -515,6 +519,8 @@ const TABS = [
   { id: "menu", label: "Cardápio", icon: Utensils },
   { id: "qr", label: "Guarda-Sóis", icon: QrCode },
   { id: "payments", label: "Pagamentos", icon: CreditCard },
+  { id: "financial", label: "Contas", icon: DollarSign },
+  { id: "printers", label: "Impressoras", icon: Printer },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "theme", label: "Personalizacao", icon: Palette },
   { id: "customers", label: "Clientes", icon: Users },
@@ -527,7 +533,7 @@ const TABS = [
 export default function VendorDashboard() {
   const pathname = usePathname();
   const isBeachOperations = pathname.startsWith("/vendor/operations");
-  const visibleTabs = isBeachOperations ? TABS.filter(tab => ["orders", "stock", "reports", "printers"].includes(tab.id)) : TABS;
+  const visibleTabs = isBeachOperations ? TABS.filter(tab => ["orders", "stock", "financial", "reports", "printers"].includes(tab.id)) : TABS;
   const [beachAccess, setBeachAccess] = useState<boolean | null>(isBeachOperations ? null : true);
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
@@ -2798,6 +2804,10 @@ export default function VendorDashboard() {
             </form>
           )}
 
+          {activeTab === "financial" && vendorId && <FinancialAccounts vendorId={vendorId} />}
+
+          {activeTab === "printers" && vendorId && <PrinterManager vendorId={vendorId} />}
+
           {activeTab === "reports" && (
             <div className="vendor-sales-surface space-y-6 rounded-2xl border border-[#e5c2ae] bg-[#fff3ec] p-3 text-[#2d1b14] sm:p-5">
               <div className="bg-white border border-[#e5c2ae] shadow-sm rounded-2xl p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -3481,6 +3491,7 @@ export default function VendorDashboard() {
       {selectedOrder && (
         <OrderModal
           order={selectedOrder}
+          vendorId={vendorId || ""}
           onClose={() => setSelectedOrder(null)}
           onMove={moveOrder}
           onPaid={markAccountPaid}
@@ -3743,6 +3754,7 @@ function CashControlModal({ mode, cashControl, cashSales, submitting, onClose, o
 
 function OrderModal({
   order,
+  vendorId,
   onClose,
   onMove,
   onPaid,
@@ -3752,6 +3764,7 @@ function OrderModal({
   onAddItems,
 }: {
   order: Order;
+  vendorId: string;
   onClose: () => void;
   onMove: (id: string, status: string) => Promise<void>;
   onPaid: (order: Order) => Promise<void>;
@@ -3869,6 +3882,7 @@ function OrderModal({
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 border-t border-gray-100 p-4 sm:grid-cols-2 sm:p-6">
+          {vendorId && !emptyAccount && <OrderPrintButton vendorId={vendorId} order={order} />}
           {!order.paid && order.status !== 'closing_requested' && (
             <button onClick={() => onAddItems(order)} className="min-h-12 rounded-xl bg-blue-600 py-3 font-black text-white hover:bg-blue-700">
               <span className="inline-flex items-center gap-2"><Utensils size={18} /> Lancar itens</span>
