@@ -33,7 +33,11 @@ export const DEFAULT_PLATFORM_PLAN_SETTINGS: PlatformPlanSettings = {
 };
 
 export function toPlanMoney(value: unknown, fallback: number) {
-  const numeric = Number(String(value ?? '').replace(',', '.'));
+  const raw = String(value ?? '').trim();
+  const normalized = typeof value === 'number' || !raw.includes(',')
+    ? raw
+    : raw.replace(/\./g, '').replace(',', '.');
+  const numeric = Number(normalized);
   if (!Number.isFinite(numeric) || numeric < 0) return fallback;
   return Number(numeric.toFixed(2));
 }

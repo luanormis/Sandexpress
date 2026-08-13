@@ -10,6 +10,7 @@ import {
   Volume2, CircleCheck, DollarSign,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithoutConsumption } from "@/lib/vendor-order-state";
 import { DEFAULT_DEVICE_ALERT_PREFERENCES, readDeviceAlertPreferences, saveDeviceAlertPreferences, vibrateDevice, type DeviceAlertPreferences } from "@/lib/device-alert-preferences";
@@ -857,7 +858,7 @@ export default function VendorDashboard() {
       if (res.ok) {
         const goal = Number(data.daily_goal || 0);
         setDailySalesGoal(goal);
-        setDailySalesGoalDraft(goal > 0 ? String(goal) : "");
+        setDailySalesGoalDraft(goal > 0 ? formatBrazilianMoneyInput(goal) : "");
       }
     } catch (err) {
       console.error('Failed to load daily sales goal:', err);
@@ -912,8 +913,8 @@ export default function VendorDashboard() {
 
   const saveDailySalesGoal = async () => {
     if (!vendorId) return;
-    const goal = Number(String(dailySalesGoalDraft).replace(',', '.'));
-    if (!Number.isFinite(goal) || goal < 0) {
+    const goal = parseBrazilianMoneyInput(dailySalesGoalDraft);
+    if (goal === null) {
       setDailyGoalMessage("Informe um valor valido.");
       return;
     }
@@ -928,7 +929,7 @@ export default function VendorDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Nao foi possivel salvar a meta.');
       setDailySalesGoal(Number(data.daily_goal || 0));
-      setDailySalesGoalDraft(data.daily_goal > 0 ? String(data.daily_goal) : "");
+      setDailySalesGoalDraft(data.daily_goal > 0 ? formatBrazilianMoneyInput(Number(data.daily_goal)) : "");
       setEditingDailyGoal(false);
       setDailyGoalMessage("Meta atualizada.");
     } catch (error) {
@@ -1925,7 +1926,7 @@ export default function VendorDashboard() {
         {editingDailyGoal && (
           <div className="mt-4 flex flex-col gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-xs font-black uppercase text-gray-700">Meta de faturamento por dia
-              <input type="number" min="0" step="0.01" value={dailySalesGoalDraft} onChange={event => setDailySalesGoalDraft(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border-2 border-white bg-white px-3 text-base font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder="Ex.: 3000,00" />
+              <input type="text" inputMode="numeric" value={dailySalesGoalDraft} onChange={event => setDailySalesGoalDraft(maskBrazilianMoneyInput(event.target.value))} className="mt-1 min-h-11 w-full rounded-xl border-2 border-white bg-white px-3 text-base font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder="0,00" aria-label="Meta diaria em reais" />
             </label>
             <button type="button" onClick={saveDailySalesGoal} disabled={savingDailyGoal} className="min-h-11 rounded-xl bg-[#FF6B00] px-5 font-black text-white hover:bg-[#E56000] disabled:opacity-60">{savingDailyGoal ? "Salvando..." : "Salvar meta"}</button>
           </div>
@@ -2765,11 +2766,12 @@ export default function VendorDashboard() {
                         <label className="space-y-2">
                           <span className="text-xs font-black uppercase text-gray-500">{feeType === "fixed" ? "Valor fixo" : "Percentual"}</span>
                           <input
-                            type="number"
+                            type={feeType === "fixed" ? "text" : "number"}
+                            inputMode={feeType === "fixed" ? "numeric" : "decimal"}
                             min="0"
                             step="0.01"
-                            value={Number(themeForm[(feeType === "fixed" ? fixedField : feeField) as keyof KioskTheme] || 0)}
-                            onChange={(event) => setThemeForm(prev => ({ ...prev, [feeType === "fixed" ? fixedField : feeField]: Number(event.target.value) || 0 }))}
+                            value={feeType === "fixed" ? formatBrazilianMoneyInput(Number(themeForm[fixedField as keyof KioskTheme] || 0)) : Number(themeForm[feeField as keyof KioskTheme] || 0)}
+                            onChange={(event) => setThemeForm(prev => ({ ...prev, [feeType === "fixed" ? fixedField : feeField]: feeType === "fixed" ? (parseBrazilianMoneyInput(maskBrazilianMoneyInput(event.target.value)) ?? 0) : (Number(event.target.value) || 0) }))}
                             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-black outline-none focus:border-[#ff6b00]"
                             aria-label={`${label} ${feeType === "fixed" ? "valor fixo" : "percentual"}`}
                           />
@@ -4124,6 +4126,8 @@ function ProductModal({
     stock_quantity: null, physical_stock_quantity: 0, beach_stock_quantity: 0, blocked_by_stock: false,
     sort_order: 99,
   });
+  const [priceInput, setPriceInput] = useState(() => formatBrazilianMoneyInput(product?.price ?? 0));
+  const [promotionalPriceInput, setPromotionalPriceInput] = useState(() => formatBrazilianMoneyInput(product?.promotional_price));
   const [hasOptions, setHasOptions] = useState(() => Boolean(product?.option_group_name || product?.option_values?.length));
   const [optionGroups, setOptionGroups] = useState<Array<{ name: string; options: string[] }>>(() => {
     const values = Array.isArray(product?.option_values) ? product.option_values.filter(Boolean) : [];
@@ -4321,8 +4325,8 @@ function ProductModal({
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Preço Normal *</label>
               <input
-                type="number" step="0.01" required
-                value={form.price || ""} onChange={e => setForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                type="text" inputMode="numeric" required
+                value={priceInput} onChange={e => { const masked = maskBrazilianMoneyInput(e.target.value); setPriceInput(masked); setForm(prev => ({ ...prev, price: parseBrazilianMoneyInput(masked) ?? 0 })); }}
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                 placeholder="R$ 0,00"
               />
@@ -4330,8 +4334,8 @@ function ProductModal({
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Preço Promocional</label>
               <input
-                type="number" step="0.01"
-                value={form.promotional_price || ""} onChange={e => setForm(prev => ({ ...prev, promotional_price: parseFloat(e.target.value) || null }))}
+                type="text" inputMode="numeric"
+                value={promotionalPriceInput} onChange={e => { const masked = maskBrazilianMoneyInput(e.target.value); setPromotionalPriceInput(masked); setForm(prev => ({ ...prev, promotional_price: parseBrazilianMoneyInput(masked) })); }}
                 className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-[#FF6B00] outline-none"
                 placeholder="Opcional"
               />
