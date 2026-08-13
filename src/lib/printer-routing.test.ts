@@ -1,4 +1,4 @@
-import { isBeverageCategory, normalizePrinters, routeOrderItems } from './printer-routing';
+import { buildPrintJobs, isBeverageCategory, normalizePrinters, routeOrderItems } from './printer-routing';
 
 describe('printer routing', () => {
   it('recognizes beverage categories without depending on accents', () => {
@@ -17,4 +17,12 @@ describe('printer routing', () => {
   it('rejects malformed persisted configuration', () => {
     expect(normalizePrinters([{ id: '1', name: 'Cozinha', route: 'food' }, { name: '', route: 'cashier' }])).toHaveLength(1);
   });
+
+  it('allows one printer to receive every destination', () => {
+    const printers = normalizePrinters([{ id: '1', name: 'Termica geral', route: 'food', routes: ['food', 'beverage', 'cashier'] }]);
+    const jobs = buildPrintJobs(printers, [{ q: 1, n: 'Agua', category: 'Bebidas' }, { q: 1, n: 'Porcao', category: 'Porcoes' }]);
+    expect(jobs.map(job => job.route)).toEqual(['food', 'beverage', 'cashier']);
+    expect(jobs[2].items).toHaveLength(2);
+  });
 });
+
