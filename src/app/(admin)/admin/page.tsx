@@ -8,6 +8,7 @@ import {
   Upload, ImageIcon,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { formatBrazilianMoneyInput, maskBrazilianMoneyInput } from "@/lib/brazilian-money";
 import { ADMIN_UMBRELLA_LIMIT, DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
 
 // ---------- TYPES ----------
@@ -214,9 +215,9 @@ export default function AdminDashboard() {
   const [dangerLoading, setDangerLoading] = useState<"customers" | "kiosk" | null>(null);
   const [planSettings, setPlanSettings] = useState<PlatformPlanSettings>(DEFAULT_PLATFORM_PLAN_SETTINGS);
   const [planForm, setPlanForm] = useState({
-    quarterly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.quarterly_price),
-    semester_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.semester_price),
-    annual_monthly_price: String(DEFAULT_PLATFORM_PLAN_SETTINGS.annual_monthly_price),
+    quarterly_price: formatBrazilianMoneyInput(DEFAULT_PLATFORM_PLAN_SETTINGS.quarterly_price),
+    semester_price: formatBrazilianMoneyInput(DEFAULT_PLATFORM_PLAN_SETTINGS.semester_price),
+    annual_monthly_price: formatBrazilianMoneyInput(DEFAULT_PLATFORM_PLAN_SETTINGS.annual_monthly_price),
     trial_days: String(DEFAULT_PLATFORM_PLAN_SETTINGS.trial_days),
     max_umbrellas: String(DEFAULT_PLATFORM_PLAN_SETTINGS.max_umbrellas),
   });
@@ -382,9 +383,9 @@ export default function AdminDashboard() {
   const applyPlanSettings = (settings: PlatformPlanSettings) => {
     setPlanSettings(settings);
     setPlanForm({
-      quarterly_price: String(settings.quarterly_price),
-      semester_price: String(settings.semester_price),
-      annual_monthly_price: String(settings.annual_monthly_price),
+      quarterly_price: formatBrazilianMoneyInput(settings.quarterly_price),
+      semester_price: formatBrazilianMoneyInput(settings.semester_price),
+      annual_monthly_price: formatBrazilianMoneyInput(settings.annual_monthly_price),
       trial_days: String(settings.trial_days),
       max_umbrellas: String(settings.max_umbrellas),
     });
@@ -1763,8 +1764,8 @@ export default function AdminDashboard() {
                     <span className="text-gray-400 font-bold">R$</span>
                     <input
                       value={planForm.quarterly_price}
-                      onChange={e => setPlanForm(p => ({ ...p, quarterly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
-                      inputMode="decimal"
+                      onChange={e => setPlanForm(p => ({ ...p, quarterly_price: maskBrazilianMoneyInput(e.target.value) }))}
+                      inputMode="numeric"
                       className="w-full bg-transparent p-3 text-white outline-none"
                       placeholder="499,99"
                     />
@@ -1776,8 +1777,8 @@ export default function AdminDashboard() {
                     <span className="text-gray-400 font-bold">R$</span>
                     <input
                       value={planForm.semester_price}
-                      onChange={e => setPlanForm(p => ({ ...p, semester_price: e.target.value.replace(/[^\d,.]/g, "") }))}
-                      inputMode="decimal"
+                      onChange={e => setPlanForm(p => ({ ...p, semester_price: maskBrazilianMoneyInput(e.target.value) }))}
+                      inputMode="numeric"
                       className="w-full bg-transparent p-3 text-white outline-none"
                       placeholder="399,99"
                     />
@@ -1789,8 +1790,8 @@ export default function AdminDashboard() {
                     <span className="text-gray-400 font-bold">R$</span>
                     <input
                       value={planForm.annual_monthly_price}
-                      onChange={e => setPlanForm(p => ({ ...p, annual_monthly_price: e.target.value.replace(/[^\d,.]/g, "") }))}
-                      inputMode="decimal"
+                      onChange={e => setPlanForm(p => ({ ...p, annual_monthly_price: maskBrazilianMoneyInput(e.target.value) }))}
+                      inputMode="numeric"
                       className="w-full bg-transparent p-3 text-white outline-none"
                       placeholder="299,99"
                     />

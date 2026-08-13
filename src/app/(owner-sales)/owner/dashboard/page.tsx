@@ -4,6 +4,7 @@ import { AlertTriangle, LogOut, Package, RefreshCw, ShoppingBag, Target, Trendin
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
+import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from '@/lib/brazilian-money';
 
 type Dashboard = {
   vendor: { name: string; owner_name: string };
@@ -28,7 +29,7 @@ export default function OwnerSalesDashboard() {
       if (response.status === 401) return router.replace('/owner/login');
       if (!response.ok) throw new Error(result.error || 'Erro ao carregar painel.');
       setData(result);
-      setGoal(String(result.sales.daily_goal || ''));
+      setGoal(result.sales.daily_goal > 0 ? formatBrazilianMoneyInput(result.sales.daily_goal) : '');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Erro ao carregar painel.');
     } finally {
@@ -43,7 +44,9 @@ export default function OwnerSalesDashboard() {
   }, [load]);
 
   async function saveGoal() {
-    const response = await fetch('/api/owner-sales/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ daily_goal: Number(goal) }) });
+    const parsedGoal = parseBrazilianMoneyInput(goal);
+    if (parsedGoal === null) return setError('Informe uma meta valida no formato 0,00.');
+    const response = await fetch('/api/owner-sales/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ daily_goal: parsedGoal }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return setError(result.error || 'Erro ao salvar meta.');
     await load();
@@ -71,7 +74,7 @@ export default function OwnerSalesDashboard() {
         ].map(card => <article key={card.label} className="rounded-2xl border bg-white p-5 shadow-sm"><card.icon className="text-[#FF6B00]" /><p className="mt-4 text-sm font-bold text-gray-500">{card.label}</p><p className="mt-1 text-2xl font-black">{card.value}</p></article>)}
       </section>
       <section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-xl font-black">Meta de vendas do dia</h2><p className="text-sm text-gray-500">{(data?.sales.goal_progress || 0).toFixed(0)}% alcançada</p></div><div className="flex gap-2"><input type="number" min="0" step="10" value={goal} onChange={event => setGoal(event.target.value)} placeholder="Meta em R$" className="min-h-11 w-40 rounded-xl border-2 px-3" /><button onClick={saveGoal} className="rounded-xl bg-[#FF6B00] px-4 font-black text-white">Salvar meta</button></div></div>
+        <div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-xl font-black">Meta de vendas do dia</h2><p className="text-sm text-gray-500">{(data?.sales.goal_progress || 0).toFixed(0)}% alcançada</p></div><div className="flex gap-2"><input type="text" inputMode="numeric" value={goal} onChange={event => setGoal(maskBrazilianMoneyInput(event.target.value))} placeholder="0,00" aria-label="Meta diária em reais" className="min-h-11 w-40 rounded-xl border-2 px-3" /><button onClick={saveGoal} className="rounded-xl bg-[#FF6B00] px-4 font-black text-white">Salvar meta</button></div></div>
         <div className="mt-4 h-4 overflow-hidden rounded-full bg-gray-100"><div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min(100, data?.sales.goal_progress || 0)}%` }} /></div>
       </section>
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
