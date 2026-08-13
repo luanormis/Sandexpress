@@ -8,6 +8,7 @@ type PrintOrder = { umbrella: number; customer: string; time: string; total: num
 const routeTitle = (route: string) => route === 'cashier' ? 'CAIXA · PEDIDO COMPLETO' : route === 'food' ? 'COZINHA · ALIMENTOS' : 'BAR · BEBIDAS';
 const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+const wrapText = (value: unknown, columns: number) => String(value ?? '').split(/\s+/).reduce<string[]>((lines, word) => { const current = lines.at(-1) || ''; if (!current) return [word.slice(0, columns)]; if (`${current} ${word}`.length <= columns) return [...lines.slice(0, -1), `${current} ${word}`]; return [...lines, word.slice(0, columns)]; }, []).join('\n');
 
 export default function OrderPrintButton({ vendorId, order }: { vendorId: string; order: PrintOrder }) {
   const [printers, setPrinters] = useState<ReturnType<typeof normalizePrinters>>([]);
@@ -25,9 +26,10 @@ export default function OrderPrintButton({ vendorId, order }: { vendorId: string
     const jobs = buildPrintJobs(printers, order.items);
     if (!jobs.length) return alert('Nenhuma impressora ativa atende aos itens deste pedido.');
     jobs.forEach(({ printer, route, items }, index) => {
+      const columns = printer.columns || (printer.paperWidth === 58 ? 32 : 42);
       if (printer.connection === 'network' && printer.host) {
-        const text = ['SAND EXPRESS', routeTitle(route), `GUARDA-SOL: ${order.umbrella}`, `PEDIDO: ${order.active_request?.sequence || '-'}`, `CLIENTE: ${order.customer}`, `HORARIO: ${order.time}`, '--------------------------------', ...items.map(item => `${item.q}x ${item.n}${route === 'cashier' ? `  ${money(Number(item.subtotal || 0))}` : ''}`), route === 'cashier' ? `TOTAL: ${money(order.total)}` : '', order.notes ? `OBSERVACOES: ${order.notes}` : '', '\n\n\n'].filter(Boolean).join('\n');
-        void fetch('http://127.0.0.1:17891/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: printer.host, port: printer.port || 9100, text }) })
+        const text = ['SAND EXPRESS', wrapText(routeTitle(route), columns), `GUARDA-SOL: ${order.umbrella}`, `PEDIDO: ${order.active_request?.sequence || '-'}`, wrapText(`CLIENTE: ${order.customer}`, columns), `HORARIO: ${order.time}`, '-'.repeat(columns), ...items.map(item => wrapText(`${item.q}x ${item.n}${route === 'cashier' ? `  ${money(Number(item.subtotal || 0))}` : ''}`, columns)), route === 'cashier' ? wrapText(`TOTAL: ${money(order.total)}`, columns) : '', order.notes ? wrapText(`OBSERVACOES: ${order.notes}`, columns) : '', '\n\n\n'].filter(Boolean).join('\n');
+        void fetch('http://127.0.0.1:17891/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: printer.host, port: printer.port || 9100, text, cut: printer.autoCut === true }) })
           .then(async response => { if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Falha na impressora.'); })
           .catch(error => alert(error instanceof Error ? error.message : 'Falha ao imprimir pela rede.'));
         return;

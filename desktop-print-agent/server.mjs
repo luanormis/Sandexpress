@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const HTTP_PORT = 17891;
 const EMULATOR_PORT = 19100;
-const DISCOVERY_PORTS = [9100, 515, 631];
+const DEFAULT_DISCOVERY_PORTS = [9100, 515, 631];
 const spoolDir = path.resolve('spool');
 const allowedOrigins = new Set(['https://sandexpress.com.br', 'https://www.sandexpress.com.br', 'https://app.sandexpress.com.br', 'https://sandexpress.vercel.app', 'http://localhost:3000']);
 
@@ -37,13 +37,14 @@ function probe(host, port = 9100, timeout = 220) {
   });
 }
 
-async function discover() {
+async function discover(additionalPorts = []) {
+  const discoveryPorts = [...new Set([...DEFAULT_DISCOVERY_PORTS, ...additionalPorts])].filter(port => Number.isInteger(port) && port > 0 && port <= 65535).slice(0, 20);
   const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, virtual: true, rawCompatible: true }];
   for (const subnet of localSubnets()) {
     const hosts = Array.from({ length: 254 }, (_, index) => `${subnet}.${index + 1}`);
     for (let offset = 0; offset < hosts.length; offset += 32) {
       const batch = hosts.slice(offset, offset + 32);
-      const found = await Promise.all(batch.flatMap(host => DISCOVERY_PORTS.map(async port => ({ host, port, found: await probe(host, port) }))));
+      const found = await Promise.all(batch.flatMap(host => discoveryPorts.map(async port => ({ host, port, found: await probe(host, port) }))));
       found.filter(item => item.found).forEach(item => {
         if (printers.some(printer => printer.host === item.host && printer.port === item.port)) return;
         printers.push({
@@ -60,11 +61,11 @@ async function discover() {
   return printers;
 }
 
-async function sendRaw(host, port, text) {
+async function sendRaw(host, port, text, cut = false) {
   if (!isPrivateIpv4(host)) throw new Error('Destino fora da rede privada.');
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ host, port: Number(port) || 9100 }, () => {
-      socket.end(Buffer.concat([Buffer.from(text, 'utf8'), Buffer.from([0x1d, 0x56, 0x00])]));
+      socket.end(Buffer.concat([Buffer.from(text, 'utf8'), ...(cut ? [Buffer.from([0x1d, 0x56, 0x00])] : [])]));
     });
     socket.setTimeout(5000);
     socket.once('close', resolve);
@@ -96,13 +97,17 @@ http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return res.writeHead(204).end();
   try {
     if (req.method === 'GET' && req.url === '/health') return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ready: true, emulator_port: EMULATOR_PORT }));
-    if (req.method === 'GET' && req.url === '/printers') return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printers: await discover() }));
+    if (req.method === 'GET' && req.url?.startsWith('/printers')) {
+      const url = new URL(req.url, `http://127.0.0.1:${HTTP_PORT}`);
+      const ports = String(url.searchParams.get('ports') || '').split(',').map(Number);
+      return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printers: await discover(ports) }));
+    }
     if (req.method === 'POST' && req.url === '/print') {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       if (typeof body.text !== 'string' || body.text.length > 100_000) throw new Error('Conteúdo inválido.');
-      await sendRaw(String(body.host), Number(body.port), body.text);
+      await sendRaw(String(body.host), Number(body.port), body.text, body.cut === true);
       return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printed: true }));
     }
     res.writeHead(404).end('Não encontrado.');
