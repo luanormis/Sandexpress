@@ -10,9 +10,13 @@ export async function GET(req: NextRequest) {
     if (!isCanonicalUuid(vendorId) || !canAccessVendor(getRequestSession(req), vendorId)) {
       return NextResponse.json({ error: 'Nao autorizado.' }, { status: 403 });
     }
-    const { data, error } = await supabaseAdmin.from('analytics_events').select('metadata').eq('vendor_id', vendorId).eq('event_type', 'printer_config').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (error) throw error;
-    return NextResponse.json({ printers: normalizePrinters((data as any)?.metadata?.printers) });
+    const [{ data: config, error: configError }, { data: vendor, error: vendorError }] = await Promise.all([
+      supabaseAdmin.from('analytics_events').select('metadata').eq('vendor_id', vendorId).eq('event_type', 'printer_config').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabaseAdmin.from('vendors').select('name').eq('id', vendorId).single(),
+    ]);
+    if (configError) throw configError;
+    if (vendorError) throw vendorError;
+    return NextResponse.json({ kiosk_name: String(vendor?.name || 'Quiosque'), printers: normalizePrinters((config as any)?.metadata?.printers) });
   } catch (error) {
     console.error('Printer settings GET error:', error);
     return NextResponse.json({ error: 'Erro ao buscar impressoras.' }, { status: 500 });
