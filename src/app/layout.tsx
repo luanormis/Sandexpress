@@ -1,19 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Lexend } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import "./globals.css";
 
-const lexend = Lexend({
-  variable: "--font-lexend",
-  subsets: ["latin"],
-  weight: ["700", "800"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "SandExpress | Peça direto do seu guarda-sol",
@@ -40,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body
-        className={`${lexend.variable} ${inter.variable} antialiased`}
-      >
+      <body className="antialiased">
         <ServiceWorkerRegister />
         {children}
       </body>
