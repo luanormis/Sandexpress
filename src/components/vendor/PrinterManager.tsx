@@ -2,82 +2,39 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Printer, Search, Trash2 } from 'lucide-react';
-import { KioskPrinter, PrinterRoute, normalizePrinters } from '@/lib/printer-routing';
+import { KioskPrinter, PrinterRoute, getPrinterRoutes, normalizePrinters } from '@/lib/printer-routing';
 
 const ROUTES: Array<{ id: PrinterRoute; label: string; help: string }> = [
-  { id: 'food', label: 'Alimentos / cozinha', help: 'Porções, pastéis e demais alimentos.' },
-  { id: 'beverage', label: 'Bebidas / bar', help: 'Bebidas, cervejas, drinks e doses.' },
-  { id: 'cashier', label: 'Caixa (consolidado)', help: 'Recebe todos os itens do pedido.' },
+  { id: 'food', label: 'Cozinha', help: 'Comidas, porções e refeições' },
+  { id: 'beverage', label: 'Bar', help: 'Bebidas, cervejas, drinks e doses' },
+  { id: 'cashier', label: 'Caixa', help: 'Pedido completo e consolidado' },
+];
+const RECEIPTS = [
+  { route: 'food', title: 'COZINHA · ALIMENTOS', items: ['1x Filé de peixe com fritas', '1x Porção de camarão'], notes: 'Peixe bem passado; porção sem sal.' },
+  { route: 'beverage', title: 'BAR · BEBIDAS', items: ['2x Água de coco', '1x Caipirinha'], notes: 'Uma água sem gelo; caipirinha com pouco açúcar.' },
+  { route: 'cashier', title: 'CAIXA · PEDIDO COMPLETO', items: ['1x Filé de peixe com fritas  R$ 58,00', '1x Porção de camarão  R$ 45,00', '2x Água de coco  R$ 20,00', '1x Caipirinha  R$ 24,00'], notes: 'Observações completas de cozinha e bar.', total: 'R$ 147,00' },
 ];
 
 export default function PrinterManager({ vendorId }: { vendorId: string }) {
   const [printers, setPrinters] = useState<KioskPrinter[]>([]);
   const [name, setName] = useState('');
-  const [route, setRoute] = useState<PrinterRoute>('food');
+  const [routes, setRoutes] = useState<PrinterRoute[]>(['food']);
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetch(`/api/printer-settings?vendor_id=${vendorId}`, { cache: 'no-store' })
-      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; })
-      .then(data => setPrinters(normalizePrinters(data.printers)))
-      .catch(error => setMessage(error instanceof Error ? error.message : 'Erro ao buscar impressoras.'));
-  }, [vendorId]);
-
+  useEffect(() => { fetch(`/api/printer-settings?vendor_id=${vendorId}`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; }).then(data => setPrinters(normalizePrinters(data.printers))).catch(error => setMessage(error instanceof Error ? error.message : 'Erro ao buscar impressoras.')); }, [vendorId]);
   const visible = useMemo(() => printers.filter(printer => printer.name.toLowerCase().includes(search.toLowerCase())), [printers, search]);
-  const persist = async (next: KioskPrinter[]) => {
-    setSaving(true); setMessage('');
-    try {
-      const response = await fetch('/api/printer-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, printers: next }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erro ao salvar.');
-      setPrinters(normalizePrinters(data.printers)); setMessage('Configuração salva.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar.'); }
-    finally { setSaving(false); }
-  };
-  const discoverNetwork = async () => {
-    setMessage('Procurando impressoras térmicas na rede local...');
-    try {
-      const response = await fetch('http://127.0.0.1:17891/printers', { cache: 'no-store' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Agente indisponível.');
-      const found: KioskPrinter[] = (Array.isArray(data.printers) ? data.printers : []).map((printer: any) => ({
-        id: `network-${String(printer.host)}-${Number(printer.port || 9100)}-${route}`,
-        name: String(printer.name || `Térmica ${printer.host}`).slice(0, 80),
-        route, active: true, connection: 'network', host: String(printer.host), port: Number(printer.port || 9100),
-      }));
-      const merged = [...printers];
-      found.forEach(printer => { if (!merged.some(item => item.id === printer.id)) merged.push(printer); });
-      if (found.length) await persist(merged);
-      setMessage(found.length ? `${found.length} impressora(s) de rede encontrada(s).` : 'Nenhuma impressora respondeu na rede.');
-    } catch {
-      setMessage('Execute o Agente de Impressão SandExpress neste desktop para buscar impressoras Wi‑Fi.');
-    }
-  };
-  const add = () => {
-    const safeName = name.trim();
-    if (!safeName) return setMessage('Informe o nome exibido pela impressora no computador ou tablet.');
-    void persist([...printers, { id: crypto.randomUUID(), name: safeName.slice(0, 80), route, active: true }]);
-    setName('');
-  };
+  const persist = async (next: KioskPrinter[]) => { setSaving(true); setMessage(''); try { const response = await fetch('/api/printer-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, printers: next }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao salvar.'); setPrinters(normalizePrinters(data.printers)); setMessage('Configuração salva.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Erro ao salvar.'); } finally { setSaving(false); } };
+  const toggleRoute = (route: PrinterRoute) => setRoutes(current => current.includes(route) ? current.filter(item => item !== route) : [...current, route]);
+  const add = () => { const safeName = name.trim(); if (!safeName) return setMessage('Informe o nome da impressora.'); if (!routes.length) return setMessage('Marque pelo menos um destino.'); void persist([...printers, { id: crypto.randomUUID(), name: safeName.slice(0, 80), route: routes[0], routes, active: true }]); setName(''); };
+  const discoverNetwork = async () => { setMessage('Procurando impressoras térmicas na rede local...'); try { const response = await fetch('http://127.0.0.1:17891/printers', { cache: 'no-store' }); const data = await response.json(); if (!response.ok) throw new Error(); const found: KioskPrinter[] = (Array.isArray(data.printers) ? data.printers : []).map((printer: { host?: string; port?: number; name?: string }) => ({ id: `network-${printer.host}-${printer.port || 9100}-${routes.join('-')}`, name: String(printer.name || `Térmica ${printer.host}`).slice(0, 80), route: routes[0], routes, active: true, connection: 'network', host: String(printer.host), port: Number(printer.port || 9100) })); const merged = [...printers]; found.forEach(printer => { if (!merged.some(item => item.id === printer.id)) merged.push(printer); }); if (found.length) await persist(merged); setMessage(found.length ? `${found.length} impressora(s) encontrada(s).` : 'Nenhuma impressora respondeu na rede.'); } catch { setMessage('Execute o Agente de Impressão SandExpress neste desktop.'); } };
 
   return <div className="space-y-5">
-    <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
-      <p className="font-black">Como funciona a impressão</p>
-      <p className="mt-1 text-sm font-bold leading-6">Cadastre o mesmo nome mostrado pelo sistema. Ao imprimir uma comanda, o navegador abrirá a janela de impressão: selecione essa impressora. Por segurança, navegadores não permitem detectar nem selecionar uma impressora automaticamente.</p>
+    <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950"><p className="font-black">Escolha para onde cada impressora recebe pedidos</p><p className="mt-1 text-sm font-bold">Marque Cozinha, Bar e/ou Caixa. Para imprimir tudo na mesma impressora, marque as três opções.</p></section>
+    <section className="rounded-2xl border bg-white p-5 shadow-sm"><h2 className="flex items-center gap-2 text-xl font-black"><Printer/> Impressoras do quiosque</h2><div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_auto]"><input value={name} onChange={event => setName(event.target.value)} maxLength={80} placeholder="Ex.: EPSON Térmica" className="min-h-12 rounded-xl border-2 px-4 font-bold"/><button disabled={saving} onClick={discoverNetwork} className="rounded-xl bg-emerald-600 px-5 font-black text-white"><Search className="inline" size={18}/> Buscar Wi-Fi</button><button disabled={saving} onClick={add} className="rounded-xl bg-[#FF6B00] px-5 font-black text-white"><Plus className="inline" size={18}/> Adicionar</button></div><div className="mt-3 flex flex-wrap gap-3">{ROUTES.map(item => <label key={item.id} className="flex items-center gap-2 rounded-xl border px-3 py-2 font-black"><input type="checkbox" checked={routes.includes(item.id)} onChange={() => toggleRoute(item.id)}/>{item.label}</label>)}<button type="button" onClick={() => setRoutes(ROUTES.map(item => item.id))} className="rounded-xl bg-gray-950 px-4 py-2 font-black text-white">Marcar todas</button></div><div className="relative mt-5"><Search className="absolute left-3 top-3.5 text-gray-400" size={18}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar impressora cadastrada" className="min-h-12 w-full rounded-xl border-2 pl-10 pr-4 font-bold"/></div>
+      <div className="mt-4 space-y-2">{visible.map(printer => <article key={printer.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-black">{printer.name}</p><p className="text-xs font-bold text-emerald-700">{printer.connection === 'network' ? `Rede ${printer.host}:${printer.port || 9100}` : 'Navegador'}</p></div><button aria-label={`Excluir ${printer.name}`} onClick={() => void persist(printers.filter(item => item.id !== printer.id))} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 size={18}/></button></div><div className="mt-3 flex flex-wrap gap-3">{ROUTES.map(target => <label key={target.id} className="flex items-center gap-2 text-sm font-black"><input type="checkbox" checked={getPrinterRoutes(printer).includes(target.id)} onChange={event => { const nextRoutes = event.target.checked ? [...getPrinterRoutes(printer), target.id] : getPrinterRoutes(printer).filter(item => item !== target.id); if (nextRoutes.length) void persist(printers.map(item => item.id === printer.id ? { ...item, route: nextRoutes[0], routes: nextRoutes } : item)); }}/>{target.label}</label>)}</div></article>)}{visible.length === 0 ? <p className="rounded-xl bg-gray-50 p-4 font-bold text-gray-500">Nenhuma impressora cadastrada.</p> : null}</div>{message ? <p className="mt-4 rounded-xl bg-orange-50 p-3 font-black text-[#8A3E22]">{message}</p> : null}
     </section>
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h2 className="flex items-center gap-2 text-xl font-black text-gray-950"><Printer /> Impressoras do quiosque</h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
-        <input value={name} onChange={event => setName(event.target.value)} maxLength={80} placeholder="Ex.: EPSON Cozinha" className="min-h-12 rounded-xl border-2 border-gray-200 px-4 font-bold outline-none focus:border-[#FF6B00]" />
-        <select value={route} onChange={event => setRoute(event.target.value as PrinterRoute)} className="min-h-12 rounded-xl border-2 border-gray-200 bg-white px-3 font-bold outline-none focus:border-[#FF6B00]">{ROUTES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-        <button disabled={saving} onClick={() => void discoverNetwork()} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-black text-white disabled:opacity-50"><Search size={18}/> Buscar Wi‑Fi</button>
-        <button disabled={saving} onClick={add} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-5 font-black text-white disabled:opacity-50"><Plus size={18}/> Adicionar</button>
-      </div>
-      <div className="relative mt-5"><Search className="absolute left-3 top-3.5 text-gray-400" size={18}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar impressora cadastrada" className="min-h-12 w-full rounded-xl border-2 border-gray-200 pl-10 pr-4 font-bold outline-none focus:border-[#FF6B00]" /></div>
-      <div className="mt-4 space-y-2">{visible.map(printer => { const target = ROUTES.find(item => item.id === printer.route)!; return <article key={printer.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black text-gray-950">{printer.name}</p><p className="text-xs font-black uppercase text-emerald-700">{printer.connection === 'network' ? `Rede ${printer.host}:${printer.port || 9100}` : 'Navegador'}</p><p className="text-sm font-bold text-gray-600">{target.label} · {target.help}</p></div><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-sm font-black"><input type="checkbox" checked={printer.active} onChange={event => void persist(printers.map(item => item.id === printer.id ? { ...item, active: event.target.checked } : item))} /> Ativa</label><button aria-label={`Excluir ${printer.name}`} onClick={() => void persist(printers.filter(item => item.id !== printer.id))} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 size={18}/></button></div></article>; })}{visible.length === 0 && <p className="rounded-xl bg-gray-50 p-4 text-sm font-bold text-gray-500">Nenhuma impressora encontrada.</p>}</div>
-      {message && <p className="mt-4 rounded-xl bg-orange-50 p-3 text-sm font-black text-[#8A3E22]">{message}</p>}
-    </section>
+    <section className="rounded-2xl border bg-white p-5 shadow-sm"><h2 className="text-xl font-black">Modelo de impressão da comanda</h2><p className="mt-1 text-sm font-bold text-gray-500">Exemplo visual; nenhum pedido fictício é salvo.</p><div className="mt-4 grid gap-4 xl:grid-cols-3">{RECEIPTS.map(receipt => <article key={receipt.route} className="mx-auto w-full max-w-[300px] border border-dashed border-gray-400 bg-white p-4 font-mono text-sm shadow"><h3 className="border-b border-dashed pb-2 text-center font-black">{receipt.title}</h3><p className="mt-2"><b>Guarda-sol:</b> 18</p><p><b>Pedido:</b> 1042</p><p><b>Cliente:</b> Maria</p><div className="my-2 border-t border-dashed"/>{receipt.items.map(item => <p key={item}>{item}</p>)}<div className="my-2 border-t border-dashed"/><p><b>OBSERVAÇÕES:</b><br/>{receipt.notes}</p>{receipt.total ? <p className="mt-3 border-t border-dashed pt-2 text-lg font-black">TOTAL: {receipt.total}</p> : null}</article>)}</div></section>
   </div>;
 }
+
