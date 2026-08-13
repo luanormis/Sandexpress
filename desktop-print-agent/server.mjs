@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const HTTP_PORT = 17891;
 const EMULATOR_PORT = 19100;
+const DISCOVERY_PORTS = [9100, 515, 631];
 const spoolDir = path.resolve('spool');
 const allowedOrigins = new Set(['https://sandexpress.com.br', 'https://www.sandexpress.com.br', 'https://app.sandexpress.com.br', 'https://sandexpress.vercel.app', 'http://localhost:3000']);
 
@@ -37,13 +38,23 @@ function probe(host, port = 9100, timeout = 220) {
 }
 
 async function discover() {
-  const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, virtual: true }];
+  const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, virtual: true, rawCompatible: true }];
   for (const subnet of localSubnets()) {
     const hosts = Array.from({ length: 254 }, (_, index) => `${subnet}.${index + 1}`);
     for (let offset = 0; offset < hosts.length; offset += 32) {
       const batch = hosts.slice(offset, offset + 32);
-      const found = await Promise.all(batch.map(async host => ({ host, found: await probe(host) })));
-      found.filter(item => item.found).forEach(item => printers.push({ name: `Impressora térmica ${item.host}`, host: item.host, port: 9100, virtual: false }));
+      const found = await Promise.all(batch.flatMap(host => DISCOVERY_PORTS.map(async port => ({ host, port, found: await probe(host, port) }))));
+      found.filter(item => item.found).forEach(item => {
+        if (printers.some(printer => printer.host === item.host && printer.port === item.port)) return;
+        printers.push({
+          name: `Impressora de rede ${item.host}`,
+          host: item.host,
+          port: item.port,
+          virtual: false,
+          rawCompatible: item.port === 9100,
+          protocol: item.port === 9100 ? 'RAW/ESC-POS' : item.port === 631 ? 'IPP' : 'LPD',
+        });
+      });
     }
   }
   return printers;
@@ -103,3 +114,4 @@ http.createServer(async (req, res) => {
   console.log(`Impressora térmica virtual ativa em 127.0.0.1:${EMULATOR_PORT}`);
   console.log(`Tickets de teste: ${spoolDir}`);
 });
+
