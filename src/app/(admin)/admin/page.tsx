@@ -192,6 +192,13 @@ function fileNameToCatalogName(fileName: string) {
     .replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase("pt-BR"));
 }
 
+function getReadyMenuPrice(image: CatalogImage) {
+  const tag = (image.tags || []).find(value => value.startsWith("menu-price:"));
+  if (!(image.tags || []).includes("ready-menu") || !tag) return null;
+  const price = Number(tag.slice("menu-price:".length));
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
 // =========================================================
 // MAIN COMPONENT
 // =========================================================
@@ -502,6 +509,38 @@ export default function AdminDashboard() {
     setCatalogImages(prev => prev.map((item) => item.id === image.id ? data.image : item));
   };
 
+  const configureReadyMenuImage = async (image: CatalogImage) => {
+    const currentPrice = getReadyMenuPrice(image);
+    const enabled = currentPrice === null;
+    let price: number | null = null;
+    if (enabled) {
+      const value = window.prompt(`Preço de "${image.name}" no cardápio pronto (ex.: 12,50):`, "");
+      if (value === null) return;
+      price = Number(value.replace(/\./g, "").replace(",", "."));
+      if (!Number.isFinite(price) || price <= 0) {
+        setCatalogMessage("Informe um preço válido maior que zero.");
+        return;
+      }
+    }
+    setCatalogSaving(true);
+    setCatalogMessage("");
+    try {
+      const response = await fetch("/api/admin/ready-menu", {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_id: image.id, enabled, price }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setCatalogMessage(data.error || "Não foi possível configurar o cardápio pronto.");
+        return;
+      }
+      setCatalogImages(current => current.map(item => item.id === image.id ? { ...item, tags: data.item.tags } : item));
+      setCatalogMessage(enabled ? "Item adicionado ao cardápio pronto." : "Item removido do cardápio pronto.");
+    } finally {
+      setCatalogSaving(false);
+    }
+  };
+
   const replaceCatalogImage = async (image: CatalogImage, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -716,6 +755,15 @@ export default function AdminDashboard() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) return alert(data.error || 'Nao foi possivel atualizar o cardapio pronto.');
       setSelectedVendorFeatures(current => ({ ...current, ready_menu: enabled }));
+      if (enabled) {
+        const applyResponse = await fetch('/api/admin/ready-menu', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vendor_id: vendor.id }),
+        });
+        const applied = await applyResponse.json().catch(() => ({}));
+        if (!applyResponse.ok) return alert(applied.error || 'Cardapio liberado, mas os produtos nao puderam ser aplicados.');
+        alert(`Cardapio pronto liberado: ${applied.inserted} produtos criados e ${applied.updated} atualizados.`);
+      }
     } catch {
       alert('Erro de rede ao atualizar o cardapio pronto.');
     } finally {
@@ -1720,6 +1768,21 @@ export default function AdminDashboard() {
                         <p className="line-clamp-2 text-xs font-bold leading-5 text-gray-400">
                           {(image.tags || []).join(", ") || image.description || "Sem tags"}
                         </p>
+                        <button
+                          type="button"
+                          disabled={catalogSaving || image.active === false}
+                          onClick={() => configureReadyMenuImage(image)}
+                          className={cn(
+                            "w-full rounded-xl border px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50",
+                            getReadyMenuPrice(image) === null
+                              ? "border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/10"
+                              : "border-amber-500/40 bg-amber-500/10 text-amber-100"
+                          )}
+                        >
+                          {getReadyMenuPrice(image) === null
+                            ? "Adicionar ao cardápio pronto"
+                            : `No cardápio pronto · ${formatCurrency(getReadyMenuPrice(image) || 0)}`}
+                        </button>
                         <button
                           type="button"
                           onClick={() => toggleCatalogImage(image)}
