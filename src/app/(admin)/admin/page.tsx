@@ -8,7 +8,7 @@ import {
   Upload, ImageIcon,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { formatBrazilianMoneyInput, maskBrazilianMoneyInput } from "@/lib/brazilian-money";
+import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
 import { ADMIN_UMBRELLA_LIMIT, DEFAULT_PLATFORM_PLAN_SETTINGS, formatPlanPriceLabel, PLAN_PRICES, PlatformPlanSettings } from "@/lib/plans";
 
 // ---------- TYPES ----------
@@ -516,7 +516,7 @@ export default function AdminDashboard() {
     if (enabled) {
       const value = window.prompt(`Preço de "${image.name}" no cardápio pronto (ex.: 12,50):`, "");
       if (value === null) return;
-      price = Number(value.replace(/\./g, "").replace(",", "."));
+      price = parseBrazilianMoneyInput(value);
       if (!Number.isFinite(price) || price <= 0) {
         setCatalogMessage("Informe um preço válido maior que zero.");
         return;
