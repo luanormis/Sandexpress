@@ -7,7 +7,6 @@ import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
 import { isRateLimited } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/vendor-password';
 import { getPlatformPlanSettings } from '@/lib/platform-plans';
-import { seedDefaultMenuForVendor } from '@/lib/default-menu-products';
 
 function safeText(value: unknown, maxLength = 120) {
   return String(value || '').trim().slice(0, maxLength);
@@ -15,7 +14,7 @@ function safeText(value: unknown, maxLength = 120) {
 
 /**
  * POST /api/vendors/register
- * Cria um tenant isolado, o vendor e o cardápio padrão.
+ * Cria um tenant isolado e o vendor com cardápio vazio para produção.
  * Os guarda-sóis são criados depois pelo próprio quiosque no painel.
  */
 export async function POST(req: NextRequest) {
@@ -179,8 +178,6 @@ export async function POST(req: NextRequest) {
       .insert(buildTenantFeatureRows(tenant.id));
     if (featuresError) throw featuresError;
 
-    const defaultMenu = await seedDefaultMenuForVendor(tenant.id, vendor.id);
-
     const confirmationEmail = buildVendorRegistrationConfirmationEmail({
       vendorName: vendor.name,
       ownerName: vendor.owner_name,
@@ -245,7 +242,6 @@ export async function POST(req: NextRequest) {
         sent: adminAlertResult.ok,
         reason: adminAlertResult.ok ? null : adminAlertResult.reason,
       },
-      default_menu: defaultMenu,
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
         : 'Quiosque criado.',
