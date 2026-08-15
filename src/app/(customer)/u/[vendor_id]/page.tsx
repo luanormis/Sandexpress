@@ -212,7 +212,7 @@ export default function CustomerApp() {
     secondary: vendor?.secondary_color || "#82533f",
     button: vendor?.button_color || vendor?.primary_color || "#ff6b00",
     buttonText: vendor?.button_text_color || "#ffffff",
-    logo: vendor?.logo_url || "/sandexpress-logo-fluid.png",
+    logo: vendor?.logo_url || null,
   };
   const customerThemeVars = {
     "--customer-primary": theme.primary,
@@ -220,11 +220,6 @@ export default function CustomerApp() {
     "--customer-button": theme.button,
     "--customer-button-text": theme.buttonText,
   } as CSSProperties;
-  const sandExpressMark = (
-    <div className="customer-brand-watermark">
-      <span>SandExpress</span>
-    </div>
-  );
   const featureEnabled = (key: string) => features[key] !== false;
 
   function resetExpiredCustomerSession(message = "Sua sessão expirou. Abra a comanda novamente para enviar pedidos.") {
@@ -830,19 +825,17 @@ export default function CustomerApp() {
         <section className="customer-welcome__content">
           <div className="customer-logo">
             {theme.logo ? (
-              <img src={theme.logo} alt="Logo do quiosque" />
+              {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="2rem" />}
             ) : (
               <UtensilsCrossed size="2.875rem" />
             )}
           </div>
-          <p className="customer-brand-label">SandExpress</p>
           <h1 className="customer-title">{vendor?.name || "Carregando quiosque..."}</h1>
           {error && <p className="customer-error">{error}</p>}
           <button onClick={() => setStep("login")} className="customer-action">
             Comecar pedido
           </button>
         </section>
-        {sandExpressMark}
       </main>
     );
   }
@@ -853,10 +846,9 @@ export default function CustomerApp() {
         <section className="customer-login__panel">
           <div className="customer-login__brand">
             <div className="customer-logo customer-logo--small">
-              <img src={theme.logo} alt="Logo do quiosque" />
+              {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="1.5rem" />}
             </div>
             <div className="customer-login__brand-text">
-              <p className="customer-login__kicker">SandExpress</p>
               <h1 className="customer-login__title">{vendor?.name || "Quiosque"}</h1>
               <p className="customer-login__subtitle">Abrir comanda</p>
             </div>
@@ -906,7 +898,6 @@ export default function CustomerApp() {
             </button>
           </div>
         </section>
-        {sandExpressMark}
       </main>
     );
   }
@@ -917,7 +908,7 @@ export default function CustomerApp() {
         <div className="customer-topbar__main">
           <div className="customer-identity">
             <div className="customer-avatar">
-              <img src={theme.logo} alt="Logo do quiosque" />
+              {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="1.5rem" />}
             </div>
             <div>
               <p className="customer-kicker">Guarda-sol {umbrella?.number || ""}</p>
