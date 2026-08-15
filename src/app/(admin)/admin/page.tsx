@@ -705,6 +705,24 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleReadyMenu = async (vendor: Vendor) => {
+    const enabled = !selectedVendorFeatures.ready_menu;
+    setFeatureSavingVendorId(vendor.id);
+    try {
+      const response = await fetch('/api/features', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendor.id, feature_key: 'ready_menu', enabled }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return alert(data.error || 'Nao foi possivel atualizar o cardapio pronto.');
+      setSelectedVendorFeatures(current => ({ ...current, ready_menu: enabled }));
+    } catch {
+      alert('Erro de rede ao atualizar o cardapio pronto.');
+    } finally {
+      setFeatureSavingVendorId(null);
+    }
+  };
+
   const migrateVendorToPaid = async (vendor: Vendor) => {
     await updateVendor(vendor.id, {
       is_active: true,
@@ -2217,6 +2235,17 @@ export default function AdminDashboard() {
               </div>
               <div className="text-sm text-gray-500">
                 Cadastrado em {new Date(selectedVendor.created_at).toLocaleDateString("pt-BR")}
+              </div>
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-black text-emerald-100">Cardapio pronto SandExpress</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-emerald-200/80">Autoriza este quiosque a receber o cardapio padrao criado e mantido pelo administrador.</p>
+                  </div>
+                  <button onClick={() => toggleReadyMenu(selectedVendor)} disabled={featureSavingVendorId === selectedVendor.id} className={`min-w-24 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${selectedVendorFeatures.ready_menu ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    {featureSavingVendorId === selectedVendor.id ? 'Salvando...' : selectedVendorFeatures.ready_menu ? 'Liberado' : 'Bloqueado'}
+                  </button>
+                </div>
               </div>
               <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4">
                 <div className="flex items-center justify-between gap-4">
