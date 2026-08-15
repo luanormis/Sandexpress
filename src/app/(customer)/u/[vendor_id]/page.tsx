@@ -824,11 +824,7 @@ export default function CustomerApp() {
       <main className="customer-app customer-welcome" style={customerThemeVars}>
         <section className="customer-welcome__content">
           <div className="customer-logo">
-            {theme.logo ? (
-              {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="2rem" />}
-            ) : (
-              <UtensilsCrossed size="2.875rem" />
-            )}
+            {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="2.875rem" />}
           </div>
           <h1 className="customer-title">{vendor?.name || "Carregando quiosque..."}</h1>
           {error && <p className="customer-error">{error}</p>}
