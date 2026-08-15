@@ -517,7 +517,7 @@ export default function AdminDashboard() {
       const value = window.prompt(`Preço de "${image.name}" no cardápio pronto (ex.: 12,50):`, "");
       if (value === null) return;
       price = parseBrazilianMoneyInput(value);
-      if (!Number.isFinite(price) || price <= 0) {
+      if (price === null || !Number.isFinite(price) || price <= 0) {
         setCatalogMessage("Informe um preço válido maior que zero.");
         return;
       }
