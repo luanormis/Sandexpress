@@ -21,6 +21,7 @@ export const CORE_FEATURE_KEYS = [
   'inventory',
   'financial',
   'menu_management',
+  'ready_menu',
   'team_management',
   'branding',
   'printer_management',
@@ -83,6 +84,7 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   inventory: 'Estoque',
   financial: 'Financeiro e relatorios',
   menu_management: 'Gestao do cardapio',
+  ready_menu: 'Cardapio pronto liberado pelo admin',
   team_management: 'Equipe',
   branding: 'Personalizacao',
   printer_management: 'Impressoras',
@@ -104,7 +106,7 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
 };
 
 export const DEFAULT_FEATURES = FEATURE_KEYS.reduce((acc, key) => {
-  acc[key] = (CORE_FEATURE_KEYS as readonly string[]).includes(key);
+  acc[key] = key === 'ready_menu' ? false : (CORE_FEATURE_KEYS as readonly string[]).includes(key);
   return acc;
 }, {} as FeatureMap);
 
