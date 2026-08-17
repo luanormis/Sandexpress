@@ -4,6 +4,7 @@ import { configureReadyMenuTags, parseReadyMenuPrice } from '@/lib/ready-menu';
 import { getTenantFeatureMap, getVendorTenantId } from '@/lib/features';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isCanonicalUuid } from '@/lib/uuid';
+import { ensureVeraMenuSeeded } from '@/lib/vera-menu-seed';
 
 function requireAdmin(req: NextRequest) {
   return getRequestSession(req)?.role === 'admin';
@@ -64,16 +65,22 @@ export async function POST(req: NextRequest) {
     const features = await getTenantFeatureMap(tenantId);
     if (!features.ready_menu) return NextResponse.json({ error: 'Libere o cardápio pronto para este quiosque primeiro.' }, { status: 409 });
 
+    await ensureVeraMenuSeeded();
+
     const { data: images, error: imagesError } = await (supabaseAdmin.from('product_images') as any)
       .select('id, name, category, description, image_url, tags, active, sort_order').eq('active', true);
     if (imagesError) throw imagesError;
-    const readyItems = (images || []).map((image: any) => ({ ...image, price: parseReadyMenuPrice(image.tags) })).filter((image: any) => image.price !== null);
+    const selectedCodes = Array.isArray(body.item_codes) ? new Set(body.item_codes.map(String)) : null;
+    const readyItems = (images || [])
+      .map((image: any) => ({ ...image, price: parseReadyMenuPrice(image.tags) }))
+      .filter((image: any) => image.price !== null && (!selectedCodes || (image.tags || []).some((tag: string) => tag.startsWith('menu-item:') && selectedCodes.has(tag.slice('menu-item:'.length)))));
     if (!readyItems.length) return NextResponse.json({ error: 'Cadastre ao menos uma imagem com preço no cardápio pronto.' }, { status: 409 });
 
     const { data: existing, error: existingError } = await supabaseAdmin.from('products')
-      .select('id, image_url').eq('vendor_id', vendorId);
+      .select('id, image_url, name, category').eq('vendor_id', vendorId);
     if (existingError) throw existingError;
-    const existingByImage = new Map((existing || []).map((product: any) => [String(product.image_url || ''), product.id]));
+    const signature = (name: unknown, category: unknown) => `${String(name || '').trim().toLocaleLowerCase('pt-BR')}|${String(category || '').trim().toLocaleLowerCase('pt-BR')}`;
+    const existingBySignature = new Map((existing || []).map((product: any) => [signature(product.name, product.category), product.id]));
     let inserted = 0;
     let updated = 0;
     for (const [index, item] of readyItems.entries()) {
@@ -89,7 +96,7 @@ export async function POST(req: NextRequest) {
         active: true,
         sort_order: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : index,
       };
-      const productId = existingByImage.get(String(item.image_url || ''));
+      const productId = existingBySignature.get(signature(payload.name, payload.category));
       if (productId) {
         const { error } = await supabaseAdmin.from('products').update(payload as any).eq('id', productId).eq('vendor_id', vendorId);
         if (error) throw error;
