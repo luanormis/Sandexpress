@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Output:
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { VERA_MENU, VERA_MENU_TEMPLATE_TAG } from '@/lib/vera-menu';
 
@@ -41,4 +38,3 @@ export async function ensureVeraMenuSeeded() {
   if (error) throw error;
   return { inserted: missing.length, total: VERA_MENU.length };
 }
-
