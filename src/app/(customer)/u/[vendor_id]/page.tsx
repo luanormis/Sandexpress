@@ -7,6 +7,8 @@ import { Bell, Home, ListOrdered, Minus, Plus, ShoppingCart, Star, UtensilsCross
 import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
 import { isValidBrazilPhoneWithDdd, normalizeBrazilPhoneWithDdd } from "@/lib/phone";
+import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
+import { QrScannerButton } from "@/components/pwa/QrScannerButton";
 import {
   CUSTOMER_MENU_CATEGORIES,
   CustomerMenuCategory,
@@ -144,9 +146,6 @@ export default function CustomerApp() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [notes, setNotes] = useState("");
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
-  const [splitMode, setSplitMode] = useState<"full" | "partial" | "split">("full");
-  const [splitPeople, setSplitPeople] = useState(2);
-  const [partialAmount, setPartialAmount] = useState("");
   const [activeCategory, setActiveCategory] = useState<CustomerMenuCategory>("Bebidas");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -200,13 +199,6 @@ export default function CustomerApp() {
   const openTotal = ordersTotal + pendingOrdersTotal + discountedCartTotal;
   const serviceFeeAmount = serviceFeeEnabled ? Number((openTotal * 0.1).toFixed(2)) : 0;
   const billTotal = Number((openTotal + serviceFeeAmount).toFixed(2));
-  const parsedPartialAmount = Math.max(0, Number(partialAmount.replace(",", ".")) || 0);
-  const requestedPaymentAmount = splitMode === "partial"
-    ? Math.min(parsedPartialAmount, billTotal)
-    : splitMode === "split"
-      ? Number((billTotal / Math.max(1, splitPeople)).toFixed(2))
-      : billTotal;
-  const remainingAfterPayment = Math.max(0, Number((billTotal - requestedPaymentAmount).toFixed(2)));
   const theme = {
     primary: vendor?.primary_color || "#ff6b00",
     secondary: vendor?.secondary_color || "#82533f",
@@ -252,8 +244,6 @@ export default function CustomerApp() {
     setOrders([]);
     setCart([]);
     setNotes("");
-    setPartialAmount("");
-    setSplitMode("full");
     setSatisfactionOrderId("");
     setSatisfactionRating(0);
     setSatisfactionSent(false);
@@ -714,11 +704,11 @@ export default function CustomerApp() {
           umbrella_id: umbrellaId,
           request_only: true,
           notes: "Fechamento solicitado pelo cliente",
-          payment_amount: requestedPaymentAmount,
+          payment_amount: billTotal,
           service_fee_amount: serviceFeeAmount,
           service_fee_enabled: serviceFeeEnabled,
-          split_people: splitPeople,
-          split_mode: splitMode === "partial" ? "custom" : splitMode,
+          split_people: 1,
+          split_mode: "full",
         }),
       });
       const data = await res.json();
@@ -747,7 +737,6 @@ export default function CustomerApp() {
         setOrders((prev) => prev.map((order) => order.id === orderIdForSurvey ? { ...order, status: "closing_requested" } : order));
       }
 
-      setPartialAmount("");
       setError(data.message || "Conta enviada ao quiosque. Vote no que achou da experiência antes de sair.");
       setStep("orders");
     } finally {
@@ -837,6 +826,8 @@ export default function CustomerApp() {
           <button onClick={() => setStep("login")} className="customer-action">
             Comecar pedido
           </button>
+          <InstallShortcutButton context="customer" className="mt-3 w-full" />
+          <QrScannerButton />
         </section>
         {sandExpressMark}
       </main>
@@ -1159,63 +1150,10 @@ export default function CustomerApp() {
               <strong>{formatCurrency(billTotal)}</strong>
             </div>
 
-            <div className="customer-pay-modes" aria-label="Modo de pagamento">
-              <button type="button" onClick={() => setSplitMode("full")} className={splitMode === "full" ? "is-active" : ""}>
-                Total
-              </button>
-              <button type="button" onClick={() => setSplitMode("partial")} className={splitMode === "partial" ? "is-active" : ""}>
-                Parcial
-              </button>
-              <button type="button" onClick={() => setSplitMode("split")} className={splitMode === "split" ? "is-active" : ""}>
-                Dividir
-              </button>
-            </div>
-
-            {splitMode === "partial" && (
-              <input
-                value={partialAmount}
-                inputMode="decimal"
-                onChange={(event) => setPartialAmount(event.target.value.replace(/[^\d,\.]/g, ""))}
-                placeholder="Valor parcial"
-                className="customer-input customer-money-input"
-              />
-            )}
-
-            {splitMode === "split" && (
-              <div className="customer-stepper customer-split-stepper">
-                <p className="customer-stepper__label">Pessoas no guarda-sol</p>
-                <div className="customer-stepper__control">
-                  <button
-                    type="button"
-                    onClick={() => setSplitPeople((value) => Math.max(1, value - 1))}
-                    className="customer-stepper__button"
-                    aria-label="Diminuir pessoas para divisão"
-                  >
-                    -
-                  </button>
-                  <input
-                    value={splitPeople}
-                    inputMode="numeric"
-                    onChange={(event) => setSplitPeople(Math.max(1, Math.min(50, Number(event.target.value.replace(/\D/g, "")) || 1)))}
-                    className="customer-stepper__input"
-                    aria-label="Quantidade de pessoas para divisão"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setSplitPeople((value) => Math.min(50, value + 1))}
-                    className="customer-stepper__button"
-                    aria-label="Aumentar pessoas para divisão"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="customer-bill-summary">
-              <span>{splitMode === "split" ? "Valor por pessoa" : splitMode === "partial" ? "Pagamento agora" : "Pagamento solicitado"}</span>
-              <strong>{formatCurrency(requestedPaymentAmount)}</strong>
-              {remainingAfterPayment > 0 && <small>Saldo restante: {formatCurrency(remainingAfterPayment)}</small>}
+              <span>Pagamento solicitado</span>
+              <strong>{formatCurrency(billTotal)}</strong>
+              <small>Pagamentos parciais são registrados pela equipe do quiosque.</small>
             </div>
 
             <button onClick={requestCloseAccount} disabled={loading || openTotal <= 0} className="customer-primary-button customer-close-button">

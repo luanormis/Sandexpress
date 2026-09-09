@@ -538,6 +538,7 @@ export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [summaryDetailsVisible, setSummaryDetailsVisible] = useState(false);
 
   // --- Orders State ---
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1915,13 +1916,14 @@ export default function VendorDashboard() {
             <p className="text-xs font-black uppercase tracking-wide text-[#C65300]">Hoje</p>
             <h3 className="text-lg font-black text-gray-900">Resumo do quiosque</h3>
           </div>
-          <button type="button" onClick={() => { setEditingDailyGoal(value => !value); setDailyGoalMessage(""); }} className="vendor-daily-goal-button min-h-11 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 text-base font-black text-[#9A3E00] hover:bg-orange-100">
-            {dailySalesGoal > 0 ? `Meta: ${formatCurrency(dailySalesGoal)}` : "Definir meta diaria"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setSummaryDetailsVisible(value => !value)} className="min-h-11 rounded-xl border-2 border-orange-200 bg-white px-4 text-sm font-black text-[#7A3515] hover:bg-orange-50" aria-expanded={summaryDetailsVisible}>{summaryDetailsVisible ? "Esconder detalhes" : "Mostrar detalhes"}</button>
+            <button type="button" onClick={() => { setEditingDailyGoal(value => !value); setDailyGoalMessage(""); }} className="vendor-daily-goal-button min-h-11 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 text-base font-black text-[#9A3E00] hover:bg-orange-100">{dailySalesGoal > 0 ? `Meta: ${formatCurrency(dailySalesGoal)}` : "Definir meta diaria"}</button>
+          </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        {summaryDetailsVisible && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           {cards.map(card => <div key={card.label} className="vendor-summary-metric rounded-xl bg-gray-50 p-3"><p className="text-xs font-black uppercase text-gray-600">{card.label}</p><p className="mt-1 break-words text-xl font-black text-gray-950">{card.value}</p></div>)}
-        </div>
+        </div>}
         {dailySalesGoal > 0 && (
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between gap-3 text-sm font-black text-gray-700"><span>Progresso da meta</span><span>{progress}%</span></div>
@@ -1929,7 +1931,7 @@ export default function VendorDashboard() {
             <p className="mt-2 text-sm font-bold text-gray-600">{progress >= 100 ? "Meta alcancada. Excelente resultado!" : `Faltam ${formatCurrency(Math.max(0, dailySalesGoal - Number(today?.revenue || 0)))} para atingir a meta.`}</p>
           </div>
         )}
-        {editingDailyGoal && (
+        {summaryDetailsVisible && editingDailyGoal && (
           <div className="mt-4 flex flex-col gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-end">
             <label className="flex-1 text-xs font-black uppercase text-gray-700">Meta de faturamento por dia
               <input type="text" inputMode="numeric" value={dailySalesGoalDraft} onChange={event => setDailySalesGoalDraft(maskBrazilianMoneyInput(event.target.value))} className="mt-1 min-h-11 w-full rounded-xl border-2 border-white bg-white px-3 text-base font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder="0,00" aria-label="Meta diaria em reais" />
@@ -3777,6 +3779,21 @@ function OrderModal({
   const emptyAccount = isOrderEmpty(order);
   const visibleItems = getVisibleConsumptionItems(order, Boolean(order.active_request));
   const visibleOrderNotes = getVisibleOrderNotes(order.notes);
+  const [deliveredItems, setDeliveredItems] = useState<Record<string, number>>({});
+  const [deliverySaving, setDeliverySaving] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(`/api/orders/${order.id}/deliveries`, { credentials: 'include' }).then(response => response.ok ? response.json() : Promise.reject()).then(data => setDeliveredItems(data.delivered || {})).catch(() => setDeliveredItems({}));
+  }, [order.id]);
+  const updateDeliveredQuantity = async (item: OrderItem, deliveredQuantity: number) => {
+    if (!item.id) return; setDeliverySaving(item.id);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/deliveries`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_item_id: item.id, delivered_quantity: deliveredQuantity }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Nao foi possivel registrar a entrega.');
+      setDeliveredItems(data.delivered || {});
+    } catch (error) { alert(error instanceof Error ? error.message : 'Erro ao registrar entrega parcial.'); }
+    finally { setDeliverySaving(null); }
+  };
   const next = emptyAccount ? null : order.status === 'received'
     ? { label: 'Iniciar preparo', status: 'preparing' }
     : order.status === 'preparing'
@@ -3835,10 +3852,17 @@ function OrderModal({
                   item.cancelled && "bg-gray-50 text-gray-400 line-through"
                 )}>
                   <span className="font-bold text-gray-900">{item.n}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <span className="font-black text-[#FF6B00]">{item.q}x</span>
                     {item.subtotal !== undefined && (
                       <span className="text-xs font-black text-gray-400">{formatCurrency(item.subtotal)}</span>
+                    )}
+                    {!item.cancelled && item.id && !order.paid && (
+                      <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50">
+                        <button type="button" disabled={deliverySaving === item.id || Number(deliveredItems[item.id!] || 0) <= 0} onClick={() => updateDeliveredQuantity(item, Number(deliveredItems[item.id!] || 0) - 1)} className="min-h-9 px-2 font-black text-emerald-800 disabled:opacity-30">-</button>
+                        <span className="min-w-20 px-1 text-center text-xs font-black text-emerald-900">Entregue {deliveredItems[item.id!] || 0}/{item.q}</span>
+                        <button type="button" disabled={deliverySaving === item.id || Number(deliveredItems[item.id!] || 0) >= item.q} onClick={() => updateDeliveredQuantity(item, Number(deliveredItems[item.id!] || 0) + 1)} className="min-h-9 px-2 font-black text-emerald-800 disabled:opacity-30">+</button>
+                      </span>
                     )}
                     {!item.cancelled && item.id && !order.paid && (
                       <button
@@ -4205,11 +4229,7 @@ function ProductModal({
     let cancelled = false;
     async function loadDefaultImages() {
       try {
-        const params = new URLSearchParams({
-          category: form.category,
-          q: form.name || form.category,
-          planType: "free",
-        });
+        const params = new URLSearchParams({ planType: "free" });
         const res = await fetch(`/api/products/gallery?${params.toString()}`);
         const data = await res.json().catch(() => null);
         if (!cancelled && res.ok) {
@@ -4279,13 +4299,13 @@ function ProductModal({
               </div>
             </div>
             <p className="mt-2 text-xs font-bold leading-5 text-gray-500">
-              O catálogo global é administrado pelo SandExpress. Digite o nome do item para receber sugestões por categoria e tags.
+              Todas as imagens do catálogo SandExpress aparecem abaixo. Role a galeria e toque em uma miniatura para selecionar.
             </p>
             {defaultImages.length > 0 && (
               <div className="mt-3">
                 <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referências do catálogo global</p>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {defaultImages.slice(0, 12).map((image) => (
+                <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-orange-100 bg-[#FFF8E8] p-2 sm:grid-cols-4">
+                  {defaultImages.map((image) => (
                     <button
                       key={image.id}
                       type="button"
@@ -4296,7 +4316,7 @@ function ProductModal({
                         form.image_url === image.image_url ? "border-[#FF6B00]" : "border-gray-200"
                       )}
                     >
-                      <img src={image.image_url} alt={image.name} className="h-full w-full object-cover" />
+                      <img src={image.image_url} alt={image.name} loading="lazy" className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>

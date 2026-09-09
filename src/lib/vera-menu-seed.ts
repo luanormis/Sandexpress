@@ -38,3 +38,19 @@ export async function ensureVeraMenuSeeded() {
   if (error) throw error;
   return { inserted: missing.length, total: VERA_MENU.length };
 }
+
+/** Creates an editable standard menu copy without overwriting existing products. */
+export async function seedVeraMenuForVendor(tenantId: string, vendorId: string) {
+  const { count, error: countError } = await supabaseAdmin.from('products')
+    .select('id', { count: 'exact', head: true }).eq('vendor_id', vendorId);
+  if (countError) throw countError;
+  if ((count || 0) > 0) return { inserted: 0, skipped: true, total: VERA_MENU.length };
+  const payload = VERA_MENU.map((item, index) => ({
+    tenant_id: tenantId, vendor_id: vendorId, category: item.category,
+    name: item.name, description: item.description || null, price: item.price,
+    image_url: item.image, is_default_image: true, active: true, sort_order: index,
+  }));
+  const { error } = await supabaseAdmin.from('products').insert(payload as any);
+  if (error) throw error;
+  return { inserted: payload.length, skipped: false, total: VERA_MENU.length };
+}

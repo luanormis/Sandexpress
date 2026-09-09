@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email';
 import { buildNewVendorAlertEmail, buildVendorRegistrationConfirmationEmail } from '@/lib/email-templates';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildTenantFeatureRows } from '@/lib/features';
+import { seedVeraMenuForVendor } from '@/lib/vera-menu-seed';
 import { buildTermsAcceptanceSnapshot } from '@/lib/terms';
 import { isRateLimited } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/vendor-password';
@@ -173,10 +174,14 @@ export async function POST(req: NextRequest) {
       .insert(termsAcceptance);
     if (termsError) throw termsError;
 
+    const featureRows = buildTenantFeatureRows(tenant.id).map((row) =>
+      row.feature_key === 'ready_menu' ? { ...row, enabled: true } : row,
+    );
     const { error: featuresError } = await supabaseAdmin
       .from('tenant_features')
-      .insert(buildTenantFeatureRows(tenant.id));
+      .insert(featureRows);
     if (featuresError) throw featuresError;
+    const defaultMenu = await seedVeraMenuForVendor(tenant.id, vendor.id);
 
     const confirmationEmail = buildVendorRegistrationConfirmationEmail({
       vendorName: vendor.name,
@@ -242,6 +247,7 @@ export async function POST(req: NextRequest) {
         sent: adminAlertResult.ok,
         reason: adminAlertResult.ok ? null : adminAlertResult.reason,
       },
+      default_menu: defaultMenu,
       message: body.password
         ? 'Quiosque criado com senha definida pelo vendor.'
         : 'Quiosque criado.',

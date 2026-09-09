@@ -67,6 +67,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = getRequestSession(req);
+    if (!session || !['vendor', 'admin'].includes(session.role)) {
+      return NextResponse.json({ error: 'Pagamento parcial permitido apenas para a equipe do quiosque.' }, { status: 403 });
+    }
     const body = await req.json().catch(() => ({}));
     const vendorId = String(body.vendor_id || '');
     const orderId = String(body.order_id || '');

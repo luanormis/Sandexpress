@@ -2367,13 +2367,16 @@ input[type="number"] {
   color: inherit !important;
 }
 /* High-contrast operational states and summary controls. */
-.vendor-ops-shell .vendor-today-summary { color: #fff8f3 !important; }
-.vendor-ops-shell .vendor-today-summary :where(h3, .text-gray-900, .text-gray-950) { color: #ffffff !important; }
-.vendor-ops-shell .vendor-today-summary :where(.text-gray-600, .text-gray-700) { color: #ffe2d3 !important; }
-.vendor-ops-shell .vendor-summary-metric { background: rgba(116, 61, 38, 0.92) !important; border: 1px solid rgba(255, 206, 181, 0.2); }
-.vendor-ops-shell .vendor-summary-metric p:first-child { color: #ffe8dc !important; }
-.vendor-ops-shell .vendor-summary-metric p:last-child { color: #ffffff !important; }
-.vendor-ops-shell .vendor-daily-goal-button { background: #8b3f16 !important; border-color: #cf7a42 !important; color: #fff4e8 !important; }
+.vendor-ops-shell { background: #fff8e8 !important; color: #2f241e; }
+.vendor-ops-shell > main > div.flex-1 { background: #fff8e8 !important; }
+.vendor-ops-shell aside { background: #fffdf7 !important; }
+.vendor-ops-shell .vendor-today-summary { background: #fffdf7 !important; color: #2f241e !important; }
+.vendor-ops-shell .vendor-today-summary :where(h3, .text-gray-900, .text-gray-950) { color: #2f241e !important; }
+.vendor-ops-shell .vendor-today-summary :where(.text-gray-600, .text-gray-700) { color: #624c40 !important; }
+.vendor-ops-shell .vendor-summary-metric { background: #fff4dc !important; border: 1px solid #f2d2ae; }
+.vendor-ops-shell .vendor-summary-metric p:first-child { color: #79533d !important; }
+.vendor-ops-shell .vendor-summary-metric p:last-child { color: #2f241e !important; }
+.vendor-ops-shell .vendor-daily-goal-button { background: #ffead0 !important; border-color: #efb375 !important; color: #713412 !important; }
 .vendor-ops-shell .vendor-sound-button { background: #244f8f !important; color: #f2f7ff !important; }
 .vendor-ops-shell .vendor-cash-button { background: #17613b !important; color: #f0fff6 !important; }
 .vendor-ops-shell .vendor-beach-legend .is-free { color: #86efac !important; }
