@@ -10,6 +10,7 @@ describe('authenticated panel visual theme', () => {
     expect(finalTheme).toContain('.admin-ops-shell main :where(.bg-white)');
     expect(finalTheme).toContain('background-color: #fffdf7 !important');
     expect(finalTheme).toContain('color: #2f241e !important');
+    expect(finalTheme).toContain('html body .vendor-ops-shell main table tbody tr');
   });
 
   it('does not target the public landing page', () => {

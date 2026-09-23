@@ -2566,3 +2566,59 @@ input[type="number"] {
   color: #c54f00 !important;
   background-image: none !important;
 }
+
+/* Specificity guard against the legacy wildcard theme. */
+html body .vendor-ops-shell main :where(h1, h2, h3),
+html body .admin-ops-shell main :where(h1, h2, h3) {
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main [class*="text-gray-"],
+html body .admin-ops-shell main [class*="text-gray-"] {
+  color: #60493c !important;
+}
+
+html body .vendor-ops-shell main :where(.text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700),
+html body .admin-ops-shell main :where(.text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700) {
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main .bg-white,
+html body .admin-ops-shell main .bg-white {
+  background-color: #fffdf7 !important;
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main :where(div, article, section, form, table, thead, tbody, tr)[class*="bg-gray-"],
+html body .admin-ops-shell main :where(div, article, section, form, table, thead, tbody, tr)[class*="bg-gray-"] {
+  background-color: #fff4dc !important;
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main table,
+html body .admin-ops-shell main table {
+  background-color: #fffdf7 !important;
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main table thead,
+html body .admin-ops-shell main table thead {
+  background-color: #f8ead8 !important;
+  color: #4f392d !important;
+}
+
+html body .vendor-ops-shell main table tbody tr,
+html body .admin-ops-shell main table tbody tr {
+  background-color: #fffdf7 !important;
+  color: #2f241e !important;
+}
+
+html body .vendor-ops-shell main table tbody tr:hover,
+html body .admin-ops-shell main table tbody tr:hover {
+  background-color: #fff1df !important;
+}
+
+html body .vendor-ops-shell main .vendor-beach-map :where(h1, h2, h3),
+html body .admin-ops-shell main .vendor-beach-map :where(h1, h2, h3) {
+  color: #fff8f3 !important;
+}
