@@ -2305,7 +2305,7 @@ export default function VendorDashboard() {
                     {rootProductCategories.map(category => {
                       const children = productCategories.filter(item => item.parent_id === category.id && item.active !== false);
                       return (
-                        <div key={category.id} className="rounded-xl border border-orange-200 bg-white p-3">
+                        <div key={category.id} className="vendor-category-card rounded-xl border border-orange-200 bg-white p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-sm font-black text-[#3d1a0a]">{category.name}</p>
@@ -2314,7 +2314,7 @@ export default function VendorDashboard() {
                             <button
                               type="button"
                               onClick={() => deleteProductCategory(category)}
-                              className="rounded-lg border border-red-200 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-50"
+                              className="vendor-category-delete rounded-lg border border-red-200 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-50"
                               title="Excluir categoria do menu superior"
                             >
                               Excluir
@@ -2323,7 +2323,7 @@ export default function VendorDashboard() {
                           {children.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {children.map(child => (
-                                <span key={child.id} className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-black text-[#8a3e22]">
+                                <span key={child.id} className="vendor-category-chip rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-black text-[#8a3e22]">
                                   {child.name}
                                 </span>
                               ))}
@@ -2333,7 +2333,7 @@ export default function VendorDashboard() {
                       );
                     })}
                     {rootProductCategories.length === 0 && (
-                      <p className="rounded-xl border border-orange-200 bg-white p-3 text-sm font-bold text-[#8a3e22]">
+                      <p className="vendor-category-card rounded-xl border border-orange-200 bg-white p-3 text-sm font-bold text-[#8a3e22]">
                         Nenhuma categoria cadastrada. Crie uma categoria para ela aparecer no menu superior e no cadastro de produto.
                       </p>
                     )}

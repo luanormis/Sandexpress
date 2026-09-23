@@ -2384,3 +2384,47 @@ input[type="number"] {
 .vendor-ops-shell .vendor-beach-legend .is-closing { color: #fcd34d !important; }
 .vendor-ops-shell .vendor-umbrella-tile { border-width: 2px !important; }
 .vendor-ops-shell .vendor-umbrella-tile .vendor-umbrella-status { color: inherit !important; }
+
+/* Light operational cards: improve outdoor readability without changing status colors. */
+.vendor-ops-shell .vendor-kanban-column {
+  background: linear-gradient(180deg, #fffdf7 0%, #fff6e7 100%) !important;
+  border-color: #e9b98d !important;
+  color: #2f241e !important;
+  box-shadow: 0 0.55rem 1.35rem rgba(91, 48, 24, 0.1) !important;
+}
+
+.vendor-ops-shell .vendor-kanban-column > div:first-child :where(h3, span),
+.vendor-ops-shell .vendor-kanban-column .text-gray-300,
+.vendor-ops-shell .vendor-kanban-column > div:nth-child(2) > div:not(.vendor-order-card) :where(p, svg) {
+  color: #3d2418 !important;
+}
+
+.vendor-ops-shell .vendor-kanban-column > div:nth-child(2) > div:not(.vendor-order-card) svg {
+  opacity: 0.55;
+}
+
+.vendor-ops-shell .vendor-category-card {
+  background: #fffdf7 !important;
+  border-color: #edc49e !important;
+  color: #2f241e !important;
+  box-shadow: 0 0.35rem 0.9rem rgba(91, 48, 24, 0.08);
+}
+
+.vendor-ops-shell .vendor-category-card :where(p, .text-\[\#3d1a0a\], .text-\[\#8a3e22\]) {
+  color: #3d2418 !important;
+}
+
+.vendor-ops-shell .vendor-category-chip {
+  background: #ffead2 !important;
+  color: #713713 !important;
+}
+
+.vendor-ops-shell .vendor-category-delete {
+  background: #fff7f5 !important;
+  border-color: #e7a49a !important;
+  color: #9b1c1c !important;
+}
+
+.vendor-ops-shell .vendor-category-delete:hover {
+  background: #ffe8e4 !important;
+}
