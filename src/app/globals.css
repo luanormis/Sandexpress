@@ -2452,3 +2452,117 @@ input[type="number"] {
 .vendor-ops-shell .vendor-mobile-nav button.bg-\[\#FF6B00\] {
   color: #ffffff !important;
 }
+
+/* Unified light cards for authenticated operational panels.
+   Kept at the end so legacy dark-theme utilities cannot reduce readability. */
+.vendor-ops-shell main,
+.admin-ops-shell main {
+  background: #fff8e8 !important;
+  color: #2f241e !important;
+}
+
+.vendor-ops-shell main :where(.bg-white),
+.admin-ops-shell main :where(.bg-white) {
+  background-color: #fffdf7 !important;
+  color: #2f241e !important;
+  border-color: #ead1b8 !important;
+}
+
+.vendor-ops-shell main :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-zinc-50),
+.admin-ops-shell main :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-zinc-50) {
+  background-color: #fff4dc !important;
+  color: #3d2b21 !important;
+}
+
+.vendor-ops-shell main :where(.bg-blue-50, .bg-blue-100),
+.admin-ops-shell main :where(.bg-blue-50, .bg-blue-100) {
+  background-color: #eef6ff !important;
+  color: #173d66 !important;
+}
+
+.vendor-ops-shell main :where(.bg-green-50, .bg-green-100, .bg-emerald-50),
+.admin-ops-shell main :where(.bg-green-50, .bg-green-100, .bg-emerald-50) {
+  background-color: #edf9f0 !important;
+  color: #174c2a !important;
+}
+
+.vendor-ops-shell main :where(.bg-orange-50, .bg-orange-100, .bg-amber-50, .bg-amber-100, .bg-\[\#fff8f6\], .bg-\[\#fffaf6\], .bg-\[\#fff1e8\]),
+.admin-ops-shell main :where(.bg-orange-50, .bg-orange-100, .bg-amber-50, .bg-amber-100, .bg-\[\#fff8f6\], .bg-\[\#fffaf6\], .bg-\[\#fff1e8\]) {
+  background-color: #fff1df !important;
+  color: #57301d !important;
+}
+
+.vendor-ops-shell main :where(div, article, section, form).bg-gray-700,
+.vendor-ops-shell main :where(div, article, section, form).bg-gray-800,
+.vendor-ops-shell main :where(div, article, section, form).bg-gray-900,
+.vendor-ops-shell main :where(div, article, section, form).bg-gray-950,
+.admin-ops-shell main :where(div, article, section, form).bg-gray-700,
+.admin-ops-shell main :where(div, article, section, form).bg-gray-800,
+.admin-ops-shell main :where(div, article, section, form).bg-gray-900,
+.admin-ops-shell main :where(div, article, section, form).bg-gray-950 {
+  background-color: #fffaf2 !important;
+  color: #2f241e !important;
+  border-color: #dec1a6 !important;
+}
+
+.vendor-ops-shell main :where(.text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-zinc-900),
+.admin-ops-shell main :where(.text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-zinc-900) {
+  color: #2f241e !important;
+}
+
+.vendor-ops-shell main :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500),
+.admin-ops-shell main :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-500, .text-zinc-500) {
+  color: #6b5142 !important;
+}
+
+.vendor-ops-shell main :where(input, select, textarea),
+.admin-ops-shell main :where(input, select, textarea) {
+  background-color: #ffffff !important;
+  color: #2f241e !important;
+  border-color: #d8b99d !important;
+}
+
+.vendor-ops-shell main :where(input, textarea)::placeholder,
+.admin-ops-shell main :where(input, textarea)::placeholder {
+  color: #80695c !important;
+  opacity: 1;
+}
+
+.vendor-ops-shell main :where(button, a).bg-white,
+.admin-ops-shell main :where(button, a).bg-white {
+  color: #633519 !important;
+  border-color: #d8a87d !important;
+}
+
+.vendor-ops-shell main :where(button, a).bg-white :where(svg, span),
+.admin-ops-shell main :where(button, a).bg-white :where(svg, span) {
+  color: inherit !important;
+}
+
+.vendor-sales-surface {
+  background: #fff8e8 !important;
+  border-color: #e1b78f !important;
+  color: #2f241e !important;
+  box-shadow: 0 0.65rem 1.6rem rgba(91, 48, 24, 0.09) !important;
+}
+
+.vendor-sales-surface :where(.bg-white, .bg-\[\#fffaf6\]) {
+  background-color: #fffdf7 !important;
+  color: #2f241e !important;
+  border-color: #ead1b8 !important;
+  box-shadow: 0 0.45rem 1.1rem rgba(91, 48, 24, 0.07) !important;
+}
+
+.vendor-sales-surface :where(h3, h4, strong),
+.vendor-sales-surface :where(.bg-white) :where(.text-white) {
+  color: #2f241e !important;
+}
+
+.vendor-sales-surface :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-orange-100, .text-green-100, .text-\[\#5a2d1d\], .text-\[\#8a3e22\], .text-\[\#82533f\]) {
+  color: #6b5142 !important;
+}
+
+.vendor-sales-surface .sales-value-gradient {
+  color: #c54f00 !important;
+  background-image: none !important;
+}
