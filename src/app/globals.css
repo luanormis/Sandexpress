@@ -2432,3 +2432,23 @@ input[type="number"] {
 .vendor-ops-shell .vendor-category-delete:hover {
   background: #ffe8e4 !important;
 }
+
+/* Outlined actions use a dark branded surface; keep their labels bright. */
+.vendor-ops-shell :where(button, a).bg-white:not(.vendor-category-delete):not(.vendor-order-card),
+.vendor-ops-shell .vendor-readable-outline {
+  color: #fff7ed !important;
+}
+
+.vendor-ops-shell :where(button, a).bg-white:not(.vendor-category-delete):not(.vendor-order-card) :where(svg, span),
+.vendor-ops-shell .vendor-readable-outline :where(svg, span) {
+  color: inherit !important;
+}
+
+/* Mobile navigation sits on a light translucent bar and needs dark inactive labels. */
+.vendor-ops-shell .vendor-mobile-nav button:not(.bg-\[\#FF6B00\]) {
+  color: #6b3a26 !important;
+}
+
+.vendor-ops-shell .vendor-mobile-nav button.bg-\[\#FF6B00\] {
+  color: #ffffff !important;
+}

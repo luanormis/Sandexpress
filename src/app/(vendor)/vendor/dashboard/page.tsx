@@ -1917,7 +1917,7 @@ export default function VendorDashboard() {
             <h3 className="text-lg font-black text-gray-900">Resumo do quiosque</h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setSummaryDetailsVisible(value => !value)} className="min-h-11 rounded-xl border-2 border-orange-200 bg-white px-4 text-sm font-black text-[#7A3515] hover:bg-orange-50" aria-expanded={summaryDetailsVisible}>{summaryDetailsVisible ? "Esconder detalhes" : "Mostrar detalhes"}</button>
+            <button type="button" onClick={() => setSummaryDetailsVisible(value => !value)} className="vendor-readable-outline min-h-11 rounded-xl border-2 border-orange-200 bg-white px-4 text-sm font-black text-[#7A3515] hover:bg-orange-50" aria-expanded={summaryDetailsVisible}>{summaryDetailsVisible ? "Esconder detalhes" : "Mostrar detalhes"}</button>
             <button type="button" onClick={() => { setEditingDailyGoal(value => !value); setDailyGoalMessage(""); }} className="vendor-daily-goal-button min-h-11 rounded-xl border-2 border-orange-200 bg-orange-50 px-4 text-base font-black text-[#9A3E00] hover:bg-orange-100">{dailySalesGoal > 0 ? `Meta: ${formatCurrency(dailySalesGoal)}` : "Definir meta diaria"}</button>
           </div>
         </div>
@@ -3453,7 +3453,7 @@ export default function VendorDashboard() {
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
+      <nav className="vendor-mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
         <div className="flex gap-2 overflow-x-auto hide-scrollbar">
           {visibleTabs.map(tab => (
             <button
