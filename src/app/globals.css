@@ -2399,6 +2399,10 @@ input[type="number"] {
   color: #3d2418 !important;
 }
 
+.vendor-ops-shell .vendor-kanban-column > div:first-child > h3 {
+  color: #3d2418 !important;
+}
+
 .vendor-ops-shell .vendor-kanban-column > div:nth-child(2) > div:not(.vendor-order-card) svg {
   opacity: 0.55;
 }
