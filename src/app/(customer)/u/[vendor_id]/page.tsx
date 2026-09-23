@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { isValidBrazilPhoneWithDdd, normalizeBrazilPhoneWithDdd } from "@/lib/phone";
 import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { QrScannerButton } from "@/components/pwa/QrScannerButton";
+import { getOrderOptionGroups, selectedOrderOptionLabel, selectedOrderOptions } from "@/lib/order-options";
 import {
   CUSTOMER_MENU_CATEGORIES,
   CustomerMenuCategory,
@@ -38,22 +39,6 @@ type CartItem = {
   quantity: number;
   option?: string | null;
 };
-
-type ProductOptionGroup = { name: string; options: string[] };
-
-function getProductOptionGroups(product: Product): ProductOptionGroup[] {
-  const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
-  if (values.length === 0) return [];
-  if (!values.some(value => value.includes('::'))) return [{ name: product.option_group_name || 'Opcao', options: values }];
-  const groups = new Map<string, string[]>();
-  values.forEach(value => {
-    const [rawGroup, ...parts] = value.split('::');
-    const group = rawGroup.trim() || 'Opcao';
-    const option = parts.join('::').trim();
-    if (option) groups.set(group, [...(groups.get(group) || []), option]);
-  });
-  return Array.from(groups, ([name, options]) => ({ name, options: Array.from(new Set(options)) }));
-}
 
 type UpsellRule = { trigger_product_id: string; suggested_product_ids: string[]; message: string };
 type FlexiblePromotion = { id: string; titulo: string; descricao?: string | null; desconto_tipo: string; desconto_valor: number; promocao_itens?: Array<{ product_id: string; quantidade: number; products?: { name?: string } }> };
@@ -568,8 +553,7 @@ export default function CustomerApp() {
   }
 
   function addToCart(product: Product) {
-    const groups = getProductOptionGroups(product);
-    const choices = groups.map(group => ({ name: group.name, value: selectedOptions[`${product.id}:${group.name}`] || group.options[0] })).filter(choice => choice.value);
+    const choices = selectedOrderOptions(product, selectedOptions, product.id);
     const option = choices.length > 0 ? choices.map(choice => `${choice.name}: ${choice.value}`).join(' | ') : null;
     setLastAddedProductId(product.id);
     setCart((prev) => {
@@ -976,8 +960,8 @@ export default function CustomerApp() {
             {visibleProducts.length === 0 ? (
               <p className="customer-empty">Nenhum produto nesta categoria.</p>
             ) : visibleProducts.map((product) => {
-              const optionGroups = getProductOptionGroups(product);
-              const selectedOption = optionGroups.length > 0 ? optionGroups.map(group => `${group.name}: ${selectedOptions[`${product.id}:${group.name}`] || group.options[0]}`).join(' | ') : null;
+              const optionGroups = getOrderOptionGroups(product);
+              const selectedOption = selectedOrderOptionLabel(product, selectedOptions, product.id) || null;
               const quantity = getCartQuantity(product.id, selectedOption);
               const highlighted = Boolean(product.menu_highlight || product.is_combo || product.promotional_price);
               return (
@@ -1183,7 +1167,7 @@ export default function CustomerApp() {
       )}
 
       {optionMenuProduct && (() => {
-        const groups = getProductOptionGroups(optionMenuProduct);
+        const groups = getOrderOptionGroups(optionMenuProduct);
         return <div className="customer-option-modal-backdrop" onClick={() => setOptionMenuProduct(null)}><div className="customer-option-modal" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Opções de ${optionMenuProduct.name}`}><div className="customer-option-modal__header"><div><small>Monte do seu jeito</small><h2>{optionMenuProduct.name}</h2><p>Escolha uma opção em cada etapa.</p></div><button type="button" onClick={() => setOptionMenuProduct(null)} aria-label="Fechar opções">×</button></div><div className="customer-option-modal__groups">{groups.map(group => <div key={group.name} className="customer-option-group"><p>{group.name}</p><div>{group.options.map(option => <button key={option} type="button" onClick={() => setSelectedOptions(current => ({ ...current, [`${optionMenuProduct.id}:${group.name}`]: option }))} className={(selectedOptions[`${optionMenuProduct.id}:${group.name}`] || group.options[0]) === option ? 'is-selected' : ''}>{option}</button>)}</div></div>)}</div><div className="customer-option-modal__footer"><div><small>Preço</small><strong>{formatCurrency(Number(optionMenuProduct.promotional_price ?? optionMenuProduct.price))}</strong></div><button type="button" onClick={() => { addToCart(optionMenuProduct); setOptionMenuProduct(null); }}>Adicionar ao pedido</button></div></div></div>;
       })()}
 

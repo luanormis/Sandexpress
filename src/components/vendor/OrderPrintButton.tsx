@@ -31,11 +31,14 @@ export default function OrderPrintButton({ vendorId, order }: { vendorId: string
     if (!jobs.length) return alert('Nenhuma impressora ativa atende aos itens deste pedido.');
     jobs.forEach(({ printer, route, items }, index) => {
       const columns = printer.columns || (printer.paperWidth === 58 ? 32 : 42);
-      if (printer.connection === 'network' && printer.host) {
-        const text = [wrapText(`QUIOSQUE: ${kioskName}`, columns), wrapText(routeTitle(route), columns), `GUARDA-SOL: ${order.umbrella}`, wrapText(`CLIENTE: ${order.customer || '-'}`, columns), `PEDIDO: ${order.active_request?.sequence || '-'}`, `HORARIO: ${order.time}`, '-'.repeat(columns), ...items.map(item => wrapText(`${item.q}x ${item.n}${route === 'cashier' ? `  ${money(Number(item.subtotal || 0))}` : ''}`, columns)), route === 'cashier' ? wrapText(`TOTAL: ${money(order.total)}`, columns) : '', wrapText(`OBSERVACOES: ${order.notes || 'Sem observacoes'}`, columns), '\n\n\n'].filter(Boolean).join('\n');
-        void fetch('http://127.0.0.1:17891/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: printer.host, port: printer.port || 9100, text, cut: printer.autoCut === true }) })
+      const text = [wrapText(`QUIOSQUE: ${kioskName}`, columns), wrapText(routeTitle(route), columns), `GUARDA-SOL: ${order.umbrella}`, wrapText(`CLIENTE: ${order.customer || '-'}`, columns), `PEDIDO: ${order.active_request?.sequence || '-'}`, `HORARIO: ${order.time}`, '-'.repeat(columns), ...items.map(item => wrapText(`${item.q}x ${item.n}${route === 'cashier' ? `  ${money(Number(item.subtotal || 0))}` : ''}`, columns)), route === 'cashier' ? wrapText(`TOTAL: ${money(order.total)}`, columns) : '', '-'.repeat(columns), 'OBSERVACOES DO PEDIDO:', wrapText(order.notes || 'Sem observacoes', columns), '\n\n\n'].filter(Boolean).join('\n');
+      if ((printer.connection === 'network' && printer.host) || (printer.connection === 'windows' && printer.printerName)) {
+        const destination = printer.connection === 'windows'
+          ? { printerName: printer.printerName }
+          : { host: printer.host, port: printer.port || 9100 };
+        void fetch('http://127.0.0.1:17891/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...destination, text, cut: printer.autoCut === true, profile: printer.profile }) })
           .then(async response => { if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Falha na impressora.'); })
-          .catch(error => alert(error instanceof Error ? error.message : 'Falha ao imprimir pela rede.'));
+          .catch(error => alert(error instanceof Error ? error.message : 'Falha ao imprimir pelo agente do desktop.'));
         return;
       }
       const popup = window.open('', `_sand_print_${index}`, 'width=420,height=720');

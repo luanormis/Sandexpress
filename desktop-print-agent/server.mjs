@@ -3,6 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const HTTP_PORT = 17891;
 const EMULATOR_PORT = 19100;
@@ -37,9 +38,64 @@ function probe(host, port = 9100, timeout = 220) {
   });
 }
 
+function runPowerShell(script, input = '', extraEnv = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      windowsHide: true,
+      env: { ...process.env, ...extraEnv },
+    });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on('data', chunk => stdout.push(chunk));
+    child.stderr.on('data', chunk => stderr.push(chunk));
+    child.once('error', reject);
+    child.once('close', code => code === 0
+      ? resolve(Buffer.concat(stdout).toString('utf8'))
+      : reject(new Error(Buffer.concat(stderr).toString('utf8').trim() || 'Falha ao acessar impressoras do Windows.')));
+    child.stdin.end(input, 'utf8');
+  });
+}
+
+function printerProfile(name, driverName) {
+  const value = `${name} ${driverName}`.toLowerCase();
+  if (/epson/.test(value) && /tm[\s-]*t20/.test(value)) return 'epson-tm-t20';
+  if (/(elgin|bematech)/.test(value) && /\bi8\b/.test(value)) return 'elgin-i8';
+  return 'generic-escpos';
+}
+
+async function discoverWindowsPrinters() {
+  if (process.platform !== 'win32') return [];
+  const output = await runPowerShell("Get-Printer | Select-Object Name,DriverName,PortName | ConvertTo-Json -Compress");
+  if (!output.trim()) return [];
+  const parsed = JSON.parse(output.replace(/^\uFEFF/, ''));
+  return (Array.isArray(parsed) ? parsed : [parsed]).map(item => ({
+    name: String(item.Name || 'Impressora do Windows'),
+    printerName: String(item.Name || ''),
+    portName: String(item.PortName || ''),
+    model: String(item.DriverName || ''),
+    profile: printerProfile(item.Name, item.DriverName),
+    connection: 'windows',
+    protocol: String(item.PortName || '').toUpperCase().startsWith('USB') ? 'Windows/USB' : 'Fila do Windows',
+    virtual: false,
+    rawCompatible: true,
+  })).filter(item => item.printerName);
+}
+
+async function printWindows(printerName, text) {
+  const queues = await discoverWindowsPrinters();
+  if (!queues.some(queue => queue.printerName === printerName)) throw new Error('Impressora não encontrada no Windows.');
+  const script = "$printer = $env:SANDEXPRESS_PRINTER_NAME; $text = [Console]::In.ReadToEnd(); $text | Out-Printer -Name $printer";
+  await runPowerShell(script, text, { SANDEXPRESS_PRINTER_NAME: printerName });
+}
+
 async function discover(additionalPorts = []) {
   const discoveryPorts = [...new Set([...DEFAULT_DISCOVERY_PORTS, ...additionalPorts])].filter(port => Number.isInteger(port) && port > 0 && port <= 65535).slice(0, 20);
-  const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, virtual: true, rawCompatible: true }];
+  const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, connection: 'network', virtual: true, rawCompatible: true, protocol: 'RAW/ESC-POS' }];
+  try {
+    printers.push(...await discoverWindowsPrinters());
+  } catch (error) {
+    console.warn('Não foi possível listar as filas do Windows:', error instanceof Error ? error.message : error);
+  }
   for (const subnet of localSubnets()) {
     const hosts = Array.from({ length: 254 }, (_, index) => `${subnet}.${index + 1}`);
     for (let offset = 0; offset < hosts.length; offset += 32) {
@@ -51,6 +107,7 @@ async function discover(additionalPorts = []) {
           name: `Impressora de rede ${item.host}`,
           host: item.host,
           port: item.port,
+          connection: 'network',
           virtual: false,
           rawCompatible: item.port === 9100,
           protocol: item.port === 9100 ? 'RAW/ESC-POS' : item.port === 631 ? 'IPP' : 'LPD',
@@ -107,8 +164,12 @@ http.createServer(async (req, res) => {
       for await (const chunk of req) chunks.push(chunk);
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       if (typeof body.text !== 'string' || body.text.length > 100_000) throw new Error('Conteúdo inválido.');
+      if (typeof body.printerName === 'string' && body.printerName.trim()) {
+        await printWindows(body.printerName.trim(), body.text);
+        return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printed: true, mode: 'windows' }));
+      }
       await sendRaw(String(body.host), Number(body.port), body.text, body.cut === true);
-      return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printed: true }));
+      return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ printed: true, mode: 'network' }));
     }
     res.writeHead(404).end('Não encontrado.');
   } catch (error) {

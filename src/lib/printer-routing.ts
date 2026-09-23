@@ -6,9 +6,13 @@ export type KioskPrinter = {
   route: PrinterRoute;
   routes?: PrinterRoute[];
   active: boolean;
-  connection?: 'browser' | 'network';
+  connection?: 'browser' | 'network' | 'windows';
   host?: string;
   port?: number;
+  printerName?: string;
+  portName?: string;
+  model?: string;
+  profile?: 'generic-escpos' | 'epson-tm-t20' | 'elgin-i8';
   paperWidth?: 58 | 80;
   columns?: number;
   autoCut?: boolean;
@@ -45,12 +49,18 @@ export function normalizePrinters(value: unknown): KioskPrinter[] {
     if (!id || !name || !['food', 'beverage', 'cashier'].includes(String(route))) return [];
     const host = typeof item.host === 'string' ? item.host.trim() : undefined;
     const port = Number(item.port || 9100);
-    const connection = item.connection === 'network' && host ? 'network' as const : 'browser' as const;
+    const printerName = typeof item.printerName === 'string' ? item.printerName.trim().slice(0, 160) : undefined;
+    const connection = item.connection === 'network' && host
+      ? 'network' as const
+      : item.connection === 'windows' && printerName
+        ? 'windows' as const
+        : 'browser' as const;
     const routes = [...new Set((Array.isArray(item.routes) ? item.routes : [route]).filter(value => ['food', 'beverage', 'cashier'].includes(String(value))))] as PrinterRoute[];
     const paperWidth = item.paperWidth === 58 ? 58 : 80;
     const defaultColumns = paperWidth === 58 ? 32 : 42;
     const columns = Math.max(24, Math.min(64, Number(item.columns) || defaultColumns));
-    return [{ id, name, route: routes[0] || route as PrinterRoute, routes: routes.length ? routes : [route as PrinterRoute], active: item.active !== false, connection, host, port: connection === 'network' && Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined, paperWidth, columns, autoCut: item.autoCut === true }];
+    const profile = ['epson-tm-t20', 'elgin-i8'].includes(String(item.profile)) ? item.profile : 'generic-escpos';
+    return [{ id, name, route: routes[0] || route as PrinterRoute, routes: routes.length ? routes : [route as PrinterRoute], active: item.active !== false, connection, host, port: connection === 'network' && Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined, printerName: connection === 'windows' ? printerName : undefined, portName: typeof item.portName === 'string' ? item.portName.trim().slice(0, 80) : undefined, model: typeof item.model === 'string' ? item.model.trim().slice(0, 160) : undefined, profile: profile as KioskPrinter['profile'], paperWidth, columns, autoCut: item.autoCut === true }];
   });
 }
 

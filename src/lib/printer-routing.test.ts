@@ -24,5 +24,15 @@ describe('printer routing', () => {
     expect(jobs.map(job => job.route)).toEqual(['food', 'beverage', 'cashier']);
     expect(jobs[2].items).toHaveLength(2);
   });
+
+  it('keeps supported Windows USB printer profiles', () => {
+    const printers = normalizePrinters([
+      { id: 'usb-1', name: 'Bar', route: 'beverage', connection: 'windows', printerName: 'EPSON TM-T20', portName: 'USB003', model: 'EPSON TM-T20', profile: 'epson-tm-t20' },
+      { id: 'usb-2', name: 'Cozinha', route: 'food', connection: 'windows', printerName: 'ELGIN i8', model: 'ELGIN i8', profile: 'elgin-i8' },
+    ]);
+    expect(printers.map(item => item.connection)).toEqual(['windows', 'windows']);
+    expect(printers.map(item => item.profile)).toEqual(['epson-tm-t20', 'elgin-i8']);
+    expect(printers[0].portName).toBe('USB003');
+  });
 });
 

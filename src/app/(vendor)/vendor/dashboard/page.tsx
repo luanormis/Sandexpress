@@ -17,6 +17,7 @@ import OrderPrintButton from "@/components/vendor/OrderPrintButton";
 import PrinterManager from "@/components/vendor/PrinterManager";
 import { getVisibleConsumptionItems, getVisibleVendorOrderNotes, isAccountWithoutConsumption } from "@/lib/vendor-order-state";
 import { DEFAULT_DEVICE_ALERT_PREFERENCES, readDeviceAlertPreferences, saveDeviceAlertPreferences, vibrateDevice, type DeviceAlertPreferences } from "@/lib/device-alert-preferences";
+import { getOrderOptionGroups, selectedOrderOptionLabel } from "@/lib/order-options";
 
 const WAITER_CALL_MARKER = "[WAITER_CALL]";
 const SERVICE_REQUEST_MARKERS = [
@@ -106,14 +107,7 @@ interface ProductCategory {
   sort_order: number;
 }
 
-function productOptionGroups(product: Pick<Product, 'option_group_name' | 'option_values'>) {
-  const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
-  if (values.length === 0) return [] as Array<{ name: string; options: string[] }>;
-  if (!values.some(value => value.includes('::'))) return [{ name: product.option_group_name || 'Opcao', options: values }];
-  const groups = new Map<string, string[]>();
-  values.forEach(value => { const [rawName, ...parts] = value.split('::'); const name = rawName.trim() || 'Opcao'; const option = parts.join('::').trim(); if (option) groups.set(name, [...(groups.get(name) || []), option]); });
-  return Array.from(groups, ([name, options]) => ({ name, options: Array.from(new Set(options)) }));
-}
+const productOptionGroups = (product: Product) => getOrderOptionGroups(product);
 
 function isOrderEmpty(order: Pick<Order, "total" | "items" | "account_items">) {
   return isAccountWithoutConsumption(order);
@@ -4015,7 +4009,7 @@ function ManualOrderMenuModal({
   const changeQuantity = (productId: string, delta: number) => {
     setCart(current => ({ ...current, [productId]: Math.max(0, Math.min(50, (current[productId] || 0) + delta)) }));
   };
-  const optionSignature = (product: Product) => productOptionGroups(product).map(group => `${group.name}: ${optionSelections[`${product.id}:${group.name}`] || group.options[0]}`).join(' | ');
+  const optionSignature = (product: Product) => selectedOrderOptionLabel(product, optionSelections, product.id);
   const handleSubmit = async () => {
     setSubmitting(true);
     setError('');

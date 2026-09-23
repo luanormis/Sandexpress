@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BellRing, CheckCircle2, LogOut, MapPin, Minus, Plus, Search, ShoppingBasket, UserRound, Volume2, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { DEFAULT_DEVICE_ALERT_PREFERENCES, readDeviceAlertPreferences, saveDeviceAlertPreferences, vibrateDevice, type DeviceAlertPreferences } from "@/lib/device-alert-preferences";
+import { getOrderOptionGroups, selectedOrderOptionLabel } from "@/lib/order-options";
 
 type Umbrella = { id: string; number: number; active: boolean; is_occupied?: boolean; current_order_id?: string | null };
 type Product = { id: string; name: string; category: string; price: number; promotional_price?: number | null; active: boolean; blocked_by_stock?: boolean; option_group_name?: string | null; option_values?: string[] | null };
@@ -28,14 +29,7 @@ function assignmentFor(order: Order) {
   const match = String(order.notes || '').match(/\[WAITER_ASSIGNED:([0-9a-f-]{36})\]\s*Assumido por\s*([^\n]+)/i);
   return match ? { userId: match[1], name: match[2].trim() } : null;
 }
-function productOptionGroups(product: Pick<Product, 'option_group_name' | 'option_values'>) {
-  const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
-  if (values.length === 0) return [] as Array<{ name: string; options: string[] }>;
-  if (!values.some(value => value.includes('::'))) return [{ name: product.option_group_name || 'Opcao', options: values }];
-  const groups = new Map<string, string[]>();
-  values.forEach(value => { const [rawName, ...parts] = value.split('::'); const name = rawName.trim() || 'Opcao'; const option = parts.join('::').trim(); if (option) groups.set(name, [...(groups.get(name) || []), option]); });
-  return Array.from(groups, ([name, options]) => ({ name, options: Array.from(new Set(options)) }));
-}
+const productOptionGroups = (product: Product) => getOrderOptionGroups(product);
 
 export default function WaiterServicePage() {
   const router = useRouter();
@@ -372,7 +366,7 @@ function OrderMenuModal({ order, products, onClose, onSubmit }: { order: Order; 
   const available = products.filter(product => product.active && !product.blocked_by_stock && product.name.toLowerCase().includes(search.toLowerCase()));
   const count = Object.values(cart).reduce((sum, value) => sum + value, 0);
   const total = products.reduce((sum, product) => sum + Number(product.promotional_price ?? product.price) * (cart[product.id] || 0), 0);
-  const signature = (product: Product) => productOptionGroups(product).map(group => `${group.name}: ${choices[`${product.id}:${group.name}`] || group.options[0]}`).join(' | ');
+  const signature = (product: Product) => selectedOrderOptionLabel(product, choices, product.id);
   const submit = async () => {
     setLoading(true); setError('');
     try {
