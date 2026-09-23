@@ -4172,6 +4172,7 @@ function ProductModal({
   });
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
+  const [imageSearch, setImageSearch] = useState("");
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [subcategoryMessage, setSubcategoryMessage] = useState("");
   const isMenuMode = mode === "menu";
@@ -4183,6 +4184,11 @@ function ProductModal({
   const categoryNames = Array.from(new Set([...existingCategoryNames, ...rootCategories.map(category => category.name)].filter(Boolean)));
   const normalizedOptionGroups = optionGroups.map(group => ({ name: group.name.trim() || 'Opcao', options: group.options.map(option => option.trim()).filter(Boolean) })).filter(group => group.options.length > 0).slice(0, 8);
   const normalizedOptionValues = normalizedOptionGroups.flatMap(group => group.options.map(option => `${group.name}::${option}`)).slice(0, 50);
+  const visibleDefaultImages = defaultImages.filter(image => {
+    const query = imageSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    if (!query) return true;
+    return `${image.name} ${image.category} ${(image.tags || []).join(" ")}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(query);
+  });
 
   const updateOptionGroup = (groupIndex: number, updater: (group: { name: string; options: string[] }) => { name: string; options: string[] }) => setOptionGroups(current => current.map((group, index) => index === groupIndex ? updater(group) : group));
   const addOptionGroup = () => setOptionGroups(current => [...current, { name: `Escolha ${current.length + 1}`, options: [''] }]);
@@ -4249,12 +4255,16 @@ function ProductModal({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("vendor_id", vendorId);
+      fd.append("category", form.category || "Geral");
+      fd.append("title", form.name || file.name.replace(/\.[^.]+$/, ""));
       const res = await fetch("/api/products/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (data.url) setForm(prev => ({ ...prev, image_url: data.url }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || "Erro ao enviar imagem.");
+      setForm(prev => ({ ...prev, image_url: data.url }));
+      if (data.image) setDefaultImages(current => [data.image, ...current.filter(image => image.id !== data.image.id)]);
     } catch (err) {
       console.error("Upload failed:", err);
-      alert('Erro ao enviar imagem.');
+      alert(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
     }
     setUploading(false);
   };
@@ -4295,11 +4305,15 @@ function ProductModal({
             <p className="mt-2 text-xs font-bold leading-5 text-gray-500">
               Todas as imagens do catálogo SandExpress aparecem abaixo. Role a galeria e toque em uma miniatura para selecionar.
             </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input type="search" value={imageSearch} onChange={event => setImageSearch(event.target.value)} placeholder="Buscar por nome, categoria ou ingrediente" className="min-h-11 w-full rounded-xl border-2 border-gray-200 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#FF6B00]"/></div>
+              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-4 text-sm font-black text-white hover:bg-[#e56000]"><Upload size={17}/>{uploading ? "Convertendo..." : "Enviar imagem"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={handleImageUpload} className="hidden"/></label>
+            </div>
             {defaultImages.length > 0 && (
               <div className="mt-3">
                 <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referências do catálogo global</p>
                 <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-orange-100 bg-[#FFF8E8] p-2 sm:grid-cols-4">
-                  {defaultImages.map((image) => (
+                  {visibleDefaultImages.map((image) => (
                     <button
                       key={image.id}
                       type="button"
@@ -4314,6 +4328,7 @@ function ProductModal({
                     </button>
                   ))}
                 </div>
+                {visibleDefaultImages.length === 0 && <p className="mt-2 rounded-xl bg-gray-50 p-3 text-sm font-bold text-gray-600">Nenhuma imagem corresponde à busca.</p>}
               </div>
             )}
             {defaultImages.length === 0 && (

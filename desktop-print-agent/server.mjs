@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 
 const HTTP_PORT = 17891;
 const EMULATOR_PORT = 19100;
+const ENABLE_VIRTUAL_PRINTER = process.env.SANDEXPRESS_ENABLE_VIRTUAL_PRINTER === 'true';
 const DEFAULT_DISCOVERY_PORTS = [9100, 515, 631];
 const spoolDir = path.resolve('spool');
 const allowedOrigins = new Set(['https://sandexpress.com.br', 'https://www.sandexpress.com.br', 'https://app.sandexpress.com.br', 'https://sandexpress.vercel.app', 'http://localhost:3000']);
@@ -90,7 +91,8 @@ async function printWindows(printerName, text) {
 
 async function discover(additionalPorts = []) {
   const discoveryPorts = [...new Set([...DEFAULT_DISCOVERY_PORTS, ...additionalPorts])].filter(port => Number.isInteger(port) && port > 0 && port <= 65535).slice(0, 20);
-  const printers = [{ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, connection: 'network', virtual: true, rawCompatible: true, protocol: 'RAW/ESC-POS' }];
+  const printers = [];
+  if (ENABLE_VIRTUAL_PRINTER) printers.push({ name: 'SandExpress térmica virtual', host: '127.0.0.1', port: EMULATOR_PORT, connection: 'network', virtual: true, rawCompatible: true, protocol: 'RAW/ESC-POS' });
   try {
     printers.push(...await discoverWindowsPrinters());
   } catch (error) {
@@ -131,15 +133,17 @@ async function sendRaw(host, port, text, cut = false) {
   });
 }
 
-await fs.mkdir(spoolDir, { recursive: true });
-net.createServer(socket => {
-  const chunks = [];
-  socket.on('data', chunk => chunks.push(chunk));
-  socket.on('end', async () => {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    await fs.writeFile(path.join(spoolDir, `ticket-${stamp}.txt`), Buffer.concat(chunks));
-  });
-}).listen(EMULATOR_PORT, '127.0.0.1');
+if (ENABLE_VIRTUAL_PRINTER) {
+  await fs.mkdir(spoolDir, { recursive: true });
+  net.createServer(socket => {
+    const chunks = [];
+    socket.on('data', chunk => chunks.push(chunk));
+    socket.on('end', async () => {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await fs.writeFile(path.join(spoolDir, `ticket-${stamp}.txt`), Buffer.concat(chunks));
+    });
+  }).listen(EMULATOR_PORT, '127.0.0.1');
+}
 
 http.createServer(async (req, res) => {
   const origin = req.headers.origin || '';
@@ -153,7 +157,7 @@ http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.writeHead(204).end();
   try {
-    if (req.method === 'GET' && req.url === '/health') return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ready: true, emulator_port: EMULATOR_PORT }));
+    if (req.method === 'GET' && req.url === '/health') return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ready: true, physical_printers: true, virtual_printer: ENABLE_VIRTUAL_PRINTER, emulator_port: ENABLE_VIRTUAL_PRINTER ? EMULATOR_PORT : null }));
     if (req.method === 'GET' && req.url?.startsWith('/printers')) {
       const url = new URL(req.url, `http://127.0.0.1:${HTTP_PORT}`);
       const ports = String(url.searchParams.get('ports') || '').split(',').map(Number);
@@ -177,7 +181,10 @@ http.createServer(async (req, res) => {
   }
 }).listen(HTTP_PORT, '127.0.0.1', () => {
   console.log(`Agente SandExpress ativo em http://127.0.0.1:${HTTP_PORT}`);
-  console.log(`Impressora térmica virtual ativa em 127.0.0.1:${EMULATOR_PORT}`);
-  console.log(`Tickets de teste: ${spoolDir}`);
+  console.log('Modo de produção: filas físicas USB/Windows e impressoras de rede.');
+  if (ENABLE_VIRTUAL_PRINTER) {
+    console.log(`Impressora térmica virtual de teste ativa em 127.0.0.1:${EMULATOR_PORT}`);
+    console.log(`Tickets de teste: ${spoolDir}`);
+  }
 });
 

@@ -10,6 +10,7 @@ import {
 } from '@/lib/product-image-processing';
 
 const CATALOG_BUCKET = 'catalogo-global';
+const MAX_CONVERTED_IMAGE_BYTES = 2 * 1024 * 1024;
 export const runtime = 'nodejs';
 
 /**
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.warn('Invalid product image payload:', error);
       return NextResponse.json({ error: 'O arquivo nao contem uma imagem valida.' }, { status: 400 });
+    }
+    if (converted.length > MAX_CONVERTED_IMAGE_BYTES) {
+      return NextResponse.json({ error: 'A imagem continuou acima de 2MB depois da conversao.' }, { status: 400 });
     }
 
     uploadedPath = buildSharedImagePath(category);

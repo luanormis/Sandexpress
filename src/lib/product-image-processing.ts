@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
-export const PRODUCT_IMAGE_MAX_DIMENSION = 1600;
-export const PRODUCT_IMAGE_WEBP_QUALITY = 82;
+export const PRODUCT_IMAGE_MAX_DIMENSION = 1200;
+export const PRODUCT_IMAGE_WEBP_QUALITY = 72;
 
 export function normalizeImageSearch(value: unknown) {
   return String(value || '')

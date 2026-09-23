@@ -47,8 +47,9 @@ export async function seedVeraMenuForVendor(tenantId: string, vendorId: string) 
   if ((count || 0) > 0) return { inserted: 0, skipped: true, total: VERA_MENU.length };
   const payload = VERA_MENU.map((item, index) => ({
     tenant_id: tenantId, vendor_id: vendorId, category: item.category,
-    name: item.name, description: item.description || null, price: item.price,
+    name: item.name, description: item.description || null, price: 0,
     image_url: item.image, is_default_image: true, active: true, sort_order: index,
+    stock_tracking_enabled: false, stock_quantity: 0, physical_stock_quantity: 0, beach_stock_quantity: 0,
   }));
   const { error } = await supabaseAdmin.from('products').insert(payload as any);
   if (error) throw error;

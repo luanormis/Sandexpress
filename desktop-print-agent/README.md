@@ -16,8 +16,9 @@ No Windows, instale primeiro o driver oficial do fabricante e confirme uma pági
 2. Abra esta pasta e execute `npm start`.
 3. No painel do quiosque, abra **Impressoras** e clique em **Buscar USB e rede**.
 4. Dê um nome operacional (Bar ou Cozinha), marque o destino e clique em **Adicionar**.
-5. Para testar sem gastar papel, selecione **SandExpress térmica virtual** e imprima um pedido.
-6. Confira o ticket criado na pasta `spool`.
+5. Imprima uma comanda de teste na impressora física selecionada.
+
+A impressora virtual fica desativada em produção. Para um teste técnico isolado, inicie o agente com `SANDEXPRESS_ENABLE_VIRTUAL_PRINTER=true`; somente nesse modo os tickets são gravados na pasta `spool`.
 
 As observações do pedido e as opções “Com gelo”, “Sem açúcar” e “Com limão” são impressas na seção **OBSERVAÇÕES DO PEDIDO**. A cópia do Bar contém bebidas, a da Cozinha contém alimentos e a do Caixa permanece consolidada.
 
