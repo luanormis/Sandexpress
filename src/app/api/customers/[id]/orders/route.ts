@@ -37,13 +37,24 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select('id, total, status, created_at, order_items(id, order_request_id, quantity, unit_price, subtotal, cancelled, products(name)), customer_order_requests(id, sequence, subtotal, status, created_at)')
+      .select('id, total, status, created_at, customer_order_requests(id, sequence, subtotal, status, created_at)')
       .eq('customer_id', id)
       .eq('vendor_id', customer.vendor_id)
       .eq('paid', false)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
+    const orderIds = (data || []).map((order: any) => order.id);
+    const { data: itemRows, error: itemError } = orderIds.length
+      ? await supabaseAdmin.from('order_items').select('id, order_id, order_request_id, quantity, unit_price, subtotal, cancelled, products(name)').in('order_id', orderIds)
+      : { data: [], error: null };
+    if (itemError) throw itemError;
+    const itemsByOrder = new Map<string, any[]>();
+    for (const item of itemRows || []) {
+      const current = itemsByOrder.get((item as any).order_id) || [];
+      current.push(item);
+      itemsByOrder.set((item as any).order_id, current);
+    }
     const enriched = await Promise.all((data || []).map(async (order: any) => {
       const events: any[] = [];
       for (let offset = 0; ; offset += 1000) {
@@ -56,7 +67,7 @@ export async function GET(
         if (!batch || batch.length < 1000) break;
       }
       const delivered = latestDeliveredQuantities(events);
-      return { ...order, items: (order.order_items || []).map((item: any) => ({
+      return { ...order, items: (itemsByOrder.get(order.id) || []).map((item: any) => ({
         id: item.id, order_request_id: item.order_request_id, name: item.products?.name || 'Produto',
         quantity: Number(item.quantity), unit_price: Number(item.unit_price), subtotal: Number(item.subtotal),
         cancelled: Boolean(item.cancelled), delivered_quantity: clampDeliveredQuantity(delivered[item.id] ?? ((order.customer_order_requests || []).find((request: any) => request.id === item.order_request_id)?.status === 'completed' || order.status === 'completed' ? item.quantity : 0), item.quantity),

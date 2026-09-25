@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { accountShare, registeredPeople } from '@/lib/account-share';
-import { AlertCircle, Check, X, Search, DollarSign, Phone } from 'lucide-react';
+import { AlertCircle, Check, X, Search, DollarSign, Phone, Printer } from 'lucide-react';
 
 interface OrderPreview {
   order_id: string;
@@ -26,6 +26,10 @@ interface AccountPaymentSummary {
   remaining_amount: number;
   payments: Array<{ id: string; amount: number; payer_name: string; payment_method: string; created_at: string }>;
 }
+
+type AccountReceipt = { customer_name: string; customer_phone: string; umbrella_number?: number; total: number; created_at: string; items: Array<{ name: string; quantity: number; unit_price: number; subtotal: number; cancelled: boolean }> };
+const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const receiptEscape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
 
 export default function CloseAccountModal() {
   const [searchType, setSearchType] = useState<'umbrella' | 'phone'>('umbrella');
@@ -157,6 +161,20 @@ export default function CloseAccountModal() {
     } finally {
       setConfirming(false);
     }
+  };
+
+  const printAccount = async () => {
+    if (!orderPreview) return;
+    try {
+      const response = await fetch(`/api/account-receipt?vendor_id=${encodeURIComponent(vendorId)}&order_id=${encodeURIComponent(orderPreview.order_id)}`);
+      const receipt: AccountReceipt | { error: string } = await response.json();
+      if (!response.ok || !('items' in receipt)) throw new Error('error' in receipt ? receipt.error : 'Não foi possível preparar a impressão.');
+      const popup = window.open('', '_sandexpress_account_receipt', 'width=420,height=720');
+      if (!popup) throw new Error('Permita a abertura da janela de impressão.');
+      const rows = receipt.items.map(item => `<tr><td>${item.quantity} × ${receiptEscape(item.name)}${item.cancelled ? ' (cancelado)' : ''}</td><td>${money(item.unit_price)}</td><td>${item.cancelled ? '-' : money(item.subtotal)}</td></tr>`).join('');
+      popup.document.write(`<!doctype html><html><head><title>Conta SandExpress</title><style>body{font-family:Arial,sans-serif;max-width:72mm;margin:4mm;color:#111}h1{font-size:18px;margin:0 0 8px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}th,td{padding:6px 0;border-bottom:1px solid #bbb;text-align:left}th:last-child,td:last-child{text-align:right}.total{font-size:18px;font-weight:700;margin-top:12px}.muted{font-size:12px;color:#444}</style></head><body><h1>Resumo da conta</h1><p><b>Cliente:</b> ${receiptEscape(receipt.customer_name)}</p><p><b>Guarda-sol:</b> ${receipt.umbrella_number || '-'}</p><p class="muted">${new Date(receipt.created_at).toLocaleString('pt-BR')}</p><table><thead><tr><th>Item</th><th>Unit.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><p class="total">TOTAL: ${money(receipt.total)}</p><p class="muted">SandExpress · Confira os itens antes do pagamento.</p><script>window.onload=()=>window.print()<\/script></body></html>`);
+      popup.document.close();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível imprimir a conta.'); }
   };
 
   const timeOpened = orderPreview
@@ -424,6 +442,9 @@ export default function CloseAccountModal() {
 
           {/* Botões de Ação */}
           <div className="flex gap-3 pt-4 border-t">
+            <button onClick={printAccount} type="button" className="px-4 py-3 border-2 border-gray-300 text-gray-800 rounded-lg font-bold hover:bg-gray-50 transition" title="Imprimir resumo da conta">
+              <Printer className="w-4 h-4 inline mr-2" /> Imprimir conta
+            </button>
             <button
               onClick={() => {
                 setOrderPreview(null);
