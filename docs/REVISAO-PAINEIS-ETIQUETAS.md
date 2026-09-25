@@ -6,7 +6,7 @@ As rotas de cliente, quiosque, garçom, administração e proprietário usam fun
 
 A abertura por QR e a abertura manual registram `party_size` na comanda. Caixa e garçom carregam a quantidade cadastrada e sugerem uma cota sobre o total original, limitada ao saldo restante. Cada recebimento registra nome, forma de pagamento e valor. A liberação do guarda-sol continua condicionada à quitação total. O cliente pode solicitar pagamento separado; a equipe confirma o recebimento.
 
-O banco conectado possui `customers.party_size`, mas ainda não possui `orders.party_size`. Antes de publicar, aplicar `infra/20260925-account-party-size.sql`. Ela acrescenta o campo, preenche comandas abertas com a quantidade cadastrada no cliente e preserva os valores financeiros. Não cria novas tabelas nem altera permissões. As credenciais locais permitem acesso à API de dados; a aplicação da migração exige acesso ao editor SQL ou conexão PostgreSQL.
+O banco conectado possui `customers.party_size` e `orders.party_size`, verificados após a atualização informada pelo usuário. Para outros ambientes, aplicar `infra/20260925-account-party-size.sql` antes de publicar. Ela acrescenta o campo, preenche comandas abertas com a quantidade cadastrada no cliente e preserva os valores financeiros. Não cria novas tabelas nem altera permissões. As credenciais locais permitem acesso à API de dados; a aplicação da migração exige acesso ao editor SQL ou conexão PostgreSQL.
 
 ## Etiquetas
 
