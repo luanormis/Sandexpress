@@ -5,7 +5,7 @@ import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readabl
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
-import { Bell, Home, ListOrdered, Minus, Plus, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
+import { Bell, CheckCircle2, CircleX, Home, ListOrdered, Minus, Plus, ShoppingCart, Star, UtensilsCrossed } from "lucide-react";
 import { extractUmbrellaIdFromRouteSegment } from "@/lib/public-url";
 import { formatCurrency } from "@/lib/utils";
 import { isValidBrazilPhoneWithDdd, normalizeBrazilPhoneWithDdd } from "@/lib/phone";
@@ -1162,7 +1162,26 @@ export default function CustomerApp() {
                   <h2 className="customer-order-title">
                     {order.sequence ? `Pedido ${order.sequence}` : `Pedido #${order.id.slice(0, 8)}`}
                   </h2>
-                  <ul className="customer-account-items">{(order.items || []).map(item => <li key={item.id}><strong>{item.quantity} × {item.name}</strong><span>{formatCurrency(item.unit_price)} cada · {formatCurrency(item.subtotal)}</span><span>{item.cancelled ? "Cancelado — não cobrado" : `Entregue: ${item.delivered_quantity} de ${item.quantity} · Falta entregar: ${Math.max(0, item.quantity - item.delivered_quantity)}`}</span></li>)}</ul>
+                  <ul className="customer-account-items">
+                    {(order.items || []).map(item => {
+                      const delivered = !item.cancelled && item.delivered_quantity >= item.quantity;
+                      const pending = !item.cancelled && !delivered;
+                      return <li key={item.id} className={`customer-account-item${delivered ? " is-delivered" : ""}${pending ? " is-pending" : ""}`}>
+                        <div>
+                          <strong>{item.quantity} × {item.name}</strong>
+                          <span>{formatCurrency(item.unit_price)} cada · {formatCurrency(item.subtotal)}</span>
+                        </div>
+                        {item.cancelled ? (
+                          <span className="customer-delivery-status is-cancelled"><CircleX size="1rem" aria-hidden="true" />Cancelado</span>
+                        ) : delivered ? (
+                          <span className="customer-delivery-status is-delivered"><CheckCircle2 size="1rem" aria-hidden="true" />Entregue</span>
+                        ) : (
+                          <span className="customer-delivery-status is-pending"><CircleX size="1rem" aria-hidden="true" />Não entregue</span>
+                        )}
+                        {!item.cancelled && <small>{delivered ? `${item.quantity} de ${item.quantity} entregue` : `Entregue: ${item.delivered_quantity} de ${item.quantity} · Faltam ${Math.max(0, item.quantity - item.delivered_quantity)}`}</small>}
+                      </li>;
+                    })}
+                  </ul>
                   <p className="customer-order-meta">
                     {ORDER_STATUS_LABELS[order.status] || order.status}
                   </p>

@@ -1958,7 +1958,7 @@ export default function VendorDashboard() {
             <span className="is-closing inline-flex items-center gap-1.5"><DollarSign size={17} aria-hidden="true" />Conta</span>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8 md:grid-cols-12">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-2.5 md:grid-cols-8 lg:grid-cols-12">
           {umbrellas.map(umbrella => {
             const order = orders.find(item => item.umbrella_id === umbrella.id);
             const closing = order?.status === 'closing_requested';
@@ -1976,7 +1976,7 @@ export default function VendorDashboard() {
                   ? setSelectedOrder(order)
                   : umbrella.active ? setManualAccountUmbrella(umbrella) : undefined}
                 className={cn(
-                  "relative aspect-square min-h-12 rounded-xl border text-sm font-black transition-all",
+                  "relative min-h-[6.25rem] overflow-hidden rounded-xl border text-sm font-black transition-all sm:aspect-square sm:min-h-0",
                   "vendor-umbrella-tile",
                   !umbrella.active && "is-inactive border-gray-200 bg-gray-100 text-gray-300",
                   umbrella.active && !occupied && "is-free border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
@@ -1989,21 +1989,21 @@ export default function VendorDashboard() {
                   : order ? `${order.customer} - ${formatCurrency(order.total)}`
                     : umbrella.active ? `Abrir comanda manual no guarda-sol ${umbrella.number}` : 'Guarda-sol inativo'}
               >
-                <span className="flex h-full min-w-0 flex-col items-center justify-center px-1 leading-tight">
-                  <span className="text-lg font-black">{umbrella.number}</span>
+                <span className="flex h-full min-w-0 flex-col items-center justify-center gap-0.5 px-1 py-1 leading-tight">
+                  <span className="text-base font-black sm:text-lg">{umbrella.number}</span>
                   {umbrella.active && (
-                    <span className="vendor-umbrella-status mt-1 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide">
-                      <StatusIcon size={14} strokeWidth={2.75} aria-hidden="true" />
+                    <span className="vendor-umbrella-status inline-flex max-w-full items-center gap-1 text-[9px] font-black uppercase leading-none tracking-normal sm:text-[10px]">
+                      <StatusIcon size={12} strokeWidth={2.75} aria-hidden="true" />
                       {statusLabel}
                     </span>
                   )}
                   {firstCustomerName && (
-                    <span className="mt-1 max-w-full truncate text-[11px] font-black opacity-90">
+                    <span className="max-w-full truncate text-[10px] font-black leading-tight opacity-90 sm:text-[11px]">
                       {firstCustomerName}
                     </span>
                   )}
                   {firstCustomerName && accountTotal && (
-                    <span className="mt-0.5 max-w-full truncate text-[10px] font-black">
+                    <span className="max-w-full truncate text-[9px] font-black leading-tight sm:text-[10px]">
                       {accountTotal}
                     </span>
                   )}

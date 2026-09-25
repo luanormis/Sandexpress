@@ -755,6 +755,51 @@ input[type="number"] {
   gap: clamp(0.7rem, 3vw, 1rem);
 }
 
+.customer-account-items {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.8rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.customer-account-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 0.65rem;
+  align-items: center;
+  padding: 0.7rem;
+  border: 1px solid var(--customer-border);
+  border-radius: 0.8rem;
+  background: var(--customer-surface);
+}
+
+.customer-account-item > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.customer-account-item > div > strong { overflow-wrap: anywhere; }
+.customer-account-item > div > span,
+.customer-account-item > small { color: var(--customer-secondary); font-size: 0.78rem; font-weight: 750; }
+.customer-account-item > small { grid-column: 1 / -1; }
+
+.customer-delivery-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  padding: 0.35rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.customer-delivery-status.is-delivered { background: #dcfce7; color: #166534; }
+.customer-delivery-status.is-pending { background: #fee2e2; color: #991b1b; }
+.customer-delivery-status.is-cancelled { background: #e5e7eb; color: #374151; }
+
 .customer-product-row,
 .customer-cart-row,
 .customer-order-row {
