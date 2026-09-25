@@ -83,3 +83,24 @@ html body .readable-app.readable-app.readable-app .customer-brand-watermark {
 @media print {
   html body .readable-app { min-height: 0; background: white; }
 }
+
+/* Light controls retain a dark, readable drawing in every state. */
+html body .readable-app.readable-app.readable-app.readable-app button {
+  background-color: #ff9a3c !important;
+  color: #241b16 !important;
+}
+html body .readable-app.readable-app.readable-app.readable-app button:disabled {
+  opacity: 1 !important;
+  background-color: #ede3d5 !important;
+  border-color: #95765b !important;
+  cursor: not-allowed;
+}
+html body .readable-app.readable-app.readable-app.readable-app .vendor-metric-icon {
+  background: #ffdfb5 !important;
+  color: #241b16 !important;
+}
+html body .readable-app.readable-app.readable-app.readable-app svg.lucide {
+  color: #241b16 !important;
+  stroke: currentColor !important;
+  opacity: 1;
+}
