@@ -154,6 +154,8 @@ export default function CustomerApp() {
   const [pendingSync, setPendingSync] = useState(0);
   const [offlineOrders, setOfflineOrders] = useState<CustomerOfflineOrder[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(() => new Set());
+  const [accountSummaryOpen, setAccountSummaryOpen] = useState(false);
 
   const visibleProducts = useMemo(() => {
     const now = Date.now();
@@ -173,6 +175,10 @@ export default function CustomerApp() {
   const discountedCartTotal = typeof promotionPreview?.total === "number" ? Number(promotionPreview.total) : cartTotal;
   const appliedPromotions = promotionPreview?.applied_promotions || [];
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const dayHighlights = useMemo(() => products
+    .filter(product => Boolean(product.menu_highlight))
+    .slice(0, 4), [products]);
+  const accountItems = useMemo(() => orders.flatMap(order => (order.items || []).map(item => ({ ...item, orderId: order.id, sequence: order.sequence }))), [orders]);
   const upsellSuggestions = useMemo(() => {
     const cartIds = new Set(cart.map(item => item.product.id));
     const rule = upsellRules.find(item => cartIds.has(item.trigger_product_id));
@@ -950,6 +956,7 @@ export default function CustomerApp() {
 
       {step === "menu" && (
         <section className="customer-content">
+          {dayHighlights.length > 0 && <div className="customer-day-highlights"><div className="customer-offers__title"><Star size="1.1rem" /><span>Destaques do dia</span></div><div className="customer-offers__rail">{dayHighlights.map(product => <article key={product.id} className="customer-offer-card"><span>Oferta do dia</span><h2>{product.name}</h2><p>{product.description || product.subcategory || product.category}</p><strong>{formatCurrency(Number(product.promotional_price ?? product.price))}</strong><button type="button" onClick={() => getOrderOptionGroups(product).length > 0 ? setOptionMenuProduct(product) : addToCart(product)}><Plus size="1rem" /> Adicionar</button></article>)}</div></div>}
           {flexiblePromotions.length > 0 && <div className="customer-offers"><div className="customer-offers__title"><Star size="1.1rem" /><span>Ofertas do quiosque</span></div><div className="customer-offers__rail">{flexiblePromotions.map(promotion => { const freeProduct = promotion.descricao?.startsWith('[PRODUTO_GRATIS]'); const description = String(promotion.descricao || '').replace(/^\[(PRODUTO_GRATIS|COMBO)\]\s*/, ''); const benefit = freeProduct ? 'Produto grátis' : promotion.desconto_tipo === 'percentual' ? `${promotion.desconto_valor}% OFF` : promotion.desconto_tipo === 'preco_fechado' ? `Combo ${formatCurrency(Number(promotion.desconto_valor))}` : `Economize ${formatCurrency(Number(promotion.desconto_valor))}`; return <article key={promotion.id} className="customer-offer-card"><span>{benefit}</span><h2>{promotion.titulo}</h2>{description && <p>{description}</p>}<small>{promotion.promocao_itens?.map(item => `${item.quantidade || 1}x ${item.products?.name || 'item'}`).join(' + ')}</small><button type="button" onClick={() => addPromotionToCart(promotion)}><Plus size="1rem" /> Adicionar oferta</button></article>; })}</div></div>}
           <div className="customer-category-rail">
             {CUSTOMER_MENU_CATEGORIES.map((category) => (
@@ -1150,6 +1157,10 @@ export default function CustomerApp() {
               <small>A equipe confere o saldo e registra cada pagamento separadamente. O guarda-sol só é liberado após quitar a conta.</small>
             </div>
 
+            <button type="button" onClick={() => setAccountSummaryOpen(true)} disabled={orders.length === 0} className="customer-account-summary-button">
+              <ListOrdered size="1.1rem" /> Resumo da conta
+            </button>
+
             <button onClick={requestCloseAccount} disabled={loading || openTotal <= 0} className="customer-primary-button customer-close-button">
               {loading ? "Enviando..." : "Pedir conta"}
             </button>
@@ -1159,10 +1170,15 @@ export default function CustomerApp() {
             {orders.length === 0 ? <p className="customer-empty">Nenhum pedido ainda.</p> : orders.map((order) => (
               <article key={order.id} className="customer-order-row">
                 <div className="customer-order-info">
-                  <h2 className="customer-order-title">
-                    {order.sequence ? `Pedido ${order.sequence}` : `Pedido #${order.id.slice(0, 8)}`}
-                  </h2>
-                  <ul className="customer-account-items">
+                  <button type="button" className="customer-order-toggle" onClick={() => setExpandedOrderIds(current => {
+                    const next = new Set(current);
+                    if (next.has(order.id)) next.delete(order.id); else next.add(order.id);
+                    return next;
+                  })} aria-expanded={expandedOrderIds.has(order.id)}>
+                    <span><strong className="customer-order-title">{order.sequence ? `Pedido ${order.sequence}` : `Pedido #${order.id.slice(0, 8)}`}</strong><small>{expandedOrderIds.has(order.id) ? "Ocultar itens" : "Ver itens do pedido"}</small></span>
+                    <span aria-hidden="true">{expandedOrderIds.has(order.id) ? "−" : "+"}</span>
+                  </button>
+                  {expandedOrderIds.has(order.id) && <ul className="customer-account-items">
                     {(order.items || []).map(item => {
                       const delivered = !item.cancelled && item.delivered_quantity >= item.quantity;
                       const pending = !item.cancelled && !delivered;
@@ -1181,7 +1197,7 @@ export default function CustomerApp() {
                         {!item.cancelled && <small>{delivered ? `${item.quantity} de ${item.quantity} entregue` : `Entregue: ${item.delivered_quantity} de ${item.quantity} · Faltam ${Math.max(0, item.quantity - item.delivered_quantity)}`}</small>}
                       </li>;
                     })}
-                  </ul>
+                  </ul>}
                   <p className="customer-order-meta">
                     {ORDER_STATUS_LABELS[order.status] || order.status}
                   </p>
@@ -1200,6 +1216,8 @@ export default function CustomerApp() {
         const groups = getOrderOptionGroups(optionMenuProduct);
         return <div className="customer-option-modal-backdrop" onClick={() => setOptionMenuProduct(null)}><div className="customer-option-modal" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Opções de ${optionMenuProduct.name}`}><div className="customer-option-modal__header"><div><small>Monte do seu jeito</small><h2>{optionMenuProduct.name}</h2><p>Escolha uma opção em cada etapa.</p></div><button type="button" onClick={() => setOptionMenuProduct(null)} aria-label="Fechar opções">×</button></div><div className="customer-option-modal__groups">{groups.map(group => <div key={group.name} className="customer-option-group"><p>{group.name}</p><div>{group.options.map(option => <button key={option} type="button" onClick={() => setSelectedOptions(current => ({ ...current, [`${optionMenuProduct.id}:${group.name}`]: option }))} className={(selectedOptions[`${optionMenuProduct.id}:${group.name}`] || group.options[0]) === option ? 'is-selected' : ''}>{option}</button>)}</div></div>)}</div><div className="customer-option-modal__footer"><div><small>Preço</small><strong>{formatCurrency(Number(optionMenuProduct.promotional_price ?? optionMenuProduct.price))}</strong></div><button type="button" onClick={() => { addToCart(optionMenuProduct); setOptionMenuProduct(null); }}>Adicionar ao pedido</button></div></div></div>;
       })()}
+
+      {accountSummaryOpen && <div className="customer-option-modal-backdrop" onClick={() => setAccountSummaryOpen(false)}><section className="customer-option-modal customer-account-summary-modal" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Resumo da conta"><div className="customer-option-modal__header"><div><small>Conferência da conta</small><h2>Todos os itens pedidos</h2><p>Confira os itens antes de pedir a conta.</p></div><button type="button" onClick={() => setAccountSummaryOpen(false)} aria-label="Fechar resumo">×</button></div><ul className="customer-account-items">{accountItems.length === 0 ? <li>Nenhum item lançado.</li> : accountItems.map(item => <li key={`${item.orderId}-${item.id}`} className="customer-account-item"><div><strong>{item.quantity} × {item.name}</strong><span>{item.sequence ? `Pedido ${item.sequence} · ` : ""}{formatCurrency(item.unit_price)} cada</span></div><strong>{item.cancelled ? "Cancelado" : formatCurrency(item.subtotal)}</strong></li>)}</ul><div className="customer-bill-total"><span>Total da conta</span><strong>{formatCurrency(openTotal)}</strong></div></section></div>}
 
       <nav className="customer-tabbar" aria-label="Navegação do pedido">
         <button onClick={() => setStep("menu")} className={`customer-tab${step === "menu" ? " is-active" : ""}`}>

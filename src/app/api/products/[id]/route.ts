@@ -110,6 +110,16 @@ export async function PATCH(
     if (Object.keys(safeUpdate).length === 0) {
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar.' }, { status: 400 });
     }
+    if (safeUpdate.menu_highlight === true) {
+      const { count, error: highlightError } = await (supabaseAdmin.from('products') as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('vendor_id', productLookup.data.vendor_id)
+        .eq('active', true)
+        .eq('menu_highlight', true)
+        .neq('id', id);
+      if (highlightError) throw highlightError;
+      if ((count || 0) >= 4) return NextResponse.json({ error: 'Você já possui 4 destaques do dia. Retire um destaque antes de incluir outro.' }, { status: 400 });
+    }
 
     const result = await (supabaseAdmin.from('products') as any)
       .update({ ...safeUpdate, updated_at: new Date().toISOString() })

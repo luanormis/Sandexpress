@@ -160,6 +160,16 @@ export async function POST(req: NextRequest) {
     }
 
     const stockPayload = normalizeProductStockForWrite(body);
+    const wantsHighlight = Boolean(body.menu_highlight);
+    if (wantsHighlight) {
+      const { count, error: highlightError } = await (supabaseAdmin.from('products') as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('vendor_id', body.vendor_id)
+        .eq('active', true)
+        .eq('menu_highlight', true);
+      if (highlightError) throw highlightError;
+      if ((count || 0) >= 4) return NextResponse.json({ error: 'Você já possui 4 destaques do dia. Retire um destaque antes de incluir outro.' }, { status: 400 });
+    }
     const insertPayload = {
       tenant_id: vendor.tenant_id,
       vendor_id: body.vendor_id,
@@ -172,7 +182,7 @@ export async function POST(req: NextRequest) {
       subcategory: normalizeText(body.subcategory, 80),
       option_group_name: normalizeText(body.option_group_name, 80),
       option_values: normalizeOptions(body.option_values),
-      menu_highlight: Boolean(body.menu_highlight || body.is_combo || promotionalPrice !== null),
+      menu_highlight: wantsHighlight,
       promotion_starts_at: body.promotion_starts_at || null,
       promotion_ends_at: body.promotion_ends_at || null,
       image_url: body.image_url ? String(body.image_url).trim().slice(0, 2048) : null,

@@ -33,7 +33,7 @@ html body .readable-app.readable-app.readable-app :where(main, aside, header, na
   .customer-empty, .customer-tabbar, .customer-option-modal,
   .customer-satisfaction-card, .vendor-kanban-column,
   [class*="bg-"]):where(:not([class*="bg-black/"]):not(.theme-background):not(.qr-page):not(.qr-card)) {
-  background: #fffdf7 !important;
+  background: #fff8e8 !important;
   border-color: #d5b797 !important;
 }
 html body .readable-app.readable-app.readable-app :where(main, .vendor-ops-shell, .admin-ops-shell) {
@@ -117,3 +117,10 @@ html body .readable-app .customer-account-items li { display: grid; gap: .3rem; 
 html body .readable-app.readable-app.readable-app.readable-app :where(.customer-upsell-card, .customer-bill-summary, .customer-bill-total) { background: #fff1db !important; }
 
 html body .readable-app.readable-app.readable-app.readable-app .report-data-bar { background: #c65300 !important; }
+
+/* Operational states remain distinct over the cream application cards. */
+html body .readable-app.readable-app.readable-app.readable-app .vendor-umbrella-tile.is-free { background: #dcfce7 !important; border-color: #5bbf7a !important; color: #14532d !important; }
+html body .readable-app.readable-app.readable-app.readable-app .vendor-umbrella-tile.is-occupied { background: #ffedd5 !important; border-color: #fb923c !important; color: #9a3412 !important; }
+html body .readable-app.readable-app.readable-app.readable-app .vendor-umbrella-tile.is-closing { background: #fee2e2 !important; border-color: #f87171 !important; color: #991b1b !important; }
+html body .readable-app.readable-app.readable-app.readable-app .vendor-umbrella-tile.is-service { background: #fecaca !important; border-color: #ef4444 !important; color: #7f1d1d !important; }
+html body .readable-app.readable-app.readable-app.readable-app .vendor-kanban-column.is-delayed { background: #fee2e2 !important; border-color: #ef9a9a !important; }

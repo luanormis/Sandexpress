@@ -1802,8 +1802,13 @@ export default function VendorDashboard() {
     options: { pulse?: boolean; paidAction?: boolean } = {}
   ) => {
     const colOrders = orders.filter(filterOrder);
+    const hasDelayedOrders = colOrders.some(order => {
+      const createdAt = order.active_request?.created_at;
+      const ageMinutes = createdAt ? Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)) : 0;
+      return Boolean(order.active_request && ageMinutes >= 20 && ['received', 'preparing'].includes(order.status));
+    });
     return (
-      <div className="vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[16rem] lg:min-h-[calc(100vh-21rem)]">
+      <div className={cn("vendor-kanban-column bg-gray-100 rounded-lg p-3 flex flex-col min-h-[16rem] lg:min-h-[calc(100vh-21rem)]", hasDelayedOrders && "is-delayed")}>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-gray-700 capitalize flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${color}`}></span>
@@ -4402,7 +4407,7 @@ function ProductModal({
               <input
                 type="checkbox"
                 checked={form.is_combo}
-                onChange={e => setForm(prev => ({ ...prev, is_combo: e.target.checked, menu_highlight: e.target.checked ? true : prev.menu_highlight }))}
+                onChange={e => setForm(prev => ({ ...prev, is_combo: e.target.checked }))}
                 className="w-5 h-5 accent-[#FF6B00]"
               />
               <span className="text-sm font-bold text-gray-700">É um combo?</span>
@@ -4414,7 +4419,7 @@ function ProductModal({
                 onChange={e => setForm(prev => ({ ...prev, menu_highlight: e.target.checked }))}
                 className="w-5 h-5 accent-[#FF6B00]"
               />
-              <span className="text-sm font-bold text-gray-700">Mostrar primeiro no cardápio</span>
+              <span className="text-sm font-bold text-gray-700">Destaque do dia no topo do cardápio (máximo 4)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -4512,7 +4517,7 @@ function ProductModal({
                 subcategory: form.subcategory?.trim() || null,
                 option_group_name: hasOptions ? (normalizedOptionGroups.length > 1 ? "Monte seu combo" : normalizedOptionGroups[0]?.name || "Opcao") : "",
                 option_values: hasOptions ? normalizedOptionValues : [],
-                menu_highlight: Boolean(form.menu_highlight || form.is_combo || form.promotional_price),
+                menu_highlight: Boolean(form.menu_highlight),
               });
             }}
             className="flex-1 py-3 bg-[#FF6B00] text-white rounded-xl font-bold hover:bg-[#E56000] active:scale-95 transition-all"
