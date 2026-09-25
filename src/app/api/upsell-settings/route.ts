@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (!isCanonicalUuid(vendorId)) return NextResponse.json({ error: 'vendor_id invalido.' }, { status: 400 });
     const { data, error } = await supabaseAdmin.from('analytics_events').select('metadata, created_at').eq('vendor_id', vendorId).eq('event_type', 'upsell_config').order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (error) throw error;
-    return NextResponse.json({ rules: normalizeRules((data as any)?.metadata?.rules || []) || [] });
+    return NextResponse.json({ enabled: (data as any)?.metadata?.enabled !== false, rules: normalizeRules((data as any)?.metadata?.rules || []) || [] });
   } catch (error) {
     console.error('Upsell settings GET error:', error);
     return NextResponse.json({ rules: [] });
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
     const rules = normalizeRules(body.rules);
     if (!rules) return NextResponse.json({ error: 'Regras invalidas.' }, { status: 400 });
     const { data: vendor } = await supabaseAdmin.from('vendors').select('tenant_id').eq('id', vendorId).single();
-    const { error } = await supabaseAdmin.from('analytics_events').insert({ tenant_id: vendor?.tenant_id, vendor_id: vendorId, event_type: 'upsell_config', metadata: { rules }, payload: { updated_by: session?.user_id || session?.role || 'vendor' } } as any);
+    const { error } = await supabaseAdmin.from('analytics_events').insert({ tenant_id: vendor?.tenant_id, vendor_id: vendorId, event_type: 'upsell_config', metadata: { rules, enabled: body.enabled !== false }, payload: { updated_by: session?.user_id || session?.role || 'vendor' } } as any);
     if (error) throw error;
-    return NextResponse.json({ saved: true, rules });
+    return NextResponse.json({ saved: true, rules, enabled: body.enabled !== false });
   } catch (error) {
     console.error('Upsell settings POST error:', error);
     return NextResponse.json({ error: 'Erro ao salvar sugestoes.' }, { status: 500 });

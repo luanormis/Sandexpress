@@ -62,6 +62,7 @@ type PromotionPreview = {
 
 type Order = {
   id: string;
+  items?: Array<{ id: string; name: string; quantity: number; unit_price: number; subtotal: number; delivered_quantity: number; cancelled: boolean }>;
   account_id?: string;
   sequence?: number;
   total: number;
@@ -300,7 +301,7 @@ export default function CustomerApp() {
         localStorage.setItem(customerCacheKey(data.vendor?.id || routeVendorId, umbrellaId), JSON.stringify({ umbrella: data.umbrella, vendor: data.vendor, products: data.products || [], features: data.features || {}, saved_at: new Date().toISOString() }));
         fetch(`/api/upsell-settings?vendor_id=${encodeURIComponent(data.vendor?.id || routeVendorId)}`)
           .then(response => response.json())
-          .then(settings => setUpsellRules(settings.rules || []))
+          .then(settings => setUpsellRules(settings.enabled === false ? [] : settings.rules || []))
           .catch(() => undefined);
         fetch(`/api/promotions?vendor_id=${encodeURIComponent(data.vendor?.id || routeVendorId)}`)
           .then(response => response.ok ? response.json() : { promotions: [] })
@@ -1161,6 +1162,7 @@ export default function CustomerApp() {
                   <h2 className="customer-order-title">
                     {order.sequence ? `Pedido ${order.sequence}` : `Pedido #${order.id.slice(0, 8)}`}
                   </h2>
+                  <ul className="customer-account-items">{(order.items || []).map(item => <li key={item.id}><strong>{item.quantity} × {item.name}</strong><span>{formatCurrency(item.unit_price)} cada · {formatCurrency(item.subtotal)}</span><span>{item.cancelled ? "Cancelado — não cobrado" : `Entregue: ${item.delivered_quantity} de ${item.quantity} · Falta entregar: ${Math.max(0, item.quantity - item.delivered_quantity)}`}</span></li>)}</ul>
                   <p className="customer-order-meta">
                     {ORDER_STATUS_LABELS[order.status] || order.status}
                   </p>

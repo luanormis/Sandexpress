@@ -564,6 +564,7 @@ export default function VendorDashboard() {
   const [stockHistoryError, setStockHistoryError] = useState("");
   const [showUpsellSettings, setShowUpsellSettings] = useState(false);
   const [showPromotionSettings, setShowPromotionSettings] = useState(false);
+  const [upsellEnabled, setUpsellEnabled] = useState(true);
   const [upsellRules, setUpsellRules] = useState<UpsellRule[]>([]);
   const [flexiblePromotions, setFlexiblePromotions] = useState<FlexiblePromotion[]>([]);
 
@@ -782,6 +783,7 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/upsell-settings?vendor_id=${vid}`);
       const data = await res.json();
       setUpsellRules(data.rules || []);
+      setUpsellEnabled(data.enabled !== false);
     } catch {
       setUpsellRules([]);
     }
@@ -1477,12 +1479,13 @@ export default function VendorDashboard() {
     }
   };
 
-  const saveUpsellSettings = async (rules: UpsellRule[]) => {
+  const saveUpsellSettings = async (rules: UpsellRule[], enabled: boolean) => {
     if (!vendorId) throw new Error("Quiosque não identificado.");
-    const res = await fetch('/api/upsell-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, rules }) });
+    const res = await fetch('/api/upsell-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, rules, enabled }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Não foi possível salvar as sugestões.');
     setUpsellRules(data.rules || []);
+      setUpsellEnabled(data.enabled !== false);
     setShowUpsellSettings(false);
   };
 
@@ -2074,7 +2077,7 @@ export default function VendorDashboard() {
         {/* Header */}
         <header className="min-h-16 border-b border-gray-100 flex items-center justify-between gap-3 bg-white px-3 pt-safe sm:min-h-20 sm:px-6 lg:px-8 shrink-0">
           <div className="flex min-w-0 items-center gap-3">
-            <button type="button" onClick={() => setSidebarOpen(true)} className="tap-target rounded-xl bg-gray-100 p-3 text-gray-700 lg:hidden" aria-label="Abrir menu">
+            <button type="button" onClick={() => setSidebarOpen(true)} className="contrast-dark tap-target rounded-xl bg-gray-100 p-3 text-gray-700 lg:hidden" aria-label="Abrir menu">
               <Menu size={20} />
             </button>
             <h2 className="truncate text-xl sm:text-2xl font-bold font-display text-gray-800">
@@ -3037,8 +3040,8 @@ export default function VendorDashboard() {
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                       <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-[#FF6B00]" /> Vendas por Horário</h4>
                       <div className="mb-4 inline-grid grid-cols-2 rounded-xl border border-[#e5c2ae] bg-[#fff8f3] p-1 text-xs font-black">
-                        <button type="button" onClick={() => setSalesChartType("bars")} className={cn("rounded-lg px-3 py-2", salesChartType === "bars" ? "bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Barras</button>
-                        <button type="button" onClick={() => setSalesChartType("pie")} className={cn("rounded-lg px-3 py-2", salesChartType === "pie" ? "bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Pizza</button>
+                        <button type="button" onClick={() => setSalesChartType("bars")} className={cn("rounded-lg px-3 py-2", salesChartType === "bars" ? "contrast-dark bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Barras</button>
+                        <button type="button" onClick={() => setSalesChartType("pie")} className={cn("rounded-lg px-3 py-2", salesChartType === "pie" ? "contrast-dark bg-[#2F4858] text-white" : "text-[#5A2D1D]")}>Pizza</button>
                       </div>
                       {salesChartType === "bars" ? (
                       <div className="flex items-end gap-2 h-40">
@@ -3049,8 +3052,8 @@ export default function VendorDashboard() {
                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
                               <span className="whitespace-nowrap text-[9px] font-bold text-[#5A2D1D]" title={`${formatCurrency(h.revenue)} · ${h.orders} pedido(s) · ticket ${formatCurrency(h.avg_ticket)}`}>{h.revenue >= 1000 ? `R$${(h.revenue / 1000).toFixed(1)}k` : `R$${Math.round(h.revenue)}`}</span>
                               <div
-                                className="w-full rounded-t-md bg-gradient-to-t from-[#8A3E22] to-[#FF6B00] transition-all"
-                                style={{ height: `${height}%`, minHeight: 4 }}
+                                className="report-data-bar w-full rounded-t-md bg-gradient-to-t from-[#8A3E22] to-[#FF6B00] transition-all"
+                                style={{ height: `${height * 1.1}px`, minHeight: 4 }}
                               />
                               <span className="text-[10px] font-bold text-[#6B3A28]">{h.hour}</span>
                             </div>
@@ -3453,7 +3456,7 @@ export default function VendorDashboard() {
         <StockAdjustmentModal products={products} onClose={() => setShowStockAdjustment(false)} onSubmit={registerStockAdjustment} />
       )}
 
-      {showUpsellSettings && <UpsellSettingsModal products={products.filter(product => product.active)} initialRules={upsellRules} onClose={() => setShowUpsellSettings(false)} onSave={saveUpsellSettings} />}
+      {showUpsellSettings && <UpsellSettingsModal products={products.filter(product => product.active)} initialEnabled={upsellEnabled} initialRules={upsellRules} onClose={() => setShowUpsellSettings(false)} onSave={saveUpsellSettings} />}
       {showPromotionSettings && <PromotionSettingsModal vendorId={vendorId || ''} products={products.filter(product => product.active)} promotions={flexiblePromotions} onClose={() => setShowPromotionSettings(false)} onChanged={() => vendorId ? loadFlexiblePromotions(vendorId) : Promise.resolve()} />}
 
       {commissionUser && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={() => setCommissionUser(null)}><div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}><button type="button" onClick={() => setCommissionUser(null)} className="float-right rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X /></button><p className="text-xs font-black uppercase text-[#C65300]">Comissao automatica</p><h3 className="text-2xl font-black text-gray-950">{commissionUser.name}</h3><p className="mt-1 text-sm font-bold text-gray-600">A nova regra sera usada nos proximos relatorios e fica registrada no historico.</p><label className="mt-5 block text-sm font-black text-gray-800">Forma de comissao<select value={commissionForm.type} onChange={event => setCommissionForm({ type: event.target.value, value: event.target.value === 'none' ? '' : commissionForm.value })} className="mt-2 min-h-12 w-full rounded-xl border-2 border-gray-200 bg-white p-3 outline-none focus:border-[#FF6B00]"><option value="none">Sem comissao</option><option value="percent">Percentual das vendas</option><option value="fixed">Valor fixo por pedido</option></select></label>{commissionForm.type !== 'none' && <label className="mt-4 block text-sm font-black text-gray-800">{commissionForm.type === 'percent' ? 'Percentual' : 'Valor por pedido'}<input type="number" min="0" max={commissionForm.type === 'percent' ? 100 : undefined} step="0.01" value={commissionForm.value} onChange={event => setCommissionForm(current => ({ ...current, value: event.target.value }))} className="mt-2 min-h-12 w-full rounded-xl border-2 border-gray-200 p-3 text-lg font-black text-gray-950 outline-none focus:border-[#FF6B00]" placeholder={commissionForm.type === 'percent' ? 'Ex.: 10' : 'Ex.: 5,00'} /></label>}{commissionMessage && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{commissionMessage}</p>}<button type="button" disabled={commissionSaving || (commissionForm.type !== 'none' && (!commissionForm.value || Number(commissionForm.value) < 0))} onClick={saveCommission} className="mt-5 min-h-13 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white hover:bg-[#E56000] disabled:opacity-40">{commissionSaving ? 'Salvando...' : 'Salvar comissao'}</button></div></div>}
@@ -3549,8 +3552,9 @@ function PromotionSettingsModal({ vendorId, products, promotions, onClose, onCha
   </div></div>;
 }
 
-function UpsellSettingsModal({ products, initialRules, onClose, onSave }: { products: Product[]; initialRules: UpsellRule[]; onClose: () => void; onSave: (rules: UpsellRule[]) => Promise<void> }) {
+function UpsellSettingsModal({ products, initialEnabled, initialRules, onClose, onSave }: { products: Product[]; initialEnabled: boolean; initialRules: UpsellRule[]; onClose: () => void; onSave: (rules: UpsellRule[], enabled: boolean) => Promise<void> }) {
   const [rules, setRules] = useState<UpsellRule[]>(initialRules);
+  const [enabled, setEnabled] = useState(initialEnabled);
   const [trigger, setTrigger] = useState(products[0]?.id || "");
   const [targets, setTargets] = useState<string[]>([]);
   const [message, setMessage] = useState("Que tal adicionar também?");
@@ -3561,8 +3565,8 @@ function UpsellSettingsModal({ products, initialRules, onClose, onSave }: { prod
     setRules(current => [...current.filter(rule => rule.trigger_product_id !== trigger), { trigger_product_id: trigger, suggested_product_ids: targets, message }]);
     setTargets([]); setError("");
   };
-  const save = async () => { setSaving(true); setError(""); try { await onSave(rules); } catch (e) { setError(e instanceof Error ? e.message : "Erro ao salvar."); } finally { setSaving(false); } };
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}><div className="flex justify-between"><div><p className="text-xs font-black uppercase text-blue-600">Upsell</p><h3 className="text-2xl font-black text-gray-900">Sugestões de venda</h3><p className="text-sm font-bold text-gray-500">Escolha o que oferecer quando um produto entrar no carrinho.</p></div><button onClick={onClose}><X /></button></div><label className="mt-5 block text-sm font-black text-gray-700">Quando o cliente adicionar<select value={trigger} onChange={e => setTrigger(e.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3">{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><p className="mt-4 text-sm font-black text-gray-700">Sugerir estes complementos</p><div className="mt-2 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">{products.filter(product => product.id !== trigger).map(product => <label key={product.id} className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 text-sm font-bold text-gray-700"><input type="checkbox" checked={targets.includes(product.id)} onChange={e => setTargets(current => e.target.checked ? [...current, product.id] : current.filter(id => id !== product.id))} />{product.name}</label>)}</div><input value={message} onChange={e => setMessage(e.target.value)} maxLength={120} className="mt-4 w-full rounded-xl border-2 border-gray-200 p-3" placeholder="Mensagem da sugestão" /><button onClick={addRule} className="mt-3 w-full rounded-xl border-2 border-blue-500 py-3 font-black text-blue-700">Adicionar regra</button><div className="mt-5 space-y-2">{rules.map((rule, index) => <div key={`${rule.trigger_product_id}-${index}`} className="flex items-center justify-between rounded-xl bg-gray-50 p-3"><div><p className="font-black text-gray-900">{products.find(p => p.id === rule.trigger_product_id)?.name}</p><p className="text-xs font-bold text-gray-500">Sugere {rule.suggested_product_ids.map(id => products.find(p => p.id === id)?.name).filter(Boolean).join(", ")}</p></div><button onClick={() => setRules(current => current.filter((_, i) => i !== index))} className="text-red-600"><Trash2 size={18} /></button></div>)}</div>{error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<button disabled={saving} onClick={save} className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-black text-white disabled:opacity-50">{saving ? "Salvando..." : "Salvar sugestões"}</button></div></div>;
+  const save = async () => { setSaving(true); setError(""); try { await onSave(rules, enabled); } catch (e) { setError(e instanceof Error ? e.message : "Erro ao salvar."); } finally { setSaving(false); } };
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center" onClick={onClose}><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}><div className="flex justify-between"><div><p className="text-xs font-black uppercase text-blue-600">Upsell</p><h3 className="text-2xl font-black text-gray-900">Sugestões de venda</h3><p className="text-sm font-bold text-gray-500">Escolha o que oferecer quando um produto entrar no carrinho.</p></div><button onClick={onClose}><X /></button></div><label className="mt-5 flex items-center gap-3 font-bold"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />Liberar sugestões de venda no aplicativo do cliente</label><p className="mt-2 text-sm">As sugestões aparecem no carrinho quando o cliente adiciona um produto com regra cadastrada.</p><label className="mt-5 block text-sm font-black text-gray-700">Quando o cliente adicionar<select value={trigger} onChange={e => setTrigger(e.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 p-3">{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><p className="mt-4 text-sm font-black text-gray-700">Sugerir estes complementos</p><div className="mt-2 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">{products.filter(product => product.id !== trigger).map(product => <label key={product.id} className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 text-sm font-bold text-gray-700"><input type="checkbox" checked={targets.includes(product.id)} onChange={e => setTargets(current => e.target.checked ? [...current, product.id] : current.filter(id => id !== product.id))} />{product.name}</label>)}</div><input value={message} onChange={e => setMessage(e.target.value)} maxLength={120} className="mt-4 w-full rounded-xl border-2 border-gray-200 p-3" placeholder="Mensagem da sugestão" /><button onClick={addRule} className="mt-3 w-full rounded-xl border-2 border-blue-500 py-3 font-black text-blue-700">Adicionar regra</button><div className="mt-5 space-y-2">{rules.map((rule, index) => <div key={`${rule.trigger_product_id}-${index}`} className="flex items-center justify-between rounded-xl bg-gray-50 p-3"><div><p className="font-black text-gray-900">{products.find(p => p.id === rule.trigger_product_id)?.name}</p><p className="text-xs font-bold text-gray-500">Sugere {rule.suggested_product_ids.map(id => products.find(p => p.id === id)?.name).filter(Boolean).join(", ")}</p></div><button onClick={() => setRules(current => current.filter((_, i) => i !== index))} className="text-red-600"><Trash2 size={18} /></button></div>)}</div>{error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<button disabled={saving} onClick={save} className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-black text-white disabled:opacity-50">{saving ? "Salvando..." : "Salvar sugestões"}</button></div></div>;
 }
 
 function StockAdjustmentModal({ products, onClose, onSubmit }: {

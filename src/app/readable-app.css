@@ -104,3 +104,16 @@ html body .readable-app.readable-app.readable-app.readable-app svg.lucide {
   stroke: currentColor !important;
   opacity: 1;
 }
+html body .readable-app.readable-app.readable-app.readable-app.readable-app .contrast-dark {
+  background: #513424 !important;
+}
+html body .readable-app.readable-app.readable-app.readable-app.readable-app .contrast-dark,
+html body .readable-app.readable-app.readable-app.readable-app.readable-app .contrast-dark * {
+  color: #fffdf7 !important;
+  -webkit-text-fill-color: currentColor;
+}
+html body .readable-app .customer-account-items { margin: 1rem 0; padding: 0; list-style: none; }
+html body .readable-app .customer-account-items li { display: grid; gap: .3rem; border-bottom: 1px solid #d5b797; padding: .75rem 0; }
+html body .readable-app.readable-app.readable-app.readable-app :where(.customer-upsell-card, .customer-bill-summary, .customer-bill-total) { background: #fff1db !important; }
+
+html body .readable-app.readable-app.readable-app.readable-app .report-data-bar { background: #c65300 !important; }

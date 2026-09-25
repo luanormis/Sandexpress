@@ -1,3 +1,4 @@
+import { clampDeliveredQuantity, latestDeliveredQuantities } from '@/lib/partial-delivery';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
@@ -36,19 +37,38 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select('id, total, status, created_at, customer_order_requests(id, sequence, subtotal, status, created_at)')
+      .select('id, total, status, created_at, order_items(id, order_request_id, quantity, unit_price, subtotal, cancelled, products(name)), customer_order_requests(id, sequence, subtotal, status, created_at)')
       .eq('customer_id', id)
       .eq('vendor_id', customer.vendor_id)
       .eq('paid', false)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    const orderLines = (data || []).flatMap((order: any) => {
+    const enriched = await Promise.all((data || []).map(async (order: any) => {
+      const events: any[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data: batch, error: deliveryError } = await supabaseAdmin.from('analytics_events')
+          .select('metadata, created_at').eq('vendor_id', customer.vendor_id)
+          .eq('event_type', 'order_item_delivery').contains('metadata', { order_id: order.id })
+          .order('created_at', { ascending: true }).range(offset, offset + 999);
+        if (deliveryError) throw deliveryError;
+        events.push(...(batch || []));
+        if (!batch || batch.length < 1000) break;
+      }
+      const delivered = latestDeliveredQuantities(events);
+      return { ...order, items: (order.order_items || []).map((item: any) => ({
+        id: item.id, order_request_id: item.order_request_id, name: item.products?.name || 'Produto',
+        quantity: Number(item.quantity), unit_price: Number(item.unit_price), subtotal: Number(item.subtotal),
+        cancelled: Boolean(item.cancelled), delivered_quantity: clampDeliveredQuantity(delivered[item.id] ?? ((order.customer_order_requests || []).find((request: any) => request.id === item.order_request_id)?.status === 'completed' || order.status === 'completed' ? item.quantity : 0), item.quantity),
+      })) };
+    }));
+    const orderLines = enriched.flatMap((order: any) => {
       const requests = Array.isArray(order.customer_order_requests) ? order.customer_order_requests : [];
       if (requests.length === 0) return [order];
       return requests
         .sort((a: any, b: any) => Number(b.sequence || 0) - Number(a.sequence || 0))
-        .map((request: any) => ({
+        .map((request: any, index: number) => ({
+          items: order.items.filter((item: any) => item.order_request_id === request.id || (!requests.some((entry: any) => entry.id === item.order_request_id) && index === 0)),
           id: request.id,
           account_id: order.id,
           sequence: request.sequence,
