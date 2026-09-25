@@ -174,6 +174,15 @@ export async function PATCH(
 
     const body = await req.json();
     const primaryColor = normalizeColor(body.primary_color);
+    if (body.background_only === true) {
+      if (!primaryColor) return NextResponse.json({ error: 'Informe uma cor válida.' }, { status: 400 });
+      // A background edit must not overwrite payment rates or the kiosk logo.
+      const { data: saved, error } = await supabaseAdmin.from('vendors')
+        .update({ primary_color: primaryColor, updated_at: new Date().toISOString() })
+        .eq('id', id).select('primary_color').single();
+      if (error) throw error;
+      return NextResponse.json(saved, { headers: NO_STORE_HEADERS });
+    }
     const secondaryColor = normalizeColor(body.secondary_color);
     const buttonColor = normalizeColor(body.button_color);
     const buttonTextColor = normalizeColor(body.button_text_color);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { accountShare, registeredPeople } from '@/lib/account-share';
 import { AlertCircle, Check, X, Search, DollarSign, Phone } from 'lucide-react';
 
 interface OrderPreview {
@@ -17,6 +18,7 @@ interface OrderPreview {
 }
 
 interface AccountPaymentSummary {
+  party_size: number;
   total: number;
   base_total: number;
   service_fee_amount: number;
@@ -31,7 +33,7 @@ export default function CloseAccountModal() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'split'>('full');
   const [partialAmount, setPartialAmount] = useState('');
-  const [splitPeople, setSplitPeople] = useState(2);
+  const [splitPeople, setSplitPeople] = useState(1);
   const [notes, setNotes] = useState('');
   const [payerName, setPayerName] = useState('');
   const [accountSummary, setAccountSummary] = useState<AccountPaymentSummary | null>(null);
@@ -79,7 +81,11 @@ export default function CloseAccountModal() {
       setOrderPreview(result);
       setPayerName(result.customer_name || 'Cliente');
       const paymentResponse = await fetch(`/api/account-payments?vendor_id=${encodeURIComponent(vendorId)}&order_id=${encodeURIComponent(result.order_id)}`);
-      if (paymentResponse.ok) setAccountSummary(await paymentResponse.json());
+      if (!paymentResponse.ok) throw new Error('Não foi possível carregar o saldo atualizado. Tente novamente.');
+      const summary = await paymentResponse.json();
+      setAccountSummary(summary);
+      setSplitPeople(registeredPeople(summary.party_size));
+      setPaymentMode(registeredPeople(summary.party_size) > 1 ? 'split' : 'full');
       setMessage('✓ Conta encontrada! Revise os dados antes de confirmar.');
     } catch (err) {
       setError('Erro na busca: ' + (err instanceof Error ? err.message : ''));
@@ -89,7 +95,7 @@ export default function CloseAccountModal() {
   };
 
   const handleCloseAccount = async () => {
-    if (!orderPreview) return;
+    if (!orderPreview || !accountSummary) return;
 
     setConfirming(true);
     setError('');
@@ -101,7 +107,7 @@ export default function CloseAccountModal() {
       const requestedAmount = paymentMode === 'partial'
         ? Math.min(parsedPartial, total)
         : paymentMode === 'split'
-          ? Number((total / Math.max(1, splitPeople)).toFixed(2))
+          ? accountShare(accountSummary!.total, total, splitPeople)
           : total;
       const body = {
         vendor_id: vendorId,
@@ -163,7 +169,7 @@ export default function CloseAccountModal() {
   const paymentAmount = paymentMode === 'partial'
     ? Math.min(parsedPartial, previewTotal)
     : paymentMode === 'split'
-      ? Number((previewTotal / Math.max(1, splitPeople)).toFixed(2))
+      ? accountShare(accountSummary?.total ?? 0, previewTotal, splitPeople)
       : previewTotal;
   const remainingAmount = Math.max(0, Number((previewTotal - paymentAmount).toFixed(2)));
 
@@ -347,7 +353,8 @@ export default function CloseAccountModal() {
             )}
 
             {paymentMode === 'split' && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="w-full text-sm">{accountSummary?.party_size || 1} pessoa(s) cadastrada(s) no guarda-sol. A cota usa o total da conta; o último pagamento ajusta os centavos.</p>
                 <button
                   type="button"
                   onClick={() => setSplitPeople((value) => Math.max(1, value - 1))}
@@ -429,7 +436,7 @@ export default function CloseAccountModal() {
             </button>
             <button
               onClick={handleCloseAccount}
-              disabled={confirming || paymentAmount <= 0 || paymentAmount > previewTotal}
+              disabled={confirming || !accountSummary || paymentAmount <= 0 || paymentAmount > previewTotal}
               className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:bg-gray-400 transition flex items-center justify-center gap-2"
             >
               {confirming ? (
@@ -455,7 +462,7 @@ export default function CloseAccountModal() {
       {/* Info Box */}
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-700">
-          ℹ️ <strong>Dica:</strong> Após confirmar o pagamento, o guarda-sol será automaticamente liberado para o próximo cliente. O cliente poderá ver seu histórico de compras.
+          ℹ️ <strong>Dica:</strong> Cada pessoa pode pagar separadamente. O guarda-sol será liberado somente quando todo o saldo estiver pago. O cliente poderá ver seu histórico de compras.
         </p>
       </div>
     </div>

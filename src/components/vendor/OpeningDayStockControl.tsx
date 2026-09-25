@@ -67,7 +67,7 @@ export default function OpeningDayStockControl({
       const initial: Record<string, number> = {};
       const physicalInitial: Record<string, number> = {};
       data.forEach((product: Product) => {
-        initial[product.id] = product.beach_stock_quantity || product.stock_quantity || 0;
+        initial[product.id] = product.beach_stock_quantity ?? product.stock_quantity ?? 0;
         physicalInitial[product.id] = product.physical_stock_quantity || 0;
       });
       setStockUpdates(initial);
@@ -89,7 +89,7 @@ export default function OpeningDayStockControl({
       const initial: Record<string, number> = {};
       const physicalInitial: Record<string, number> = {};
       externalProducts.forEach((product: Product) => {
-        initial[product.id] = product.beach_stock_quantity || product.stock_quantity || 0;
+        initial[product.id] = product.beach_stock_quantity ?? product.stock_quantity ?? 0;
         physicalInitial[product.id] = product.physical_stock_quantity || 0;
       });
       setStockUpdates(initial);
@@ -139,7 +139,11 @@ export default function OpeningDayStockControl({
         return;
       }
 
-      setMessage(mode === 'close'
+      if (result.results?.some((item: { success: boolean }) => !item.success)) {
+        setError('Alguns produtos não foram salvos. Recarregue e confira as quantidades antes de tentar novamente.');
+        return;
+      }
+      setMessage(mode === 'set_physical' ? `Estoque central salvo: ${result.updated_count} produtos atualizados.` : mode === 'close'
         ? `Fechamento de estoque salvo: ${result.updated_count} produtos devolvidos ao estoque central.`
         : `Estoque de praia salvo: ${result.updated_count} produtos atualizados.`);
       await loadProducts();
@@ -322,10 +326,10 @@ export default function OpeningDayStockControl({
                       <button
                         type="button"
                         onClick={() => onEditProduct(product)}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 hover:text-gray-900"
-                        aria-label={`Alterar produto ${product.name}`}
+                        className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 font-bold text-gray-900"
+                        aria-label={`Editar estoque de ${product.name}`}
                       >
-                        <Pencil size={16} />
+                        <Pencil size={16} /> Editar estoque
                       </button>
                     )}
                     {onDeleteProduct && (

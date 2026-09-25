@@ -18,7 +18,7 @@ export async function createBrandedQrSvg(value: string) {
   const source = await QRCode.toString(value, {
     type: 'svg',
     errorCorrectionLevel: 'H',
-    margin: 2,
+    margin: 4,
   });
 
   // Normaliza o viewBox para 100 unidades e reserva uma area branca pequena
@@ -37,4 +37,10 @@ export async function createBrandedQrSvg(value: string) {
 
 export function svgToDataUrl(svg: string) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
+export async function createQrLabelSvg(value: string, umbrellaNumber: number) {
+  const qr = (await createBrandedQrSvg(value)).replace('<svg ', '<svg x="325" y="100" width="340" height="340" ');
+  const number = Number.isInteger(umbrellaNumber) ? umbrellaNumber : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="99mm" height="55.8mm" viewBox="0 0 990 558"><rect width="990" height="558" fill="white"/><text x="495" y="72" text-anchor="middle" font-family="Arial,sans-serif" font-size="42" font-weight="bold" fill="black">Faça seu pedido aqui</text>${qr}<text x="495" y="495" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" font-weight="bold" fill="black">Guarda-sol ${number}</text></svg>`;
 }

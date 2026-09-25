@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
+import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readable-theme";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 import FinancialAccounts from "@/components/vendor/FinancialAccounts";
 import OrderPrintButton from "@/components/vendor/OrderPrintButton";
@@ -283,7 +284,7 @@ interface ManagementIntelligence {
 type PaymentFeeType = "percent" | "fixed";
 
 const DEFAULT_THEME: KioskTheme = {
-  primary_color: "#ff6b00",
+  primary_color: CREAM,
   secondary_color: "#451704",
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
@@ -949,14 +950,14 @@ export default function VendorDashboard() {
       const res = await fetch(`/api/vendors/${vendorId}/theme`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(themeForm),
+        body: JSON.stringify(activeTab === "theme" ? { background_only: true, primary_color: themeForm.primary_color } : themeForm),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setThemeMessage(data.error || "Não foi possível salvar a personalização.");
         return;
       }
-      setThemeForm(buildThemeForm(data));
+      setThemeForm(prev => buildThemeForm({ ...prev, ...data }));
       setThemeMessage(activeTab === "payments"
         ? "Formas de pagamento salvas para este quiosque."
         : "Personalização salva. O login do cliente e os QRs já usam essas cores.");
@@ -1485,12 +1486,12 @@ export default function VendorDashboard() {
     setShowUpsellSettings(false);
   };
 
-  const openManualAccount = async (umbrella: Umbrella, name: string, phone: string) => {
+  const openManualAccount = async (umbrella: Umbrella, name: string, phone: string, partySize: number) => {
     if (!vendorId) throw new Error('Quiosque nao identificado.');
     const res = await fetch('/api/vendor/manual-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor_id: vendorId, umbrella_id: umbrella.id, name, phone }),
+      body: JSON.stringify({ vendor_id: vendorId, umbrella_id: umbrella.id, name, phone, party_size: partySize }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Nao foi possivel abrir a comanda.');
@@ -1783,10 +1784,10 @@ export default function VendorDashboard() {
     c.phone.includes(customerSearch)
   );
   const panelThemeStyle = {
-    "--vendor-primary": themeForm.primary_color,
-    "--vendor-secondary": themeForm.secondary_color,
-    "--vendor-button": themeForm.button_color,
-    "--vendor-button-text": themeForm.button_text_color,
+    "--vendor-primary": ORANGE,
+    "--vendor-secondary": INK,
+    "--vendor-button": ORANGE,
+    "--vendor-button-text": INK,
   } as React.CSSProperties;
 
   const renderCompactKanbanColumn = (
@@ -2459,7 +2460,7 @@ export default function VendorDashboard() {
                         rel="noreferrer"
                         className="border-2 border-[#FF6B00] bg-white text-[#C75200] px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 hover:bg-orange-50 active:scale-95 transition-all"
                       >
-                        <Download size={19} /> Imprimir todos os QRs
+                        <Download size={19} /> Imprimir etiquetas QR
                       </a>
                     )}
                     <button
@@ -2505,14 +2506,15 @@ export default function VendorDashboard() {
 
                       {u.qr_image_url ? (
                         <div className="flex flex-col items-center gap-3">
+                          <p className="text-center font-black">Faça seu pedido aqui</p>
                           <img src={u.qr_image_url} alt={`QR Barraca ${u.number}`} className="w-40 h-40 rounded-lg border border-gray-100" />
                           <p className="text-xs text-gray-400 text-center break-all">{u.qr_url}</p>
                           <a
-                            href={u.qr_image_url}
+                            href={`/api/qr?umbrella_id=${encodeURIComponent(u.id)}&format=label`}
                             download={`qr-guarda-sol-${u.number}-sandexpress.svg`}
                             className="flex items-center gap-1 text-sm font-bold text-[#FF6B00] hover:underline"
                           >
-                            <Download size={14} /> Baixar QR com logo
+                            <Download size={14} /> Baixar etiqueta com QR
                           </a>
                         </div>
                       ) : (
@@ -2545,94 +2547,15 @@ export default function VendorDashboard() {
               <form onSubmit={saveTheme} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                 <div className="mb-6">
                   <h3 className="text-lg font-black text-gray-900">Identidade do quiosque</h3>
-                  <p className="text-sm font-semibold text-gray-500">Cores e logo gravadas no tenant deste quiosque.</p>
+                  <p className="text-sm font-semibold text-gray-500">Escolha somente o fundo da experiência do cliente.</p>
                 </div>
 
-                <div className="grid gap-5 md:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Cor principal</span>
-                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                      <input
-                        type="color"
-                        value={themeForm.primary_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))}
-                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
-                      />
-                      <input
-                        value={themeForm.primary_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Cor secundaria</span>
-                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                      <input
-                        type="color"
-                        value={themeForm.secondary_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, secondary_color: event.target.value }))}
-                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
-                      />
-                      <input
-                        value={themeForm.secondary_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, secondary_color: event.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Cor do botão</span>
-                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                      <input
-                        type="color"
-                        value={themeForm.button_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
-                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
-                      />
-                      <input
-                        value={themeForm.button_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_color: event.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-black text-gray-700">Texto do botão</span>
-                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                      <input
-                        type="color"
-                        value={themeForm.button_text_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
-                        className="h-11 w-14 cursor-pointer rounded-lg border-0 bg-transparent p-0"
-                      />
-                      <input
-                        value={themeForm.button_text_color}
-                        onChange={(event) => setThemeForm(prev => ({ ...prev, button_text_color: event.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent font-mono text-sm font-bold uppercase outline-none"
-                      />
-                    </div>
-                  </label>
-                </div>
-
-                <div className="mt-5">
-                  <p className="mb-2 text-sm font-black text-gray-700">Paleta SandExpress</p>
-                  <div className="flex flex-wrap gap-2">
-                    {BRAND_PALETTE.map(color => (
-                      <button
-                        key={color.value}
-                        type="button"
-                        title={color.name}
-                        onClick={() => setThemeForm(prev => ({ ...prev, primary_color: color.value, button_color: color.value }))}
-                        className="h-10 w-10 rounded-lg border border-gray-200 shadow-sm transition-transform hover:scale-105"
-                        style={{ backgroundColor: color.value }}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <label className="block space-y-3">
+                  <span className="font-bold">Cor de fundo</span>
+                  <input type="color" aria-label="Cor de fundo" value={validBackground(themeForm.primary_color)} onChange={event => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))} className="h-12 w-24" />
+                  <p className="text-sm">O texto sobre o fundo escolhido ajusta o contraste automaticamente. Cartões claros e botões laranja mantêm letras escuras.</p>
+                </label>
+                <button type="button" className="mt-4 rounded-xl border px-4 py-3 font-bold" onClick={() => setThemeForm(prev => ({ ...prev, primary_color: CREAM }))}>Usar creme padrão</button>
 
                 <div className="mt-5 rounded-2xl border border-dashed border-[#85736C] bg-[#fff8f6] p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -2646,7 +2569,7 @@ export default function VendorDashboard() {
                     <div className="min-w-0 flex-1 space-y-2">
                       <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
                       <p className="rounded-xl border border-[#EFD5CA] bg-white px-4 py-3 text-sm font-bold leading-5 text-[#3D1A0A]">
-                        A logo e definida pelo admin geral. Neste painel o quiosque pode ajustar apenas as cores da experiencia do cliente.
+                        A logo e definida pelo admin geral. Neste painel o quiosque pode ajustar apenas a cor de fundo da experiência do cliente.
                       </p>
                     </div>
                   </div>
@@ -2660,14 +2583,14 @@ export default function VendorDashboard() {
                   type="submit"
                   disabled={themeSaving}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
-                  style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}
+                  style={{ backgroundColor: ORANGE, color: INK }}
                 >
                   <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalização"}
                 </button>
               </form>
 
               <aside className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div className="p-6 text-white" style={{ backgroundColor: themeForm.primary_color }}>
+                <div className="theme-background p-6" style={{ backgroundColor: validBackground(themeForm.primary_color), "--preview-ink": contrastText(themeForm.primary_color) } as React.CSSProperties}>
                   <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-md">
                     {themeForm.logo_url ? (
                       <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
@@ -2676,17 +2599,17 @@ export default function VendorDashboard() {
                     )}
                   </div>
                   <h4 className="mt-5 text-2xl font-black">Preview cliente</h4>
-                  <p className="text-sm font-semibold text-white/80">Login, cardápio e botões do QR.</p>
+                  <p className="text-sm font-semibold text-white/80">Prévia do fundo com contraste automático.</p>
                 </div>
                 <div className="space-y-4 bg-[#fff8f6] p-6">
                   <div className="rounded-xl border border-[#85736C] bg-white p-4">
-                    <p className="text-xs font-black uppercase" style={{ color: themeForm.secondary_color }}>Total da conta</p>
-                    <p className="text-3xl font-black" style={{ color: themeForm.primary_color }}>{formatCurrency(0)}</p>
+                    <p className="text-xs font-black uppercase" style={{ color: INK }}>Total da conta</p>
+                    <p className="text-3xl font-black" style={{ color: INK }}>{formatCurrency(0)}</p>
                   </div>
-                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.button_color, color: themeForm.button_text_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: ORANGE, color: INK }}>
                     Abrir comanda
                   </button>
-                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: themeForm.secondary_color, color: themeForm.button_text_color }}>
+                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: ORANGE, color: INK }}>
                     Fechar conta
                   </button>
                 </div>
@@ -3935,10 +3858,11 @@ function ManualAccountModal({
 }: {
   umbrella: Umbrella;
   onClose: () => void;
-  onSubmit: (umbrella: Umbrella, name: string, phone: string) => Promise<void>;
+  onSubmit: (umbrella: Umbrella, name: string, phone: string, partySize: number) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [partySize, setPartySize] = useState(1);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -3947,7 +3871,7 @@ function ManualAccountModal({
     setSubmitting(true);
     setError('');
     try {
-      await onSubmit(umbrella, name, phone);
+      await onSubmit(umbrella, name, phone, partySize);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nao foi possivel abrir a comanda.');
     } finally {
@@ -3974,6 +3898,7 @@ function ManualAccountModal({
           Telefone com DDD
           <input required inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-gray-200 px-4 py-3 outline-none focus:border-[#FF6B00]" placeholder="(11) 99999-9999" />
         </label>
+<label className="mt-4 block font-bold">Pessoas no guarda-sol<input type="number" min={1} max={50} required value={partySize} onChange={event => setPartySize(Math.max(1, Math.min(50, Math.trunc(Number(event.target.value) || 1))))} className="mt-2 w-full rounded-xl border-2 p-3" /></label>
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
         <button disabled={submitting} className="mt-6 min-h-12 w-full rounded-xl bg-[#FF6B00] py-3 font-black text-white disabled:opacity-50">
           {submitting ? 'Abrindo...' : 'Abrir comanda'}

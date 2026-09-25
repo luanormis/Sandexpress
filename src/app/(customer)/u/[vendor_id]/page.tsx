@@ -1,5 +1,7 @@
 "use client";
 
+import { accountShare, registeredPeople } from "@/lib/account-share";
+import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readable-theme";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
@@ -131,6 +133,7 @@ export default function CustomerApp() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [notes, setNotes] = useState("");
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
+  const [separatePayment, setSeparatePayment] = useState(false);
   const [activeCategory, setActiveCategory] = useState<CustomerMenuCategory>("Bebidas");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -185,14 +188,16 @@ export default function CustomerApp() {
   const serviceFeeAmount = serviceFeeEnabled ? Number((openTotal * 0.1).toFixed(2)) : 0;
   const billTotal = Number((openTotal + serviceFeeAmount).toFixed(2));
   const theme = {
-    primary: vendor?.primary_color || "#ff6b00",
-    secondary: vendor?.secondary_color || "#82533f",
-    button: vendor?.button_color || vendor?.primary_color || "#ff6b00",
-    buttonText: vendor?.button_text_color || "#ffffff",
+    primary: validBackground(vendor?.primary_color ?? CREAM),
+    secondary: INK,
+    button: ORANGE,
+    buttonText: INK,
     logo: vendor?.logo_url || null,
   };
   const customerThemeVars = {
-    "--customer-primary": theme.primary,
+    "--customer-primary": ORANGE,
+    "--customer-background": theme.primary,
+    "--customer-background-text": contrastText(theme.primary),
     "--customer-secondary": theme.secondary,
     "--customer-button": theme.button,
     "--customer-button-text": theme.buttonText,
@@ -305,7 +310,7 @@ export default function CustomerApp() {
         const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
         if (saved) {
           const parsed = JSON.parse(saved);
-          setCustomerId(parsed.customer_id || "");
+          setCustomerId(parsed.customer_id || ""); setPartySize(registeredPeople(parsed.party_size));
           setCustomerName(parsed.name || "");
           setStep("menu");
           loadCustomerOrders(parsed.customer_id || "", data.vendor?.id || routeVendorId);
@@ -319,7 +324,7 @@ export default function CustomerApp() {
             setUmbrella(cached.umbrella); setVendor(cached.vendor); setProducts(cached.products || []); setFeatures(cached.features || {});
             setOnline(false); setWelcomeMessage("Internet indisponível. Cardápio salvo carregado no modo offline.");
             const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
-            if (saved) { const parsed = JSON.parse(saved); setCustomerId(parsed.customer_id || ""); setCustomerName(parsed.name || ""); setStep("menu"); }
+            if (saved) { const parsed = JSON.parse(saved); setCustomerId(parsed.customer_id || ""); setPartySize(registeredPeople(parsed.party_size)); setCustomerName(parsed.name || ""); setStep("menu"); }
           } catch { setError("Não foi possível abrir o cardápio salvo."); }
         } else setError("Erro de rede ao carregar o cardápio. Conecte-se uma vez para salvá-lo neste aparelho.");
       }
@@ -688,11 +693,11 @@ export default function CustomerApp() {
           umbrella_id: umbrellaId,
           request_only: true,
           notes: "Fechamento solicitado pelo cliente",
-          payment_amount: billTotal,
+          payment_amount: separatePayment ? accountShare(billTotal, billTotal, partySize) : billTotal,
           service_fee_amount: serviceFeeAmount,
           service_fee_enabled: serviceFeeEnabled,
-          split_people: 1,
-          split_mode: "full",
+          split_people: registeredPeople(partySize),
+          split_mode: separatePayment ? "split" : "full",
         }),
       });
       const data = await res.json();
@@ -1134,10 +1139,14 @@ export default function CustomerApp() {
               <strong>{formatCurrency(billTotal)}</strong>
             </div>
 
+            <label className="customer-fee-toggle">
+              <input type="checkbox" checked={separatePayment} onChange={event => setSeparatePayment(event.target.checked)} />
+              <span>Pagar separado — {registeredPeople(partySize)} pessoa(s) cadastrada(s)</span>
+            </label>
             <div className="customer-bill-summary">
-              <span>Pagamento solicitado</span>
-              <strong>{formatCurrency(billTotal)}</strong>
-              <small>Pagamentos parciais são registrados pela equipe do quiosque.</small>
+              <span>{separatePayment ? "Cota por pessoa (estimativa)" : "Pagamento solicitado"}</span>
+              <strong>{formatCurrency(separatePayment ? accountShare(billTotal, billTotal, partySize) : billTotal)}</strong>
+              <small>A equipe confere o saldo e registra cada pagamento separadamente. O guarda-sol só é liberado após quitar a conta.</small>
             </div>
 
             <button onClick={requestCloseAccount} disabled={loading || openTotal <= 0} className="customer-primary-button customer-close-button">

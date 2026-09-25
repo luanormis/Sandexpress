@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildUmbrellaQrTargetPath, buildUmbrellaQrTargetUrl, getConfiguredPublicAppUrl, getPublicAppUrl } from '@/lib/public-url';
-import { createBrandedQrSvg, svgToDataUrl } from '@/lib/branded-qr';
+import { createBrandedQrSvg, createQrLabelSvg, svgToDataUrl } from '@/lib/branded-qr';
 
 /**
  * GET /api/qr?umbrella_id=xxx&format=svg|png
@@ -55,8 +55,12 @@ export async function GET(req: NextRequest) {
       .update({ qr_url: targetUrl, qr_path: targetPath })
       .eq('id', umbrella.id);
 
+    if (format === 'label') {
+      return new NextResponse(await createQrLabelSvg(targetUrl, Number(umbrella.number)), { headers: { 'Content-Type': 'image/svg+xml', 'Content-Disposition': 'attachment; filename=etiqueta-guarda-sol.svg' } });
+    }
+
     if (format === 'png') {
-      const dataUrl = await QRCode.toDataURL(targetUrl, { width: 400, margin: 2 });
+      const dataUrl = await QRCode.toDataURL(targetUrl, { width: 400, margin: 4 });
       return NextResponse.json({
         umbrella_id: umbrella.id,
         tenant_id: umbrella.tenant_id,

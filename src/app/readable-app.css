@@ -1,0 +1,85 @@
+/* A single light palette for application routes, including dialogs outside main.
+   The public home page and printable QR sheets have separate designs. */
+html body .readable-app {
+  --background: #fff8e8;
+  --foreground: #241b16;
+  --on-surface: #241b16;
+  --on-surface-variant: #51463e;
+  --surface: #fffdf7;
+  --surface-container: #fff1db;
+  --surface-container-low: #fff8e8;
+  --surface-container-lowest: #fffdf7;
+  --on-primary: #241b16;
+  --on-primary-container: #241b16;
+  --brand-error: #241b16;
+  --brand-error-soft: #fff1db;
+  min-height: 100dvh;
+  background: #fff8e8;
+  color: #241b16;
+  color-scheme: light;
+}
+
+/* Legacy selectors used !important and sometimes styled every gray utility.
+   Reset ink consistently across panels, tables, labels, icons and modals. */
+html body .readable-app.readable-app.readable-app.readable-app :where(*) {
+  color: #241b16 !important;
+  -webkit-text-fill-color: currentColor;
+}
+html body .readable-app.readable-app.readable-app :where(main, aside, header, nav, footer,
+  .vendor-ops-shell, .admin-ops-shell, .vendor-beach-map,
+  .customer-app, .customer-login__panel, .customer-topbar,
+  .customer-bill-panel, .customer-product-row, .customer-cart-row,
+  .customer-order-row, .customer-total-card, .customer-status-card,
+  .customer-empty, .customer-tabbar, .customer-option-modal,
+  .customer-satisfaction-card, .vendor-kanban-column,
+  [class*="bg-"]):where(:not([class*="bg-black/"]):not(.theme-background):not(.qr-page):not(.qr-card)) {
+  background: #fffdf7 !important;
+  border-color: #d5b797 !important;
+}
+html body .readable-app.readable-app.readable-app :where(main, .vendor-ops-shell, .admin-ops-shell) {
+  background: #fff8e8 !important;
+}
+html body .readable-app.readable-app.readable-app :where(input:not([type="color"]), select, textarea) {
+  background: #ffffff !important;
+  border-color: #95765b !important;
+}
+html body .readable-app.readable-app.readable-app :where(input, textarea)::placeholder {
+  color: #65574b !important;
+  opacity: 1;
+}
+html body .readable-app.readable-app.readable-app :where(button, a)[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-gray-100"]):not([class*="bg-gray-200"]),
+html body .readable-app.readable-app.readable-app :where(.customer-action, .customer-primary-button,
+  .customer-add-button, .customer-cart-dock, .customer-cart-dock button,
+  .customer-chip.is-active, .customer-tab.is-active, .customer-option-modal__footer button,
+  .customer-icon-button, .customer-icon-button--secondary,
+  .customer-offer-card > span, .customer-offer-card button,
+  .vendor-cash-button, .vendor-sound-button) {
+  background: #ff9a3c !important;
+  border-color: #9c4c12 !important;
+}
+html body .readable-app.readable-app.readable-app :where(button, a):focus-visible {
+  outline: 3px solid #241b16;
+  outline-offset: 3px;
+}
+html body .readable-app.readable-app.readable-app :where(button, a)[aria-selected="true"] {
+  box-shadow: inset 0 -3px #241b16;
+}
+html body .readable-app.readable-app.readable-app.readable-app .theme-background {
+  color: var(--preview-ink, #241b16) !important;
+}
+html body .readable-app.readable-app.readable-app.readable-app .theme-background > :where(h4, p) {
+  color: inherit !important;
+}
+html body .readable-app.readable-app.readable-app .customer-app {
+  background: var(--customer-background, #fff8e8) !important;
+}
+html body .readable-app.readable-app.readable-app :where(.customer-welcome__content, .customer-content) {
+  background: #fff8e8;
+  border-radius: 1rem;
+}
+html body .readable-app.readable-app.readable-app .customer-brand-watermark {
+  background: #fff8e8;
+}
+@media print {
+  html body .readable-app { min-height: 0; background: white; }
+}

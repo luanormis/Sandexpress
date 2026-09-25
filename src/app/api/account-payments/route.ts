@@ -6,6 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isCanonicalUuid } from '@/lib/uuid';
 import { accountAmountsWithServiceFee } from '@/lib/service-fee';
 
+import { registeredPeople } from '@/lib/account-share';
+
 const PAYMENT_METHODS = new Set(['cash', 'pix', 'debit_card', 'credit_card']);
 const OPEN_STATUSES = ['received', 'preparing', 'delivering', 'completed', 'closing_requested'];
 
@@ -38,7 +40,7 @@ async function loadPayments(vendorId: string, orderId: string) {
 
 async function loadOpenOrder(vendorId: string, orderId: string) {
   const { data, error } = await supabaseAdmin.from('orders')
-    .select('id, tenant_id, vendor_id, umbrella_id, customer_id, total, status, paid, notes')
+    .select('id, tenant_id, vendor_id, umbrella_id, customer_id, total, status, paid, notes, party_size')
     .eq('id', orderId).eq('vendor_id', vendorId).single();
   if (error || !data) return null;
   return data as any;
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
     const totals = accountAmountsWithServiceFee(order);
     const payments = await loadPayments(vendorId, orderId);
     const paidAmount = toMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
-    return NextResponse.json({ order_id: orderId, total: totals.accountTotal, base_total: totals.baseTotal, service_fee_amount: totals.serviceFeeAmount, paid_amount: paidAmount, remaining_amount: toMoney(Math.max(0, totals.accountTotal - paidAmount)), payments, closed: Boolean(order.paid) });
+    return NextResponse.json({ order_id: orderId, party_size: registeredPeople(order.party_size), total: totals.accountTotal, base_total: totals.baseTotal, service_fee_amount: totals.serviceFeeAmount, paid_amount: paidAmount, remaining_amount: toMoney(Math.max(0, totals.accountTotal - paidAmount)), payments, closed: Boolean(order.paid) });
   } catch (err) {
     console.error('Account payments GET error:', err);
     return NextResponse.json({ error: 'Erro ao carregar pagamentos da comanda.' }, { status: 500 });

@@ -1,3 +1,4 @@
+import { registeredPeople } from "@/lib/account-share";
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessVendor, getRequestSession } from '@/lib/auth-session';
 import { vendorFeatureEnabled, featureDisabledResponse } from '@/lib/features';
@@ -73,11 +74,13 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (customerLookupError) throw customerLookupError;
 
+    const partySize = registeredPeople(body.party_size);
     const now = new Date().toISOString();
     let customerId = existingCustomer?.id;
     if (existingCustomer) {
       const { error } = await supabaseAdmin.from('customers').update({
         name,
+        party_size: partySize,
         visit_count: Number(existingCustomer.visit_count || 0) + 1,
         last_visit_at: now,
         updated_at: now,
@@ -89,7 +92,7 @@ export async function POST(req: NextRequest) {
         vendor_id: vendorId,
         name,
         phone,
-        party_size: 1,
+        party_size: partySize,
         visit_count: 1,
         last_visit_at: now,
       } as any).select('id').single();
@@ -106,6 +109,7 @@ export async function POST(req: NextRequest) {
       total: 0,
       paid: false,
       notes: 'Comanda aberta manualmente pelo quiosque',
+      party_size: partySize,
     } as any).select('id').single();
     if (orderError) throw orderError;
 

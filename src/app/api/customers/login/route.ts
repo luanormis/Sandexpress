@@ -1,3 +1,4 @@
+import { registeredPeople } from '@/lib/account-share';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth-session';
 import { isRateLimited } from '@/lib/rate-limit';
@@ -13,7 +14,9 @@ async function ensureOpenAccount({
   vendorId,
   customerId,
   umbrellaId,
+  partySize,
 }: {
+  partySize: number;
   tenantId: string | null;
   vendorId: string;
   customerId: string;
@@ -59,6 +62,7 @@ async function ensureOpenAccount({
       total: 0,
       paid: false,
       notes: 'Comanda aberta pelo QR Code',
+      party_size: partySize,
     } as any)
     .select('id')
     .single();
@@ -144,7 +148,7 @@ export async function POST(req: NextRequest) {
       .eq('phone', cleanPhone)
       .single();
 
-    const partySize = Math.max(1, Math.min(50, Number(party_size || 1)));
+    const partySize = registeredPeople(party_size);
 
     if (umbrellaState?.is_occupied || umbrellaState?.current_order_id) {
       const { data: openOrders, error: openOrderError } = await supabaseAdmin
@@ -186,6 +190,7 @@ export async function POST(req: NextRequest) {
         vendorId: vendor_id,
         customerId: updated.id,
         umbrellaId: umbrella_id,
+        partySize,
       });
       if (account?.error) {
         return NextResponse.json({ error: account.error }, { status: 409 });
@@ -233,6 +238,7 @@ export async function POST(req: NextRequest) {
       vendorId: vendor_id,
       customerId: newCustomer.id,
       umbrellaId: umbrella_id,
+        partySize,
     });
     if (account?.error) {
       return NextResponse.json({ error: account.error }, { status: 409 });

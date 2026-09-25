@@ -1,6 +1,12 @@
-import { createBrandedQrSvg, svgToDataUrl } from '@/lib/branded-qr';
+import { createBrandedQrSvg, createQrLabelSvg, svgToDataUrl } from '@/lib/branded-qr';
 
 describe('branded QR code', () => {
+  it('downloads a sized label with the requested callout', async () => {
+    const svg = await createQrLabelSvg('https://app.sandexpress.com.br/u/teste/guarda-sol-1', 12);
+    expect(svg).toContain('width="99mm" height="55.8mm"');
+    expect(svg).toContain('Faça seu pedido aqui');
+    expect(svg).toContain('Guarda-sol 12');
+  });
   it('creates a valid SVG with the SandExpress orange mark in the center', async () => {
     const svg = await createBrandedQrSvg('https://app.sandexpress.com.br/u/teste/guarda-sol-1');
     expect(svg).toMatch(/^<svg/);
