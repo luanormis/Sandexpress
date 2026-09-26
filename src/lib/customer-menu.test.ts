@@ -1,5 +1,6 @@
 import {
   CUSTOMER_MENU_CATEGORIES,
+  getAvailableCustomerCategories,
   filterCustomerMenuProducts,
   getCustomerMenuThumbnail,
 } from './customer-menu';
@@ -30,4 +31,15 @@ describe('customer menu helpers', () => {
     expect(thumb).toContain('w=128');
     expect(thumb).toContain('q=72');
   });
+});
+
+it('exposes all pilot categories and every item, including breakfast and meals', () => {
+  const menu = [
+    { name: 'Café', category: 'Café da manhã' },
+    { name: 'Peixe executivo', category: 'Pratos' },
+    { name: 'Combo', category: 'Combos' },
+  ];
+  expect(getAvailableCustomerCategories(menu)).toEqual(['Todos', 'Café da manhã', 'Pratos', 'Combos']);
+  expect(filterCustomerMenuProducts(menu, 'Todos')).toHaveLength(3);
+  expect(filterCustomerMenuProducts(menu, 'Pratos')).toEqual([menu[1]]);
 });

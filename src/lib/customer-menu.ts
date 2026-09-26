@@ -7,7 +7,7 @@ export const CUSTOMER_MENU_CATEGORIES = [
   'Cervejas',
 ] as const;
 
-export type CustomerMenuCategory = (typeof CUSTOMER_MENU_CATEGORIES)[number];
+export type CustomerMenuCategory = string;
 
 type MenuProductLike = {
   name?: string | null;
@@ -22,6 +22,10 @@ function normalizeText(value: unknown) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+export function getAvailableCustomerCategories(products: MenuProductLike[]) {
+  return ['Todos', ...Array.from(new Set(products.map(product => product.category?.trim() || 'Geral')))];
 }
 
 function productSearchText(product: MenuProductLike) {
@@ -49,6 +53,9 @@ export function productMatchesCustomerCategory(product: MenuProductLike, categor
 }
 
 export function filterCustomerMenuProducts<T extends MenuProductLike>(products: T[], category: CustomerMenuCategory) {
+  if (category === 'Todos') return products;
+  const exact = products.filter(product => normalizeText(product.category?.trim() || 'Geral') === normalizeText(category));
+  if (exact.length) return exact;
   return products.filter((product) => productMatchesCustomerCategory(product, category));
 }
 

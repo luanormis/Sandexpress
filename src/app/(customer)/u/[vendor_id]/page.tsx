@@ -14,7 +14,7 @@ import { InstallShortcutButton } from "@/components/pwa/InstallShortcutButton";
 import { QrScannerButton } from "@/components/pwa/QrScannerButton";
 import { getOrderOptionGroups, selectedOrderOptionLabel, selectedOrderOptions } from "@/lib/order-options";
 import {
-  CUSTOMER_MENU_CATEGORIES,
+  getAvailableCustomerCategories,
   CustomerMenuCategory,
   filterCustomerMenuProducts,
   getCustomerMenuThumbnail,
@@ -136,7 +136,7 @@ export default function CustomerApp() {
   const [notes, setNotes] = useState("");
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(true);
   const [separatePayment, setSeparatePayment] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<CustomerMenuCategory>("Bebidas");
+  const [activeCategory, setActiveCategory] = useState<CustomerMenuCategory>("Todos");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("");
@@ -965,7 +965,7 @@ export default function CustomerApp() {
           {dayHighlights.length > 0 && <div className="customer-day-highlights"><div className="customer-offers__title"><Star size="1.1rem" /><span>Destaques do dia</span></div><div className="customer-offers__rail">{dayHighlights.map(product => <article key={product.id} className="customer-offer-card"><span>Oferta do dia</span><h2>{product.name}</h2><p>{product.description || product.subcategory || product.category}</p><strong>{formatCurrency(Number(product.promotional_price ?? product.price))}</strong><button type="button" onClick={() => getOrderOptionGroups(product).length > 0 ? setOptionMenuProduct(product) : addToCart(product)}><Plus size="1rem" /> Adicionar</button></article>)}</div></div>}
           {flexiblePromotions.length > 0 && <div className="customer-offers"><div className="customer-offers__title"><Star size="1.1rem" /><span>Ofertas do quiosque</span></div><div className="customer-offers__rail">{flexiblePromotions.map(promotion => { const freeProduct = promotion.descricao?.startsWith('[PRODUTO_GRATIS]'); const description = String(promotion.descricao || '').replace(/^\[(PRODUTO_GRATIS|COMBO)\]\s*/, ''); const benefit = freeProduct ? 'Produto grátis' : promotion.desconto_tipo === 'percentual' ? `${promotion.desconto_valor}% OFF` : promotion.desconto_tipo === 'preco_fechado' ? `Combo ${formatCurrency(Number(promotion.desconto_valor))}` : `Economize ${formatCurrency(Number(promotion.desconto_valor))}`; return <article key={promotion.id} className="customer-offer-card"><span>{benefit}</span><h2>{promotion.titulo}</h2>{description && <p>{description}</p>}<small>{promotion.promocao_itens?.map(item => `${item.quantidade || 1}x ${item.products?.name || 'item'}`).join(' + ')}</small><button type="button" onClick={() => addPromotionToCart(promotion)}><Plus size="1rem" /> Adicionar oferta</button></article>; })}</div></div>}
           <div className="customer-category-rail">
-            {CUSTOMER_MENU_CATEGORIES.map((category) => (
+            {getAvailableCustomerCategories(products).map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
