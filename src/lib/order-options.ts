@@ -1,15 +1,8 @@
-import { isBeverageCategory } from './printer-routing';
 
 export type ProductOptionGroup = { name: string; options: string[] };
 export type OptionProduct = { category?: string | null; option_group_name?: string | null; option_values?: string[] | null };
 
 export const NO_CUSTOMIZATION = 'Sem alteração';
-
-const BEVERAGE_QUICK_OPTIONS: ProductOptionGroup[] = [
-  { name: 'Gelo', options: [NO_CUSTOMIZATION, 'Com gelo'] },
-  { name: 'Açúcar', options: [NO_CUSTOMIZATION, 'Sem açúcar'] },
-  { name: 'Limão', options: [NO_CUSTOMIZATION, 'Com limão'] },
-];
 
 function storedOptionGroups(product: OptionProduct): ProductOptionGroup[] {
   const values = Array.isArray(product.option_values) ? product.option_values.map(String).filter(Boolean) : [];
@@ -26,10 +19,9 @@ function storedOptionGroups(product: OptionProduct): ProductOptionGroup[] {
 }
 
 export function getOrderOptionGroups(product: OptionProduct): ProductOptionGroup[] {
-  const groups = storedOptionGroups(product);
-  if (!isBeverageCategory(product.category)) return groups;
-  const existing = new Set(groups.map(group => group.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()));
-  return [...groups, ...BEVERAGE_QUICK_OPTIONS.filter(group => !existing.has(group.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()))];
+  return storedOptionGroups(product).filter(group => !['gelo', 'acucar', 'limao'].includes(
+    group.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+  ));
 }
 
 export function selectedOrderOptions(product: OptionProduct, selections: Record<string, string>, productId: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { accountShare, registeredPeople } from "@/lib/account-share";
+import { customerOrderView } from "@/lib/customer-order-view";
 import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readable-theme";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
@@ -156,6 +157,18 @@ export default function CustomerApp() {
   const [syncing, setSyncing] = useState(false);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(() => new Set());
   const [accountSummaryOpen, setAccountSummaryOpen] = useState(false);
+  const [accountPreferences, setAccountPreferences] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!customerId || !currentOrderId) return;
+    try { setAccountPreferences(JSON.parse(sessionStorage.getItem(`account_preferences_${currentOrderId}`) || "{}")); }
+    catch { setAccountPreferences({}); }
+  }, [customerId, currentOrderId]);
+
+  function changeAccountPreference(name: string, value: string) {
+    const next = { ...accountPreferences, [name]: value };
+    setAccountPreferences(next);
+    if (currentOrderId) sessionStorage.setItem(`account_preferences_${currentOrderId}`, JSON.stringify(next));
+  }
 
   const visibleProducts = useMemo(() => {
     const now = Date.now();
@@ -191,7 +204,7 @@ export default function CustomerApp() {
   const pendingOrdersTotal = orders
     .filter((order) => !BILLABLE_STATUSES.has(order.status))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
-  const openTotal = ordersTotal + pendingOrdersTotal + discountedCartTotal;
+  const openTotal = ordersTotal + pendingOrdersTotal;
   const serviceFeeAmount = serviceFeeEnabled ? Number((openTotal * 0.1).toFixed(2)) : 0;
   const billTotal = Number((openTotal + serviceFeeAmount).toFixed(2));
   const theme = {
@@ -265,16 +278,7 @@ export default function CustomerApp() {
       return;
     }
     if (!res.ok) return;
-    const mapped = (Array.isArray(data) ? data : []).map((order) => ({
-      id: order.id,
-      account_id: order.account_id,
-      sequence: order.sequence,
-      total: Number(order.total || 0),
-      account_total: Number(order.account_total || order.total || 0),
-      status: order.status || "received",
-      account_status: order.account_status,
-      created_at: order.created_at || new Date().toISOString(),
-    }));
+    const mapped: Order[] = (Array.isArray(data) ? data : []).map(order => customerOrderView(order));
     const queued = readCustomerQueue(nextVendorId, umbrellaId);
     setOfflineOrders(queued);
     setPendingSync(queued.length);
@@ -611,7 +615,8 @@ export default function CustomerApp() {
         .filter((item) => item.option)
         .map((item) => `${item.product.name}: ${item.option}`)
         .join("; ");
-      const orderNotes = [notes.trim(), optionNotes ? `Opções escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
+      const preferences = Object.entries(accountPreferences).filter(([, value]) => value && value !== "Sem alteração").map(([name, value]) => `${name}: ${value}`).join("; ");
+      const orderNotes = [notes.trim(), preferences ? `Preferências da conta: ${preferences}` : "", optionNotes ? `Opções escolhidas: ${optionNotes}` : ""].filter(Boolean).join("\n");
       const idempotencyKey = crypto.randomUUID();
       const orderBody = {
         vendor_id: vendor.id,
@@ -665,6 +670,7 @@ export default function CustomerApp() {
       setCart([]);
       setNotes("");
       setStep("orders");
+      await loadCustomerOrders(customerId, vendor.id);
     } catch (sendError) {
       if (sendError instanceof TypeError && vendor && offlineCandidate) {
         const queued = offlineCandidate;
@@ -1129,6 +1135,20 @@ export default function CustomerApp() {
           )}
 
           <div className="customer-bill-panel">
+            <fieldset className="rounded-xl border p-3">
+              <legend className="px-1 font-bold">Preferências da conta</legend>
+              <p className="customer-small">Aplicadas aos próximos pedidos. Para pedidos já enviados, avise o atendente.</p>
+              {[
+                { name: "Gelo", values: ["Sem alteração", "Com gelo", "Sem gelo"] },
+                { name: "Limão", values: ["Sem alteração", "Com limão", "Sem limão"] },
+                { name: "Açúcar", values: ["Sem alteração", "Com açúcar", "Sem açúcar"] },
+              ].map(({ name, values }) => <label key={name} className="mt-2 flex items-center justify-between gap-3">
+                <span>{name}</span>
+                <select aria-label={name} className="rounded-lg border p-2" value={accountPreferences[name] || "Sem alteração"} onChange={event => changeAccountPreference(name, event.target.value)}>
+                  {values.map(value => <option key={value}>{value}</option>)}
+                </select>
+              </label>)}
+            </fieldset>
             <div className="customer-bill-row">
               <span>Conta</span>
               <strong>{formatCurrency(openTotal)}</strong>
