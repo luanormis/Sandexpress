@@ -83,6 +83,12 @@ export const VERA_MENU: VeraMenuItem[] = [
     ["088", "Combo 01", 230, "Isca de peixe e fritas"], ["089", "Combo 02", 160, "Fritas, polenta e mandioca"],
     ["090", "Combo 03", 280, "Calabresa, frango e fritas"], ["091", "Combo 04", 480, "Camarão, pescada, lula, fritas e cebola empanada"],
   ]),
+  ...items("Bebidas", "bebidas.png", [
+    ["092", "Água mineral 500 ml", 5, "Com ou sem gás"], ["093", "Refrigerante lata", 8, "Cola, laranja, limão ou guaraná"],
+    ["094", "Refrigerante 2 litros", 18, "Cola, laranja ou guaraná"], ["095", "Suco natural", 12, "Laranja, limão ou maracujá"],
+    ["096", "Água de coco", 12], ["097", "Chá gelado", 10], ["098", "Cerveja lata", 10],
+    ["099", "Cerveja long neck", 15], ["100", "Caipirinha", 22, "Limão, maracujá ou morango"],
+  ]),
 ];
 
 export const VERA_MENU_TEMPLATE_TAG = "menu-template:vera";
