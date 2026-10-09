@@ -755,6 +755,12 @@ input[type="number"] {
   gap: clamp(0.7rem, 3vw, 1rem);
 }
 
+.customer-menu-sections { display: grid; gap: 1.5rem; }
+.customer-menu-section { scroll-margin-top: 7rem; }
+.customer-menu-section__heading { display: flex; align-items: center; gap: .75rem; margin: .35rem 0 .65rem; color: var(--customer-background-text, #3d1a0a); }
+.customer-menu-section__heading h2 { margin: 0; font-size: 1.05rem; font-weight: 900; white-space: nowrap; }
+.customer-menu-section__line { height: 1px; flex: 1; background: color-mix(in srgb, currentColor 28%, transparent); }
+
 .customer-account-items {
   display: grid;
   gap: 0.55rem;
