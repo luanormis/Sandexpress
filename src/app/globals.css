@@ -1394,7 +1394,9 @@ input[type="number"] {
   color: var(--customer-primary);
   display: block;
   margin-top: 0.2rem;
-  font-size: 0.98rem;
+  font-size: 1.12rem;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
 }
 
 .customer-add-button {
@@ -1467,7 +1469,7 @@ input[type="number"] {
   margin-top: 0.15rem;
   overflow: hidden;
   color: var(--customer-muted);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -994,7 +994,7 @@ export default function CustomerApp() {
                 const highlighted = Boolean(product.menu_highlight || product.is_combo || product.promotional_price);
                 return <article key={product.id} className={`customer-product-row${lastAddedProductId === product.id ? " is-added" : ""}`}>
                   {product.image_url && <div className="customer-product-media"><img src={getCustomerMenuThumbnail(product.image_url)} alt={product.name} loading="lazy" decoding="async" /></div>}
-                  <div className="customer-product-info"><h2 className="customer-product-name">{product.name}</h2><p className="customer-product-description">{product.description || product.subcategory || product.category}</p>{highlighted && <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>}{optionGroups.length > 0 && <button type="button" onClick={() => setOptionMenuProduct(product)} className="customer-options-trigger">Escolher opções</button>}<span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span></div>
+                  <div className="customer-product-info"><h2 className="customer-product-name">{product.name}</h2>{(product.description || product.subcategory) && <p className="customer-product-description">{product.description || product.subcategory}</p>}{highlighted && <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>}{optionGroups.length > 0 && <button type="button" onClick={() => setOptionMenuProduct(product)} className="customer-options-trigger">Escolher opções</button>}<span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span></div>
                   <div className="customer-product-side">{quantity > 0 ? <div className="customer-qty customer-qty--compact"><button onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}><Minus size="1rem" /></button><span>{quantity}</span><button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}><Plus size="1rem" /></button></div> : <button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-add-button" aria-label={`Adicionar ${product.name} ao carrinho`}><Plus size="1.15rem" /></button>}</div>
                 </article>;
               })}</div>
@@ -1017,7 +1017,7 @@ export default function CustomerApp() {
                   )}
                   <div className="customer-product-info">
                     <h2 className="customer-product-name">{product.name}</h2>
-                    <p className="customer-product-description">{product.description || product.subcategory || product.category}</p>
+                    {(product.description || product.subcategory) && <p className="customer-product-description">{product.description || product.subcategory}</p>}
                     {highlighted && (
                       <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>
                     )}
