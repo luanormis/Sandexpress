@@ -3,7 +3,8 @@ import { performance } from 'node:perf_hooks';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
-for (const rawLine of readFileSync('.env.local', 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)) {
+const envPath = process.env.LOAD_TEST_ENV_PATH || '.env.local';
+for (const rawLine of readFileSync(envPath, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)) {
   const line = rawLine.trim();
   const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
   if (!match || process.env[match[1]]) continue;
@@ -182,9 +183,11 @@ try {
     name: `${runId}-cliente-${i + 1}`, phone: `119${String(20000000 + i).slice(-8)}`, party_size: 2,
   })));
 
-  const productByVendor = new Map();
+  const productsByVendor = new Map();
   for (const product of products) {
-    if (!productByVendor.has(product.vendor_id)) productByVendor.set(product.vendor_id, product);
+    const list = productsByVendor.get(product.vendor_id) ?? [];
+    list.push(product);
+    productsByVendor.set(product.vendor_id, list);
   }
   const customerByVendorAndIndex = new Map();
   for (const customer of customers) {
@@ -199,7 +202,8 @@ try {
       const vendorUmbrellas = activeUmbrellas.filter((item) => item.vendor_id === umbrella.vendor_id);
       const index = vendorUmbrellas.findIndex((item) => item.id === umbrella.id);
       const customer = customerByVendorAndIndex.get(umbrella.vendor_id)[index];
-      const product = productByVendor.get(umbrella.vendor_id);
+      const vendorProducts = productsByVendor.get(umbrella.vendor_id) ?? [];
+      const product = vendorProducts[index % Math.max(vendorProducts.length, 1)];
       const cookie = `customer_session=${token({ role: 'customer', vendor_id: umbrella.vendor_id, customer_id: customer.id, tenant_id: umbrella.tenant_id })}`;
       const virtualClientIp = `2001:db8::${(orderCalls.length + 1).toString(16)}`;
       orderCalls.push(() => http('/api/orders', {
@@ -236,7 +240,7 @@ try {
     const marker = '/product-images/';
     const offset = upload.body.url.indexOf(marker);
     if (offset >= 0) uploadedPaths.push(decodeURIComponent(upload.body.url.slice(offset + marker.length)));
-    await admin.from('products').update({ image_url: upload.body.url, is_default_image: false }).eq('id', productByVendor.get(firstVendor.id).id);
+    await admin.from('products').update({ image_url: upload.body.url, is_default_image: false }).eq('id', productsByVendor.get(firstVendor.id)?.[0]?.id);
   }
 
   const registrationPayload = {
