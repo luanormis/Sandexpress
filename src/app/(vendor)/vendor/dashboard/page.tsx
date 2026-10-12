@@ -2118,7 +2118,6 @@ export default function VendorDashboard() {
           {activeTab === "orders" && (
             <div className="space-y-4">
               {renderTodayManagementSummary()}
-              {renderBeachMap()}
               <div className="vendor-kanban-board grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-3">
                 {renderCompactKanbanColumn(
                   "Mesa aberta",
@@ -2144,6 +2143,7 @@ export default function VendorDashboard() {
                   { paidAction: true }
                 )}
               </div>
+              {renderBeachMap()}
             </div>
           )}
 
