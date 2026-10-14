@@ -4219,8 +4219,6 @@ function ProductModal({
               <p className="text-sm font-bold text-gray-500">{form.category}</p>
             </div>
           )}
-          {!isMenuMode && (
-            <>
           {/* Global image catalog */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Foto do Produto</label>
@@ -4293,9 +4291,6 @@ function ProductModal({
               placeholder="Descreva o produto..."
             />
           </div>
-
-            </>
-          )}
 
           {/* Price row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
