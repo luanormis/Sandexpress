@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Store, TrendingUp, Plus, ShieldCheck, Ban, CheckCircle2,
   X, Search, Eye, AlertTriangle, DollarSign, Phone, Mail, Clock, Menu, Trash2, Star, Save,
-  Upload, ImageIcon,
+  Upload, ImageIcon, Palette,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
@@ -24,6 +24,10 @@ interface Vendor {
   cnpj: string | null;
   cpf: string | null;
   logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  button_color?: string | null;
+  button_text_color?: string | null;
   subscription_status: string;
   plan_type: string | null;
   trial_ends_at: string | null;
@@ -209,6 +213,9 @@ export default function AdminDashboard() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [vendorUmbrellaLimit, setVendorUmbrellaLimit] = useState("100");
   const [selectedVendorFeatures, setSelectedVendorFeatures] = useState<Record<string, boolean>>({});
+  const [vendorThemeDraft, setVendorThemeDraft] = useState({ primary_color: "#fff8e8", secondary_color: "#451704", button_color: "#ff6b00", button_text_color: "#ffffff" });
+  const [vendorThemeSaving, setVendorThemeSaving] = useState(false);
+  const [vendorThemeMessage, setVendorThemeMessage] = useState("");
   const [featureSavingVendorId, setFeatureSavingVendorId] = useState<string | null>(null);
   const [platformReport, setPlatformReport] = useState<PlatformReport | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -622,6 +629,39 @@ export default function AdminDashboard() {
     } finally {
       setLogoUploadingVendorId(null);
     }
+  };
+
+  const openVendorDetails = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setVendorThemeDraft({
+      primary_color: vendor.primary_color || "#fff8e8",
+      secondary_color: vendor.secondary_color || "#451704",
+      button_color: vendor.button_color || vendor.primary_color || "#ff6b00",
+      button_text_color: vendor.button_text_color || "#ffffff",
+    });
+    setVendorThemeMessage("");
+  };
+
+  const saveVendorTheme = async () => {
+    if (!selectedVendor) return;
+    setVendorThemeSaving(true);
+    setVendorThemeMessage("");
+    try {
+      const response = await fetch(`/api/vendors/${selectedVendor.id}/theme`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vendorThemeDraft),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível salvar as cores.");
+      setVendorThemeDraft(current => ({ ...current, ...data }));
+      setVendors(current => current.map(item => item.id === selectedVendor.id ? { ...item, ...data } : item));
+      setSelectedVendor(current => current ? { ...current, ...data } : current);
+      setVendorThemeMessage("Identidade visual salva para este quiosque.");
+    } catch (error) {
+      setVendorThemeMessage(error instanceof Error ? error.message : "Erro ao salvar identidade visual.");
+    } finally { setVendorThemeSaving(false); }
   };
 
   const savePlanSettings = async (e: React.FormEvent) => {
@@ -1193,7 +1233,7 @@ export default function AdminDashboard() {
                       <td className="p-4">
                         <div className="flex gap-1">
                           <button
-                            onClick={() => setSelectedVendor(v)}
+                            onClick={() => openVendorDetails(v)}
                             className="text-gray-400 hover:text-white transition-colors bg-gray-700 p-2 rounded-lg hover:bg-gray-600"
                             title="Ver detalhes"
                           >
@@ -2224,6 +2264,15 @@ export default function AdminDashboard() {
               <button onClick={() => setSelectedVendor(null)} className="text-gray-400 hover:text-white"><X size={24} /></button>
             </div>
             <div className="p-6 space-y-4">
+              <section className="rounded-2xl border border-orange-300/40 bg-orange-500/10 p-4">
+                <div className="flex items-start gap-3"><Palette className="mt-1 text-orange-300" size={21}/><div><h4 className="font-black text-orange-100">Identidade visual do quiosque</h4><p className="mt-1 text-xs font-bold leading-5 text-orange-200/80">Estas cores afetam o cardápio, os botões e as telas internas deste cliente. A tela institucional de login do SandExpress permanece igual.</p></div></div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {[['primary_color','Fundo do cliente'],['secondary_color','Texto e detalhes'],['button_color','Botões'],['button_text_color','Texto dos botões']].map(([field,label]) => <label key={field} className="text-xs font-black text-orange-100"><span className="mb-1 block">{label}</span><span className="flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 p-2"><input type="color" value={vendorThemeDraft[field as keyof typeof vendorThemeDraft]} onChange={event => setVendorThemeDraft(current => ({ ...current, [field]: event.target.value }))} className="h-9 w-10 cursor-pointer rounded"/><input value={vendorThemeDraft[field as keyof typeof vendorThemeDraft]} onChange={event => setVendorThemeDraft(current => ({ ...current, [field]: event.target.value }))} className="min-w-0 flex-1 bg-transparent text-sm font-black text-white outline-none" aria-label={label}/></span></label>)}
+                </div>
+                <div className="mt-4 flex items-center gap-3 rounded-xl p-3" style={{ background: vendorThemeDraft.primary_color, color: vendorThemeDraft.secondary_color }}><div className="h-9 w-9 overflow-hidden rounded-lg bg-white/80">{selectedVendor.logo_url && <img src={selectedVendor.logo_url} alt="Logo" className="h-full w-full object-contain"/>}</div><span className="font-black">Prévia do cardápio</span><button type="button" className="ml-auto rounded-lg px-3 py-2 text-xs font-black" style={{ background: vendorThemeDraft.button_color, color: vendorThemeDraft.button_text_color }}>Botão</button></div>
+                {vendorThemeMessage && <p className="mt-3 rounded-xl bg-white/10 p-3 text-sm font-black text-orange-100">{vendorThemeMessage}</p>}
+                <button type="button" onClick={saveVendorTheme} disabled={vendorThemeSaving} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-500 px-4 font-black text-white hover:bg-orange-600 disabled:opacity-50"><Save size={17}/>{vendorThemeSaving ? "Salvando..." : "Salvar identidade visual"}</button>
+              </section>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-700/50 p-4 rounded-xl">
                   <p className="text-xs text-gray-400 font-bold mb-1">Responsável</p>
