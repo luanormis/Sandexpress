@@ -542,8 +542,11 @@ export default function CustomerApp() {
         phone: data.phone || normalizedPhone,
         party_size: data.party_size || partySize,
       }));
-      await loadCustomerOrders(data.id || data.customer_id, vendor.id);
       setStep("menu");
+      // O cardápio não deve depender da consulta secundária de pedidos. O
+      // cliente já foi autenticado; carregamos a tela primeiro e atualizamos
+      // o histórico quando a consulta terminar.
+      void loadCustomerOrders(data.id || data.customer_id, vendor.id).catch(() => undefined);
     } catch {
       setError("Não foi possível abrir o cardápio agora. Verifique sua conexão e tente novamente.");
     } finally {
