@@ -146,7 +146,9 @@ export async function POST(req: NextRequest) {
       .select('*')
       .eq('vendor_id', vendor_id)
       .eq('phone', cleanPhone)
-      .single();
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     const partySize = registeredPeople(party_size);
 
