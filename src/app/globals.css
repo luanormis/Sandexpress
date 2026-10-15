@@ -866,6 +866,32 @@ input[type="number"] {
   transition: transform 160ms ease, filter 160ms ease, background-color 160ms ease;
 }
 
+.customer-qty--compact {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  min-width: 6.2rem;
+}
+
+.customer-qty--compact > span {
+  min-width: 1.15rem;
+  color: var(--customer-text);
+  font-size: 0.96rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.customer-qty--compact .customer-qty-button {
+  cursor: pointer;
+  color: var(--customer-primary);
+  background: color-mix(in srgb, var(--customer-primary) 8%, white);
+}
+
+.customer-qty--compact .customer-qty-button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
 .customer-add-button.is-added {
   filter: brightness(0.92);
   transform: scale(0.98);

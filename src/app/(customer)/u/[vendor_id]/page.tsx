@@ -158,6 +158,7 @@ export default function CustomerApp() {
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(() => new Set());
   const [accountSummaryOpen, setAccountSummaryOpen] = useState(false);
   const [accountPreferences, setAccountPreferences] = useState<Record<string, string>>({});
+  const [scrollCategory, setScrollCategory] = useState<string>("Todos");
   const categoryRefs = useRef<Record<string, HTMLElement | null>>({});
   useEffect(() => {
     if (!customerId || !currentOrderId) return;
@@ -188,6 +189,23 @@ export default function CustomerApp() {
     category,
     products: filterCustomerMenuProducts(products, category).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
   })).filter(section => section.products.length > 0), [products]);
+  useEffect(() => {
+    if (step !== "menu" || activeCategory !== "Todos" || categorySections.length === 0) return;
+    const sections = categorySections
+      .map(({ category }) => categoryRefs.current[category])
+      .filter((section): section is HTMLElement => Boolean(section));
+    if (sections.length === 0) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (visible?.target instanceof HTMLElement) {
+        setScrollCategory(visible.target.dataset.category || "Todos");
+      }
+    }, { rootMargin: "-9rem 0px -55% 0px", threshold: 0 });
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, [activeCategory, categorySections, step]);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.promotional_price ?? item.product.price) * item.quantity, 0);
   const promotionDiscount = Math.max(0, Number(promotionPreview?.discount_total || 0));
   const discountedCartTotal = typeof promotionPreview?.total === "number" ? Number(promotionPreview.total) : cartTotal;
@@ -978,14 +996,14 @@ export default function CustomerApp() {
                   setActiveCategory(category);
                   categoryRefs.current[category]?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
-                className={`customer-chip${activeCategory === category ? " is-active" : ""}`}
+                className={`customer-chip${(activeCategory === category || (activeCategory === "Todos" && scrollCategory === category)) ? " is-active" : ""}`}
               >
                 {category}
               </button>
             ))}
           </div>
           {activeCategory === "Todos" && <div className="customer-menu-sections">
-            {categorySections.map(({ category, products: sectionProducts }) => <section key={category} ref={node => { categoryRefs.current[category] = node; }} className="customer-menu-section" aria-labelledby={`category-${category}`}>
+            {categorySections.map(({ category, products: sectionProducts }) => <section key={category} ref={node => { categoryRefs.current[category] = node; }} data-category={category} className="customer-menu-section" aria-labelledby={`category-${category}`}>
               <div className="customer-menu-section__heading"><span className="customer-menu-section__line" /><h2 id={`category-${category}`}>{category}</h2><span className="customer-menu-section__line" /></div>
               <div className="customer-list">{sectionProducts.map(product => {
                 const optionGroups = getOrderOptionGroups(product);
@@ -995,7 +1013,7 @@ export default function CustomerApp() {
                 return <article key={product.id} className={`customer-product-row${lastAddedProductId === product.id ? " is-added" : ""}`}>
                   {product.image_url && <div className="customer-product-media"><img src={getCustomerMenuThumbnail(product.image_url)} alt={product.name} loading="lazy" decoding="async" /></div>}
                   <div className="customer-product-info"><h2 className="customer-product-name">{product.name}</h2>{(product.description || product.subcategory) && <p className="customer-product-description">{product.description || product.subcategory}</p>}{highlighted && <span className="customer-promo-pill">{product.is_combo ? "Combo" : "Promoção"}</span>}{optionGroups.length > 0 && <button type="button" onClick={() => setOptionMenuProduct(product)} className="customer-options-trigger">Escolher opções</button>}<span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span></div>
-                  <div className="customer-product-side">{quantity > 0 ? <div className="customer-qty customer-qty--compact"><button onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}><Minus size="1rem" /></button><span>{quantity}</span><button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}><Plus size="1rem" /></button></div> : <button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-add-button" aria-label={`Adicionar ${product.name} ao carrinho`}><Plus size="1.15rem" /></button>}</div>
+                  <div className="customer-product-side"><div className="customer-qty customer-qty--compact"><button disabled={quantity === 0} onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}><Minus size="1rem" /></button><span>{quantity}</span><button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}><Plus size="1rem" /></button></div></div>
                 </article>;
               })}</div>
             </section>)}
@@ -1025,25 +1043,15 @@ export default function CustomerApp() {
                     <span className="customer-price">{formatCurrency(Number(product.promotional_price ?? product.price))}</span>
                   </div>
                   <div className="customer-product-side">
-                    {quantity > 0 ? (
-                      <div className="customer-qty customer-qty--compact">
-                        <button onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}>
-                          <Minus size="1rem" />
-                        </button>
-                        <span>{quantity}</span>
-                        <button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}>
-                          <Plus size="1rem" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)}
-                        className="customer-add-button"
-                        aria-label={`Adicionar ${product.name} ao carrinho`}
-                      >
-                        <Plus size="1.15rem" />
+                    <div className="customer-qty customer-qty--compact">
+                      <button disabled={quantity === 0} onClick={() => updateQuantity(product.id, -1, selectedOption)} className="customer-qty-button" aria-label={`Remover ${product.name}`}>
+                        <Minus size="1rem" />
                       </button>
-                    )}
+                      <span>{quantity}</span>
+                      <button onClick={() => optionGroups.length > 0 ? setOptionMenuProduct(product) : addToCart(product)} className="customer-qty-button" aria-label={`Adicionar ${product.name}`}>
+                        <Plus size="1rem" />
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
