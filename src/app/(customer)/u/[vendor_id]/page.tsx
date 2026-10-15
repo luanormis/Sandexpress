@@ -118,6 +118,7 @@ export default function CustomerApp() {
   const [step, setStep] = useState<"welcome" | "login" | "menu" | "cart" | "orders">("welcome");
   const [vendor, setVendor] = useState<CustomerVendor | null>(null);
   const [umbrella, setUmbrella] = useState<{ id: string; number: number; label?: string | null } | null>(null);
+  const [resolvedUmbrellaId, setResolvedUmbrellaId] = useState(umbrellaId);
   const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [currentOrderId, setCurrentOrderId] = useState("");
@@ -330,6 +331,7 @@ export default function CustomerApp() {
           return;
         }
         setUmbrella(data.umbrella);
+        setResolvedUmbrellaId(data.umbrella.id);
         setVendor(data.vendor);
         setProducts(data.products || []);
         setFeatures(data.features || {});
@@ -521,7 +523,7 @@ export default function CustomerApp() {
           name,
           phone: normalizedPhone,
           vendor_id: vendor.id,
-          umbrella_id: umbrellaId,
+          umbrella_id: resolvedUmbrellaId,
           party_size: partySize,
         }),
       });
@@ -542,6 +544,8 @@ export default function CustomerApp() {
       }));
       await loadCustomerOrders(data.id || data.customer_id, vendor.id);
       setStep("menu");
+    } catch {
+      setError("Não foi possível abrir o cardápio agora. Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
     }
