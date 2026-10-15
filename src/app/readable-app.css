@@ -1,11 +1,11 @@
 /* A single light palette for application routes, including dialogs outside main.
    The public home page and printable QR sheets have separate designs. */
 html body .readable-app {
-  --background: #fff8e8;
-  --foreground: #241b16;
-  --on-surface: #241b16;
-  --on-surface-variant: #51463e;
-  --surface: #fffdf7;
+  --background: var(--platform-background, #fff8e8);
+  --foreground: var(--platform-foreground, #241b16);
+  --on-surface: var(--platform-foreground, #241b16);
+  --on-surface-variant: var(--platform-muted, #51463e);
+  --surface: var(--platform-surface, #fffdf7);
   --surface-container: #fff1db;
   --surface-container-low: #fff8e8;
   --surface-container-lowest: #fffdf7;
@@ -14,8 +14,8 @@ html body .readable-app {
   --brand-error: #241b16;
   --brand-error-soft: #fff1db;
   min-height: 100dvh;
-  background: #fff8e8;
-  color: #241b16;
+  background: var(--platform-background, #fff8e8);
+  color: var(--platform-foreground, #241b16);
   color-scheme: light;
 }
 
@@ -33,7 +33,7 @@ html body .readable-app.readable-app.readable-app :where(main, aside, header, na
   .customer-empty, .customer-tabbar, .customer-option-modal,
   .customer-satisfaction-card, .vendor-kanban-column,
   [class*="bg-"]):where(:not([class*="bg-black/"]):not(.theme-background):not(.qr-page):not(.qr-card)) {
-  background: #fff8e8 !important;
+  background: var(--platform-background, #fff8e8) !important;
   border-color: #d5b797 !important;
 }
 html body .readable-app.readable-app.readable-app :where(main, .vendor-ops-shell, .admin-ops-shell) {
@@ -54,8 +54,8 @@ html body .readable-app.readable-app.readable-app :where(.customer-action, .cust
   .customer-icon-button, .customer-icon-button--secondary,
   .customer-offer-card > span, .customer-offer-card button,
   .vendor-cash-button, .vendor-sound-button) {
-  background: #ff9a3c !important;
-  border-color: #9c4c12 !important;
+  background: var(--platform-primary, #ff9a3c) !important;
+  border-color: var(--platform-border, #9c4c12) !important;
 }
 html body .readable-app.readable-app.readable-app :where(button, a):focus-visible {
   outline: 3px solid #241b16;

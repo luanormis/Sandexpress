@@ -98,6 +98,7 @@ const TABS = [
   { id: "analytics", label: "Analytics", icon: TrendingUp },
   { id: "catalog", label: "Catálogo", icon: ImageIcon },
   { id: "plans", label: "Planos", icon: DollarSign },
+  { id: "theme", label: "Cores globais", icon: Palette },
   { id: "new", label: "Novo Quiosque", icon: Plus },
   { id: "danger", label: "Risco", icon: Trash2 },
 ];
@@ -237,6 +238,9 @@ export default function AdminDashboard() {
   });
   const [planSaving, setPlanSaving] = useState(false);
   const [planMessage, setPlanMessage] = useState("");
+  const [globalTheme, setGlobalTheme] = useState({ background: '#fff8e8', foreground: '#241b16', surface: '#fffdf7', primary: '#ff9a3c', border: '#d5b797', muted: '#65574b', buttonText: '#241b16' });
+  const [globalThemeMessage, setGlobalThemeMessage] = useState("");
+  const [globalThemeSaving, setGlobalThemeSaving] = useState(false);
   const [catalogImages, setCatalogImages] = useState<CatalogImage[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogSaving, setCatalogSaving] = useState(false);
@@ -289,6 +293,9 @@ export default function AdminDashboard() {
     }
     if (isAuthenticated && activeTab === "catalog") {
       loadCatalogImages();
+    }
+    if (isAuthenticated && activeTab === "theme") {
+      fetch('/api/platform-settings/theme', { credentials: 'include' }).then(response => response.ok ? response.json() : null).then(data => data && setGlobalTheme(current => ({ ...current, ...data }))).catch(() => undefined);
     }
   }, [activeTab, isAuthenticated]);
 
@@ -693,6 +700,11 @@ export default function AdminDashboard() {
     } finally {
       setPlanSaving(false);
     }
+  };
+
+  const saveGlobalTheme = async () => {
+    setGlobalThemeSaving(true); setGlobalThemeMessage("");
+    try { const response = await fetch('/api/platform-settings/theme', { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(globalTheme) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao salvar cores.'); setGlobalTheme(data); setGlobalThemeMessage('Cores globais salvas. Atualize as telas abertas para visualizar.'); } catch (error) { setGlobalThemeMessage(error instanceof Error ? error.message : 'Erro ao salvar cores.'); } finally { setGlobalThemeSaving(false); }
   };
 
   const updateVendor = async (id: string, payload: Partial<Vendor>) => {
@@ -1868,6 +1880,13 @@ export default function AdminDashboard() {
         )}
 
         {/* ========== PLANOS ========== */}
+        {activeTab === "theme" && (
+          <section className="rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-xl">
+            <div className="flex items-start gap-3"><Palette className="text-orange-400"/><div><h2 className="text-2xl font-black text-white">Cores globais do sistema</h2><p className="mt-1 text-sm font-bold text-gray-300">Controle central dos elementos das telas internas. A página inicial de login permanece separada.</p></div></div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{([['background','Fundo'],['foreground','Texto'],['surface','Cards e superfícies'],['primary','Botões e destaque'],['border','Bordas'],['muted','Texto secundário'],['buttonText','Texto dos botões'] ] as const).map(([field,label]) => <label key={field} className="text-sm font-black text-gray-200"><span className="mb-2 block">{label}</span><span className="flex items-center gap-2 rounded-xl border border-gray-600 bg-gray-900 p-2"><input type="color" value={globalTheme[field]} onChange={event => setGlobalTheme(current => ({ ...current, [field]: event.target.value }))} className="h-10 w-12 cursor-pointer"/><input value={globalTheme[field]} onChange={event => setGlobalTheme(current => ({ ...current, [field]: event.target.value }))} className="min-w-0 flex-1 bg-transparent font-black text-white outline-none" aria-label={label}/></span></label>)}</div>
+            <div className="mt-6 flex flex-wrap items-center gap-3"><button type="button" onClick={saveGlobalTheme} disabled={globalThemeSaving} className="min-h-12 rounded-xl bg-orange-500 px-5 font-black text-white hover:bg-orange-600 disabled:opacity-50">{globalThemeSaving ? 'Salvando...' : 'Salvar cores globais'}</button>{globalThemeMessage && <p className="rounded-xl bg-green-900/40 p-3 text-sm font-black text-green-200">{globalThemeMessage}</p>}</div>
+          </section>
+        )}
         {activeTab === "plans" && (
           <div className="max-w-3xl w-full space-y-6">
             <div>

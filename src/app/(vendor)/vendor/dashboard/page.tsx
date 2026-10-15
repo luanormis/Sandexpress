@@ -517,7 +517,6 @@ const TABS = [
   { id: "financial", label: "Contas", icon: DollarSign },
   { id: "printers", label: "Impressoras", icon: Printer },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
-  { id: "theme", label: "Personalizacao", icon: Palette },
   { id: "customers", label: "Clientes", icon: Users },
   { id: "team", label: "Equipe", icon: Users },
 ];

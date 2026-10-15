@@ -100,7 +100,7 @@ export async function GET(
   try {
     const { id } = await params;
     const session = getRequestSession(req);
-    if (!canAccessVendor(session, id)) {
+    if (!session || session.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso restrito ao quiosque.' }, { status: 403 });
     }
 
