@@ -21,21 +21,21 @@ function items(category: string, image: string, rows: Array<[string, string, num
 }
 
 export const VERA_MENU: VeraMenuItem[] = [
-  ...items("Café da manhã", "cafe-da-manha.webp", [
+  ...items("Café da manhã", "cafe-da-manha-v2.png", [
     ["001", "Pão na chapa", 10], ["002", "Café", 10], ["003", "Café com leite", 12],
     ["004", "Chocolate quente", 12], ["005", "Pão com ovo", 10], ["006", "Misto quente", 24],
     ["007", "Bauru", 26], ["008", "Salada de frutas", 25, "Com leite condensado ou suco de laranja"],
   ]),
-  ...items("Porções frias", "saladas-entradas.webp", [
+  ...items("Porções frias", "porcoes-frias-v2.png", [
     ["009", "Salame com provolone", 95], ["010", "Salame", 70], ["011", "Provolone", 70],
     ["012", "Salgadinho", 12, "Fandangos ou Cheetos"],
   ]),
-  ...items("Entradas", "saladas-entradas.webp", [
+  ...items("Entradas", "entradas-v2.png", [
     ["013", "Bruschetta", 60, "Acompanha 8 torradas"],
     ["014", "Antepasto de berinjela", 60, "Acompanha 8 torradas"],
     ["015", "Mini sanduíche natural", 50],
   ]),
-  ...items("Porções quentes", "porcoes-quentes.webp", [
+  ...items("Porções quentes", "porcoes-quentes-v2.png", [
     ["016", "Pastéis de carne e queijo", 110, "16 unidades"], ["017", "Pastéis especiais", 130, "16 unidades, até 4 sabores"],
     ["018", "Fritas", 90], ["019", "Polenta", 90], ["020", "Mandioca", 90],
     ["021", "Bolinho de bacalhau", 110, "12 unidades"], ["022", "Fritas maluca", 130, "Com bacon e parmesão"],
@@ -45,18 +45,18 @@ export const VERA_MENU: VeraMenuItem[] = [
     ["032", "Pescada", 170], ["033", "Porquinho", 170], ["034", "Lula à dorê", 190],
     ["035", "Camarão paulista ou empanado", 190], ["036", "Cebola empanada", 90],
   ]),
-  ...items("Saladas", "saladas-entradas.webp", [
+  ...items("Saladas", "saladas-v2.png", [
     ["037", "Salada simples", 25, "Tomate, cebola e alface"],
     ["038", "Salada completa", 70, "Alface, tomate, cebola, pepino e palmito"],
   ]),
-  ...items("Pratos", "pratos-executivos.webp", [
+  ...items("Pratos", "pratos-v2.png", [
     ["039", "Contrafilé à parmegiana", 58, "Arroz e fritas"], ["040", "Contrafilé executivo", 55, "Arroz, feijão e fritas"],
     ["041", "Contrafilé a cavalo", 55, "Contrafilé, ovo, arroz e feijão"], ["042", "Filé de frango à parmegiana", 55, "Arroz e fritas"],
     ["043", "Filé de frango com fritas", 50, "Arroz, feijão e fritas"], ["044", "Filé de frango com purê", 50, "Arroz e feijão"],
     ["045", "Filé de peixe com fritas", 50, "Arroz e feijão"], ["046", "Filé de peixe com purê", 50, "Arroz e feijão"],
     ["047", "Filé de peixe ao molho de camarão", 60, "Arroz e legumes na manteiga"],
   ]),
-  ...items("Pastéis", "pasteis.webp", [
+  ...items("Pastéis", "pasteis-v2.png", [
     ["048", "Pastel de alho e óleo", 22, "Mussarela e alho frito"], ["049", "Pastel de bauru", 22, "Mussarela e presunto"],
     ["050", "Pastel de brócolis", 25, "Brócolis, mussarela e alho frito"], ["051", "Pastel de calabresa", 22],
     ["052", "Pastel de calabresa com catupiry", 25], ["053", "Pastel de calabresa com 2 queijos", 28],
@@ -76,14 +76,14 @@ export const VERA_MENU: VeraMenuItem[] = [
     ["082", "Pastel de queijo", 22], ["083", "Pastel vegetariano", 28, "Mussarela, brócolis, tomate seco, palmito e alho frito"],
     ["084", "Pastel de 2 queijos", 25, "Mussarela e catupiry"], ["085", "Pastel de 3 queijos", 28, "Mussarela, catupiry e cheddar"],
   ]),
-  ...items("Lanches", "lanches-combos.webp", [
+  ...items("Lanches", "lanches-combos-v2.png", [
     ["086", "Churrasco com queijo e fritas", 38], ["087", "X-Lanche com fritas e salada", 40, "Escolha X-Salada, X-Bacon, X-Egg ou X-Calabresa"],
   ]),
-  ...items("Combos", "lanches-combos.webp", [
+  ...items("Combos", "lanches-combos-v2.png", [
     ["088", "Combo 01", 230, "Isca de peixe e fritas"], ["089", "Combo 02", 160, "Fritas, polenta e mandioca"],
     ["090", "Combo 03", 280, "Calabresa, frango e fritas"], ["091", "Combo 04", 480, "Camarão, pescada, lula, fritas e cebola empanada"],
   ]),
-  ...items("Bebidas", "bebidas.png", [
+  ...items("Bebidas", "bebidas-v2.png", [
     ["092", "Água mineral 500 ml", 5, "Com ou sem gás"], ["093", "Refrigerante lata", 8, "Cola, laranja, limão ou guaraná"],
     ["094", "Refrigerante 2 litros", 18, "Cola, laranja ou guaraná"], ["095", "Suco natural", 12, "Laranja, limão ou maracujá"],
     ["096", "Água de coco", 12], ["097", "Chá gelado", 10], ["098", "Cerveja lata", 10],
