@@ -850,6 +850,7 @@ export default function CustomerApp() {
           </div>
           <p className="customer-brand-label">SandExpress</p>
           <h1 className="customer-title">{vendor?.name || "Carregando quiosque..."}</h1>
+          {umbrella?.number ? <p className="customer-kicker">Guarda-sol {umbrella.number}</p> : null}
           {error && <p className="customer-error">{error}</p>}
           <button onClick={() => setStep("login")} className="customer-action">
             Comecar pedido
