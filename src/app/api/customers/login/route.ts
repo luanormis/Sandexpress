@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       tenantId = vendor?.tenant_id || null;
     }
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existingCustomer } = await supabaseAdmin
       .from('customers')
       .select('*')
       .eq('vendor_id', vendor_id)
@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+    let existing: any = existingCustomer;
 
     const partySize = registeredPeople(party_size);
 
@@ -166,9 +167,13 @@ export async function POST(req: NextRequest) {
       if (openOrderError) throw openOrderError;
       const openOrder = openOrders?.[0];
       if (openOrder && (!existing || openOrder.customer_id !== existing.id)) {
-        return NextResponse.json({
-          error: 'Este guarda-sol esta com uma conta aberta. Ele sera liberado apos o pagamento.',
-        }, { status: 409 });
+        // O QR é fixo e pode ser lido por várias pessoas na mesma mesa. Use o
+        // cliente da comanda aberta para que o novo leitor consiga ver o
+        // cardápio e continuar adicionando itens à conta compartilhada.
+        const { data: accountCustomer } = await supabaseAdmin
+          .from('customers').select('*').eq('id', openOrder.customer_id).maybeSingle();
+        if (!accountCustomer) return NextResponse.json({ error: 'Cliente da conta aberta não encontrado.' }, { status: 409 });
+        existing = accountCustomer;
       }
     }
 
