@@ -514,6 +514,9 @@ export default function CustomerApp() {
     setLoading(true);
     setError("");
     setWelcomeMessage("");
+    // O catálogo já foi carregado pelo QR. Mostre-o imediatamente enquanto a
+    // abertura/associação da comanda é concluída em segundo plano.
+    setStep("menu");
     try {
       const res = await fetch("/api/customers/login", {
         method: "POST",
@@ -529,6 +532,7 @@ export default function CustomerApp() {
       });
       const data = await res.json();
       if (!res.ok) {
+        setStep("login");
         setError(data.error || "Erro ao abrir comanda.");
         return;
       }
@@ -548,6 +552,7 @@ export default function CustomerApp() {
       // o histórico quando a consulta terminar.
       void loadCustomerOrders(data.id || data.customer_id, vendor.id).catch(() => undefined);
     } catch {
+      setStep("login");
       setError("Não foi possível abrir o cardápio agora. Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
