@@ -191,7 +191,7 @@ export default function CustomerApp() {
     products: filterCustomerMenuProducts(products, category).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
   })).filter(section => section.products.length > 0), [products]);
   useEffect(() => {
-    if (step !== "menu" || activeCategory !== "Todos" || categorySections.length === 0) return;
+    if (step !== "menu" || activeCategory !== "Todos" || categorySections.length === 0 || typeof IntersectionObserver === "undefined") return;
     const sections = categorySections
       .map(({ category }) => categoryRefs.current[category])
       .filter((section): section is HTMLElement => Boolean(section));
