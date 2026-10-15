@@ -19,12 +19,28 @@ export async function GET(
   try {
     const { umbrellaId } = await params;
     const { searchParams } = new URL(req.url);
-    const vendorId = searchParams.get('vendor_id');
+    let vendorId = searchParams.get('vendor_id');
+    const vendorSlug = searchParams.get('vendor_slug');
+
+    // QR codes antigos carregam o nome do quiosque e o número do guarda-sol.
+    // Resolva esse formato também para não deixar links impressos inutilizados.
+    if (!vendorId && vendorSlug) {
+      const { data: vendors } = await supabaseAdmin.from('vendors').select('id, name');
+      const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      vendorId = (vendors || []).find((vendor: any) => normalize(String(vendor.name)) === vendorSlug)?.id || null;
+    }
+
+    const numberMatch = String(umbrellaId).match(/^guarda-sol-(\d+)(?:-|$)/i);
+    const umbrellaNumber = numberMatch ? Number(numberMatch[1]) : null;
 
     let umbrellaQuery = supabaseAdmin
       .from('umbrellas')
       .select('id, tenant_id, number, label, active, vendor_id')
       .eq('id', umbrellaId);
+
+    if (umbrellaNumber && vendorId) {
+      umbrellaQuery = supabaseAdmin.from('umbrellas').select('id, tenant_id, number, label, active, vendor_id').eq('number', umbrellaNumber).eq('vendor_id', vendorId).limit(1);
+    }
 
     if (vendorId) {
       umbrellaQuery = umbrellaQuery.eq('vendor_id', vendorId);

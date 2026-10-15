@@ -320,7 +320,9 @@ export default function CustomerApp() {
           return;
         }
         const isUuidVendorRoute = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(routeVendorId);
-        const vendorQuery = isUuidVendorRoute ? `?vendor_id=${encodeURIComponent(routeVendorId)}` : "";
+        const vendorQuery = isUuidVendorRoute
+          ? `?vendor_id=${encodeURIComponent(routeVendorId)}`
+          : `?vendor_slug=${encodeURIComponent(routeVendorId)}`;
         const res = await fetch(`/api/public/umbrella/${umbrellaId}${vendorQuery}`);
         const data = await res.json();
         if (!res.ok) {
