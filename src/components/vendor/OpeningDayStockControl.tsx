@@ -45,6 +45,7 @@ export default function OpeningDayStockControl({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const vendorId = vendorIdProp || (typeof window !== 'undefined'
     ? sessionStorage.getItem('vendor_id') || localStorage.getItem('vendor_id') || ''
@@ -159,6 +160,21 @@ export default function OpeningDayStockControl({
   const handleCloseDayStock = () => saveStock('close');
   const handleSavePhysicalStock = () => saveStock('set_physical');
 
+  const resetCounters = async () => {
+    const password = window.prompt('Digite a senha do proprietário para zerar estoque e consumos:');
+    if (!password) return;
+    if (!window.confirm('Zerar os contadores operacionais? Os pedidos continuarão preservados nos relatórios do admin.')) return;
+    setResetting(true); setError(''); setMessage('');
+    try {
+      const response = await fetch('/api/vendor/reset-counters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor_id: vendorId, password }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível zerar os contadores.');
+      setMessage(result.message || 'Contadores zerados.');
+      await loadProducts();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível zerar os contadores.'); }
+    finally { setResetting(false); }
+  };
+
   const grouped = products.reduce((acc: Record<string, Product[]>, product) => {
     const category = product.category || 'Geral';
     if (!acc[category]) acc[category] = [];
@@ -196,6 +212,9 @@ export default function OpeningDayStockControl({
             </button>
           )}
         </div>
+        <button type="button" onClick={resetCounters} disabled={resetting} className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-black text-red-800 hover:bg-red-100 disabled:opacity-50">
+          {resetting ? 'Zerando...' : 'Zerar contadores e consumos'}
+        </button>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-[#85736C] bg-[#FFF8F6] p-4">
             <p className="text-xs font-black uppercase text-[#3d1a0a]">Estoque central</p>
