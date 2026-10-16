@@ -118,54 +118,6 @@ export default function KioskConfigPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
-              Cor Primária
-            </label>
-            <input
-              type="color"
-              value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
-              Cor Secundária
-            </label>
-            <input
-              type="color"
-              value={secondaryColor}
-              onChange={(e) => setSecondaryColor(e.target.value)}
-              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
-              Cor do Botao
-            </label>
-            <input
-              type="color"
-              value={buttonColor}
-              onChange={(e) => setButtonColor(e.target.value)}
-              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-black text-[#ffcfb1]">
-              Texto do Botao
-            </label>
-            <input
-              type="color"
-              value={buttonTextColor}
-              onChange={(e) => setButtonTextColor(e.target.value)}
-              className="h-11 w-16 rounded-xl border border-[#7a2b00] bg-[#201411] p-1"
-            />
-          </div>
-
-          <div>
             <label className="mb-2 block text-sm font-black text-[#ffcfb1]">Logo</label>
             <input
               type="file"
