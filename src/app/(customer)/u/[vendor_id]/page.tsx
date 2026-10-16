@@ -637,7 +637,7 @@ export default function CustomerApp() {
         const queue = [...readCustomerQueue(vendor.id, umbrellaId), queued];
         writeCustomerQueue(vendor.id, umbrellaId, queue); setOfflineOrders(queue); setPendingSync(queue.length); setOnline(false);
         setOrders(prev => [{ id: idempotencyKey, total: discountedCartTotal, status: 'offline_pending', created_at: queued.created_at }, ...prev]);
-        setPromotionPreview(null); setCart([]); setNotes(''); setWelcomeMessage('Pedido salvo neste aparelho. Ele será enviado automaticamente quando a internet voltar.'); setStep('orders');
+        setPromotionPreview(null); setCart([]); setNotes(''); setWelcomeMessage('Agradecemos seu pedido! Logo ele será entregue. Ele será enviado automaticamente quando a internet voltar.'); setStep('orders');
       };
       if (!navigator.onLine) { saveOffline(); return; }
       const res = await fetch("/api/orders", {
@@ -674,7 +674,7 @@ export default function CustomerApp() {
       setPromotionPreview(null);
       setCart([]);
       setNotes("");
-      setWelcomeMessage("Pedido enviado com sucesso! Acompanhe o status na sua conta.");
+      setWelcomeMessage("Agradecemos seu pedido! Logo ele será entregue. Acompanhe o status na sua conta.");
       setStep("orders");
       await loadCustomerOrders(customerId, vendor.id);
     } catch (sendError) {
