@@ -1497,6 +1497,10 @@ input[type="number"] {
 .customer-list { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .customer-app { overflow-x: hidden; }
 .customer-product-row { height: auto; min-height: 7rem; max-height: none; }
+.customer-menu-section { min-width: 0; }
+.customer-menu-section__heading { display: flex; align-items: center; gap: 0.55rem; margin: 0.35rem 0 0.7rem; }
+.customer-menu-section__heading h2 { margin: 0; color: var(--customer-secondary); font-size: clamp(1.05rem, 4vw, 1.35rem); font-weight: 950; }
+.customer-menu-section__line { height: 0.12rem; flex: 1 1 auto; background: color-mix(in srgb, var(--customer-primary) 28%, transparent); }
 .customer-product-info { min-width: 0; flex: 1 1 auto; }
 .customer-product-side { min-width: 2.75rem; flex: 0 0 2.75rem; }
 .customer-add-button { display: inline-flex !important; width: 2.75rem; min-width: 2.75rem; min-height: 2.75rem; }
