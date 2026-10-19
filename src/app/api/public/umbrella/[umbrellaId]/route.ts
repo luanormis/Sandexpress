@@ -95,7 +95,7 @@ export async function GET(
         secondary_color: vendor.secondary_color,
         button_color: (vendor as any).button_color,
         button_text_color: (vendor as any).button_text_color,
-        logo_url: vendor.logo_url,
+        logo_url: vendor.logo_url || (/vera/i.test(vendor.name || '') ? '/logos/vera-quiosque.webp' : null),
       },
       features,
       products: visible,

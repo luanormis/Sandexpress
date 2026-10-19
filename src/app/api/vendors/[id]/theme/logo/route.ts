@@ -26,6 +26,12 @@ export async function GET(
       return NextResponse.json({ error: 'Apenas o proprietario pode acessar as logos do quiosque.' }, { status: 403 });
     }
 
+    const { data: vendor, error: vendorError } = await supabaseAdmin.from('vendors').select('name').eq('id', id).single();
+    if (vendorError || !vendor) return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
+    if (!/vera/i.test(vendor.name || '')) {
+      return NextResponse.json({ images: [] }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
+
     const { data, error } = await (supabaseAdmin.from('product_images') as any)
       .select('id, name, title, category, image_url, storage_path, active')
       .eq('active', true)
@@ -55,6 +61,11 @@ export async function GET(
     const uniqueLogos = [...catalogLogos, ...storedVeraLogos].filter((image, index, all) =>
       all.findIndex(candidate => candidate.id === image.id || candidate.image_url === image.image_url) === index
     );
+    uniqueLogos.unshift({
+      id: 'bundled:vera-quiosque',
+      name: 'Logo Quiosque da Vera',
+      image_url: '/logos/vera-quiosque.webp',
+    });
 
     return NextResponse.json({
       images: uniqueLogos,
@@ -91,7 +102,7 @@ export async function POST(
 
     const { data: vendor, error: vendorError } = await supabaseAdmin
       .from('vendors')
-      .select('id, tenant_id')
+      .select('id, tenant_id, name')
       .eq('id', id)
       .single();
 
@@ -113,6 +124,11 @@ export async function POST(
 
       const { data: urlData } = supabaseAdmin.storage.from('kiosk-assets').getPublicUrl(fileName);
       logoUrl = urlData.publicUrl;
+    } else if (imageId === 'bundled:vera-quiosque') {
+      if (!/vera/i.test(vendor.name || '')) {
+        return NextResponse.json({ error: 'Esta logo esta reservada ao Quiosque da Vera.' }, { status: 403 });
+      }
+      logoUrl = '/logos/vera-quiosque.webp';
     } else if (imageId) {
       const { data: image, error: imageError } = await (supabaseAdmin.from('product_images') as any)
         .select('id, image_url, storage_path, active')
