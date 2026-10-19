@@ -320,6 +320,35 @@ export default function CustomerApp() {
           .then(result => setFlexiblePromotions(result.promotions || []))
           .catch(() => undefined);
 
+        let restoredFromServer = false;
+        try {
+          const sessionResponse = await fetch(`/api/customers/session?umbrella_id=${encodeURIComponent(umbrellaId)}&vendor_id=${encodeURIComponent(data.vendor?.id || routeVendorId)}`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          if (sessionResponse.ok) {
+            const restored = await sessionResponse.json();
+            const restoredCustomerId = restored.id || restored.customer_id;
+            if (restoredCustomerId) {
+              setCustomerId(restoredCustomerId);
+              setCurrentOrderId(restored.current_order_id || '');
+              setCustomerName(restored.name || '');
+              setPartySize(registeredPeople(restored.party_size));
+              setStep('menu');
+              sessionStorage.setItem(`sandexpress_user_${umbrellaId}`, JSON.stringify({
+                customer_id: restoredCustomerId,
+                name: restored.name || '',
+                party_size: restored.party_size || 1,
+              }));
+              await loadCustomerOrders(restoredCustomerId, data.vendor?.id || routeVendorId);
+              restoredFromServer = true;
+            }
+          }
+        } catch {
+          // Keep the saved browser session as a compatibility fallback when offline.
+        }
+
+        if (restoredFromServer) return;
         const saved = sessionStorage.getItem(`sandexpress_user_${umbrellaId}`);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -850,6 +879,11 @@ export default function CustomerApp() {
               <p className="customer-login__subtitle">Abrir comanda</p>
             </div>
           </div>
+          {umbrella?.number != null && (
+            <p className="customer-login__subtitle" style={{ margin: "0 auto 0.75rem", width: "fit-content", borderRadius: "999px", padding: "0.45rem 0.85rem", background: "var(--customer-surface)", color: "var(--customer-background-text)", fontWeight: 800 }}>
+              Guarda-sol Nº {umbrella.number}
+            </p>
+          )}
           <p className="customer-login__subtitle">Informe os dados para iniciar.</p>
           {welcomeMessage && <p className="customer-feedback">{welcomeMessage}</p>}
           <div className="customer-form">

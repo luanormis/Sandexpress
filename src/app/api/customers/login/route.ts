@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
         umbrellaId: umbrella_id,
         userAgent: req.headers.get('user-agent'),
       });
-      const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id }, 12 * 60 * 60);
+      const token = createSessionToken({ role: 'customer', vendor_id, customer_id: updated.id, ...(umbrella_id ? { umbrella_id } : {}) }, 12 * 60 * 60);
       const response = NextResponse.json({
         ...updated,
         current_order_id: account?.orderId || null,
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
       umbrellaId: umbrella_id,
       userAgent: req.headers.get('user-agent'),
     });
-    const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id }, 12 * 60 * 60);
+    const token = createSessionToken({ role: 'customer', vendor_id, customer_id: newCustomer.id, ...(umbrella_id ? { umbrella_id } : {}) }, 12 * 60 * 60);
     const response = NextResponse.json({
       ...newCustomer,
       current_order_id: account?.orderId || null,
