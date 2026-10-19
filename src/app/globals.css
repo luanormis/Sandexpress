@@ -2710,3 +2710,8 @@ html body .admin-ops-shell main .vendor-beach-map :where(h1, h2, h3) {
   .vendor-ops-shell .vendor-order-card{padding:.55rem!important}
   .vendor-ops-shell main>div.flex-1{padding:.65rem!important}
 }
+/* Reliable sidebar drawer behavior on production, independent of breakpoint utilities */
+.vendor-operation-sidebar{position:fixed!important;inset:0 auto 0 0!important;width:min(18rem,86vw)!important;height:100dvh!important;margin:0!important;border:0!important;border-radius:0 1.25rem 1.25rem 0!important;transform:translateX(-105%)!important;transition:transform .22s ease!important;pointer-events:none!important;z-index:100!important;overflow-y:auto!important}
+.vendor-operation-sidebar[data-open="true"]{transform:translateX(0)!important;pointer-events:auto!important}
+.vendor-sidebar-backdrop{appearance:none!important;border:0!important;padding:0!important;cursor:pointer!important;z-index:90!important}
+.vendor-operation-sidebar .vendor-sidebar-close{display:inline-flex!important;min-width:2.75rem!important;min-height:2.75rem!important;align-items:center!important;justify-content:center!important;position:relative!important;z-index:2!important;cursor:pointer!important;color:#2a1a12!important}
