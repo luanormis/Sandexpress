@@ -46,6 +46,9 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
     );
   }
 
+  const customerLogo = kioskLogoForCustomer(vendor.logo_url)
+    || (/vera/i.test(vendor.name || '') ? '/logos/vera-quiosque.webp' : null);
+
   return (
     <div
       className="min-h-screen p-6"
@@ -54,9 +57,9 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
       <div className="max-w-2xl mx-auto">
         {/* Header com logo e nome */}
         <div className="text-white mb-8 text-center">
-          {kioskLogoForCustomer(vendor.logo_url) ? (
+          {customerLogo ? (
             <img
-              src={kioskLogoForCustomer(vendor.logo_url) || undefined}
+              src={customerLogo}
               alt={vendor.name}
               className="w-24 h-24 mx-auto mb-4 rounded-lg shadow-lg"
             />

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { featureDisabledResponse, getTenantFeatureMap } from '@/lib/features';
 import { isProductVisibleToCustomer } from '@/lib/public-product-visibility';
 import { normalizeRenderableProductImageUrl } from '@/lib/product-image-url';
+import { kioskLogoForCustomer } from '@/lib/kiosk-logo';
 
 /**
  * GET /api/public/umbrella/[umbrellaId]?vendor_id=xxx
@@ -95,11 +96,11 @@ export async function GET(
         secondary_color: vendor.secondary_color,
         button_color: (vendor as any).button_color,
         button_text_color: (vendor as any).button_text_color,
-        logo_url: vendor.logo_url || (/vera/i.test(vendor.name || '') ? '/logos/vera-quiosque.webp' : null),
+        logo_url: kioskLogoForCustomer(vendor.logo_url) || (/vera/i.test(vendor.name || '') ? '/logos/vera-quiosque.webp' : null),
       },
       features,
       products: visible,
-    });
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } });
   } catch (err) {
     console.error('Public umbrella error:', err);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
