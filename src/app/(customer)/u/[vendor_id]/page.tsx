@@ -3,6 +3,7 @@
 import { accountShare, registeredPeople } from "@/lib/account-share";
 import { customerOrderView } from "@/lib/customer-order-view";
 import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readable-theme";
+import { kioskLogoForCustomer } from "@/lib/kiosk-logo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
@@ -215,23 +216,19 @@ export default function CustomerApp() {
   const theme = {
     primary: validBackground(vendor?.primary_color ?? CREAM),
     secondary: INK,
-    button: ORANGE,
-    buttonText: INK,
-    logo: vendor?.logo_url || null,
+    button: validBackground(vendor?.button_color || ORANGE),
+    buttonText: contrastText(validBackground(vendor?.button_color || ORANGE)),
+    logo: kioskLogoForCustomer(vendor?.logo_url),
   };
   const customerThemeVars = {
-    "--customer-primary": ORANGE,
+    "--customer-primary": theme.button,
     "--customer-background": theme.primary,
     "--customer-background-text": contrastText(theme.primary),
+    "--customer-surface": `color-mix(in srgb, ${theme.primary} 22%, #fffdf9)`,
     "--customer-secondary": theme.secondary,
     "--customer-button": theme.button,
     "--customer-button-text": theme.buttonText,
   } as CSSProperties;
-  const sandExpressMark = (
-    <div className="customer-brand-watermark" aria-label="Tecnologia SandExpress">
-      <span>SandExpress</span>
-    </div>
-  );
   const featureEnabled = (key: string) => features[key] !== false;
 
   function resetExpiredCustomerSession(message = "Sua sessão expirou. Abra a comanda novamente para enviar pedidos.") {
@@ -828,7 +825,6 @@ export default function CustomerApp() {
           <div className="customer-logo">
             {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="2.875rem" />}
           </div>
-          <p className="customer-brand-label">SandExpress</p>
           <h1 className="customer-title">{vendor?.name || "Carregando quiosque..."}</h1>
           {error && <p className="customer-error">{error}</p>}
           <button onClick={() => setStep("login")} className="customer-action">
@@ -837,7 +833,6 @@ export default function CustomerApp() {
           <InstallShortcutButton context="customer" className="mt-3 w-full" />
           <QrScannerButton />
         </section>
-        {sandExpressMark}
       </main>
     );
   }
@@ -851,7 +846,6 @@ export default function CustomerApp() {
               {theme.logo ? <img src={theme.logo} alt="Logo do quiosque" /> : <UtensilsCrossed size="1.5rem" />}
             </div>
             <div className="customer-login__brand-text">
-              <p className="customer-login__kicker">SandExpress</p>
               <h1 className="customer-login__title">{vendor?.name || "Quiosque"}</h1>
               <p className="customer-login__subtitle">Abrir comanda</p>
             </div>
@@ -901,7 +895,6 @@ export default function CustomerApp() {
             </button>
           </div>
         </section>
-        {sandExpressMark}
       </main>
     );
   }

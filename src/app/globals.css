@@ -1230,9 +1230,8 @@ input[type="number"] {
 }
 
 .customer-welcome {
-  background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.26), transparent 16rem),
-    linear-gradient(145deg, var(--customer-primary) 0%, var(--customer-secondary) 100%);
+  color: var(--customer-background-text, #241b16);
+  background: var(--customer-background, var(--customer-bg)) !important;
 }
 
 .customer-login {

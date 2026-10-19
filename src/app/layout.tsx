@@ -10,13 +10,13 @@ export const metadata: Metadata = {
   description: "Peça direto do seu guarda-sol pelo QR Code, sem filas e sem esperar atendimento para fazer o pedido.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/sandexpress-logo-fluid.png",
-    apple: "/icon-192.png",
+    icon: "/sandexpress-app-icon-512.png",
+    apple: "/sandexpress-app-icon-180.png",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ff6b00",
+  themeColor: "#3d1a0a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,

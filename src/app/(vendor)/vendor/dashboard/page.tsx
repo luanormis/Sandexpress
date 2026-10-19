@@ -12,6 +12,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
 import { contrastText, validBackground, CREAM, INK, ORANGE } from "@/lib/readable-theme";
+import { kioskLogoForCustomer } from "@/lib/kiosk-logo";
 import OpeningDayStockControl from "@/components/vendor/OpeningDayStockControl";
 import FinancialAccounts from "@/components/vendor/FinancialAccounts";
 import OrderPrintButton from "@/components/vendor/OrderPrintButton";
@@ -288,7 +289,7 @@ const DEFAULT_THEME: KioskTheme = {
   secondary_color: "#451704",
   button_color: "#ff6b00",
   button_text_color: "#ffffff",
-  logo_url: "/sandexpress-logo-fluid.png",
+  logo_url: "",
   cash_fee_rate: 0,
   cash_fee_type: "percent",
   cash_fixed_fee_amount: 0,
@@ -314,6 +315,51 @@ const DEFAULT_THEME: KioskTheme = {
   pix_active: true,
   pix_api_enabled: false,
 };
+
+async function deriveLogoBackground(source: File | string): Promise<string> {
+  const fallback = "#f4eedd";
+  try {
+    const blob = typeof source === "string" ? await (await fetch(source)).blob() : source;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = 36;
+    canvas.height = 36;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return fallback;
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const colors = new Map<number, { r: number; g: number; b: number; weight: number }>();
+    for (let index = 0; index < pixels.length; index += 4) {
+      const alpha = pixels[index + 3] / 255;
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+      const high = Math.max(red, green, blue);
+      const low = Math.min(red, green, blue);
+      const saturation = high === 0 ? 0 : (high - low) / high;
+      if (alpha < 0.4 || saturation < 0.22 || high < 35 || high > 245) continue;
+      let hue = 0;
+      if (high === red) hue = 60 * (((green - blue) / (high - low)) % 6);
+      else if (high === green) hue = 60 * ((blue - red) / (high - low) + 2);
+      else hue = 60 * ((red - green) / (high - low) + 4);
+      const bin = Math.round(((hue + 360) % 360) / 18);
+      const weight = alpha * saturation;
+      const current = colors.get(bin) || { r: 0, g: 0, b: 0, weight: 0 };
+      current.r += red * weight;
+      current.g += green * weight;
+      current.b += blue * weight;
+      current.weight += weight;
+      colors.set(bin, current);
+    }
+    const accent = [...colors.values()].sort((a, b) => b.weight - a.weight)[0];
+    if (!accent?.weight) return fallback;
+    const mix = (base: number, color: number) => Math.round(base * 0.88 + (color / accent.weight) * 0.12);
+    return `#${[mix(244, accent.r), mix(238, accent.g), mix(221, accent.b)].map(value => value.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return fallback;
+  }
+}
 
 const BRAND_PALETTE = [
   { name: "Primary / Laranja", value: "#ff6b00" },
@@ -397,7 +443,7 @@ function buildThemeForm(data: Partial<KioskTheme> & Record<string, unknown>): Ki
     secondary_color: String(data.secondary_color || DEFAULT_THEME.secondary_color),
     button_color: String(data.button_color || data.primary_color || DEFAULT_THEME.button_color),
     button_text_color: String(data.button_text_color || DEFAULT_THEME.button_text_color),
-    logo_url: String(data.logo_url || DEFAULT_THEME.logo_url),
+    logo_url: kioskLogoForCustomer(data.logo_url) || "",
     cash_fee_rate: Number(data.cash_fee_rate || 0),
     cash_fee_type: data.cash_fee_type === "fixed" ? "fixed" : "percent",
     cash_fixed_fee_amount: Number(data.cash_fixed_fee_amount || 0),
@@ -531,6 +577,7 @@ export default function VendorDashboard() {
   const [beachAccess, setBeachAccess] = useState<boolean | null>(isBeachOperations ? null : true);
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [operatorRole, setOperatorRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [operationsFocusMode, setOperationsFocusMode] = useState(false);
   const [summaryDetailsVisible, setSummaryDetailsVisible] = useState(false);
@@ -608,6 +655,10 @@ export default function VendorDashboard() {
   const [themeForm, setThemeForm] = useState<KioskTheme>(DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState("");
+  const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoMessage, setLogoMessage] = useState("");
+  const [globalKioskLogos, setGlobalKioskLogos] = useState<Array<{ id: string; name: string; image_url: string; storage_path?: string }>>([]);
   const knownOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const ordersRevisionRef = useRef("");
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -893,6 +944,7 @@ export default function VendorDashboard() {
     }
     if (vid) {
       setVendorId(vid);
+      setOperatorRole(sessionStorage.getItem("user_role") || "owner");
       if (isBeachOperations) {
         fetch(`/api/features?vendor_id=${vid}`, { cache: "no-store" })
           .then(async response => ({ ok: response.ok, data: await response.json().catch(() => ({})) }))
@@ -914,6 +966,18 @@ export default function VendorDashboard() {
       loadTodayCashControl(vid);
     }
   }, []);
+
+  useEffect(() => {
+    if (!vendorId || activeTab !== "team" || operatorRole !== "owner") return;
+    let cancelled = false;
+    fetch(`/api/vendors/${vendorId}/theme/logo`, { cache: "no-store" })
+      .then(async response => ({ ok: response.ok, data: await response.json().catch(() => ({})) }))
+      .then(({ ok, data }) => {
+        if (!cancelled) setGlobalKioskLogos(ok ? data.images || [] : []);
+      })
+      .catch(() => { if (!cancelled) setGlobalKioskLogos([]); });
+    return () => { cancelled = true; };
+  }, [activeTab, operatorRole, vendorId]);
 
   const saveDailySalesGoal = async () => {
     if (!vendorId) return;
@@ -968,6 +1032,41 @@ export default function VendorDashboard() {
     } finally {
       setThemeSaving(false);
     }
+  };
+
+  const applyKioskLogo = async (formData: FormData) => {
+    if (!vendorId) return;
+    setLogoUploading(true);
+    setLogoMessage("");
+    try {
+      const res = await fetch(`/api/vendors/${vendorId}/theme/logo`, { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível salvar a logo.");
+      setThemeForm(current => ({ ...current, logo_url: data.logo_url, primary_color: data.primary_color || current.primary_color }));
+      setLogoMessage("Logo atualizada. O fundo dos pedidos foi ajustado para combinar com as cores dela.");
+    } catch (error) {
+      setLogoMessage(error instanceof Error ? error.message : "Erro ao salvar a logo.");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleKioskLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !vendorId) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("primary_color", await deriveLogoBackground(file));
+    await applyKioskLogo(formData);
+  };
+
+  const chooseGlobalKioskLogo = async (image: { id: string; image_url: string; storage_path?: string }) => {
+    const formData = new FormData();
+    if (image.storage_path) formData.append("storage_path", image.storage_path);
+    else formData.append("image_id", image.id);
+    formData.append("primary_color", await deriveLogoBackground(image.image_url));
+    await applyKioskLogo(formData);
   };
 
   useEffect(() => {
@@ -2082,7 +2181,7 @@ export default function VendorDashboard() {
         {/* Header */}
         <header className="min-h-16 border-b border-gray-100 flex items-center justify-between gap-3 bg-white px-3 pt-safe sm:min-h-20 sm:px-6 lg:px-8 shrink-0">
           <div className="flex min-w-0 items-center gap-3">
-            <button type="button" onClick={() => setSidebarOpen(true)} aria-expanded={sidebarOpen} className="contrast-dark tap-target rounded-xl bg-gray-100 p-3 text-gray-700" aria-label="Abrir menu">
+            <button type="button" onClick={() => setSidebarOpen(true)} aria-expanded={sidebarOpen} className="contrast-dark tap-target hidden rounded-xl bg-gray-100 p-3 text-gray-700 lg:inline-flex" aria-label="Abrir menu">
               <MoreHorizontal size={20} />
             </button>
             <h2 className="truncate text-xl sm:text-2xl font-bold font-display text-gray-800">
@@ -2115,7 +2214,7 @@ export default function VendorDashboard() {
         </div>}
 
         {/* Tab Contents */}
-          <div className="flex-1 overflow-auto bg-gray-50 p-3 pb-[calc(100px+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(104px+env(safe-area-inset-bottom))] lg:pb-6">
+          <div className="flex-1 overflow-auto bg-gray-50 p-3 pb-[calc(76px+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
 
           {/* ========== ABA 1: PEDIDOS (KANBAN) ========== */}
           {activeTab === "orders" && (
@@ -2580,7 +2679,7 @@ export default function VendorDashboard() {
                     <div className="min-w-0 flex-1 space-y-2">
                       <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
                       <p className="rounded-xl border border-[#EFD5CA] bg-white px-4 py-3 text-sm font-bold leading-5 text-[#3D1A0A]">
-                        A logo e definida pelo admin geral. Neste painel o quiosque pode ajustar apenas a cor de fundo da experiência do cliente.
+                        Envie ou escolha a logo na aba Equipe. O fundo dos pedidos usa uma tonalidade suave da própria marca.
                       </p>
                     </div>
                   </div>
@@ -3272,6 +3371,39 @@ export default function VendorDashboard() {
           {/* ========== ABA 6: EQUIPE ========== */}
           {activeTab === "team" && (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+              {operatorRole === "owner" && <section className="rounded-2xl border border-[#e7d7c5] bg-white p-5 shadow-sm lg:col-span-2">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e7d7c5] bg-[#fffdf8] p-2">
+                    {themeForm.logo_url ? <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain" /> : <Utensils className="text-[#6f5546]" size={34} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-black text-[#3D1A0A]">Logo e cores do quiosque</h3>
+                    <p className="mt-1 text-sm font-semibold text-gray-600">A logo do quiosque aparecerá para os clientes. O fundo dos pedidos acompanha uma cor suave extraída da imagem.</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button type="button" disabled={logoUploading} onClick={() => logoUploadInputRef.current?.click()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#FF6B00] px-4 font-black text-white disabled:opacity-60">
+                        <Upload size={17} /> {logoUploading ? "Salvando..." : "Enviar logo"}
+                      </button>
+                      <input ref={logoUploadInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleKioskLogoUpload} className="hidden" />
+                      <span className="inline-flex items-center gap-2 text-sm font-bold text-gray-700"><span className="h-6 w-6 rounded-md border border-gray-300" style={{ backgroundColor: themeForm.primary_color }} /> Fundo atual</span>
+                    </div>
+                  </div>
+                </div>
+                {globalKioskLogos.length > 0 && (
+                  <div className="mt-5 border-t border-gray-100 pt-4">
+                    <p className="mb-3 text-sm font-black text-gray-800">Logo encontrada no catálogo global</p>
+                    <div className="flex flex-wrap gap-3">
+                      {globalKioskLogos.map(image => (
+                        <button key={image.id} type="button" disabled={logoUploading} onClick={() => chooseGlobalKioskLogo(image)} className="flex min-h-16 items-center gap-3 rounded-xl border border-[#e7d7c5] bg-[#fffdf8] p-2 text-left hover:border-[#FF6B00] disabled:opacity-60">
+                          <img src={image.image_url} alt="" className="h-12 w-12 rounded-lg bg-white object-contain" />
+                          <span className="max-w-40 text-sm font-black text-[#3D1A0A]">Usar {image.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {globalKioskLogos.length === 0 && <p className="mt-3 text-xs font-semibold text-gray-500">Se a logo “Vera” não estiver registrada como imagem no catálogo, envie o arquivo acima para cadastrá-la.</p>}
+                {logoMessage && <p role="status" className="mt-4 rounded-xl bg-[#f4eedd] p-3 text-sm font-bold text-[#3D1A0A]">{logoMessage}</p>}
+              </section>}
               <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950 lg:col-span-2">
                 <p className="font-black">Acesso exclusivo do garcom</p>
                 <p className="mt-1 text-sm font-bold leading-5 text-blue-800">Crie o usuario como Garcom / Vendedor. Depois que o administrador liberar o modulo, ele entra pelo botao “Acesso do garcom” e atende mesas e guarda-sois em /garcom.</p>
@@ -3381,28 +3513,16 @@ export default function VendorDashboard() {
         </div>
       </main>
 
-      <nav className="vendor-mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pt-2 app-bottom-safe shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
-        <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-          {visibleTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
-              className={cn(
-                "tap-target relative flex min-w-[74px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-black",
-                activeTab === tab.id ? "bg-[#FF6B00] text-white shadow-sm" : "text-gray-500"
-              )}
-            >
-              <tab.icon size={19} />
-              <span className="mt-0.5 max-w-[68px] truncate">{tab.label}</span>
-              {tab.id === "orders" && newOrderCount > 0 && activeTab !== "orders" && (
-                <span className="absolute right-2 top-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
-                  {newOrderCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Abrir opções do painel"
+        aria-expanded={sidebarOpen}
+        title="Abrir opções"
+        className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] right-3 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e7d7c5] bg-[#fffdf8]/95 text-[#3D1A0A] shadow-lg backdrop-blur transition hover:bg-white active:scale-95 sm:bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:right-5 lg:hidden"
+      >
+        <MoreHorizontal size={23} aria-hidden="true" />
+      </button>
 
       {/* ========== MODAL: ADD/EDIT PRODUCT ========== */}
       {showProductModal && (
@@ -4110,6 +4230,7 @@ function ProductModal({
   const [uploading, setUploading] = useState(false);
   const [defaultImages, setDefaultImages] = useState<Array<{ id: string; name: string; image_url: string; category: string; tags?: string[] }>>([]);
   const [imageSearch, setImageSearch] = useState("");
+  const [showImagePicker, setShowImagePicker] = useState(!product?.image_url);
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [subcategoryMessage, setSubcategoryMessage] = useState("");
   const isMenuMode = mode === "menu";
@@ -4162,7 +4283,6 @@ function ProductModal({
   };
 
   useEffect(() => {
-    if (isMenuMode) return;
     let cancelled = false;
     async function loadDefaultImages() {
       try {
@@ -4180,7 +4300,7 @@ function ProductModal({
     return () => {
       cancelled = true;
     };
-  }, [form.category, form.name, isMenuMode]);
+  }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -4222,31 +4342,36 @@ function ProductModal({
               <p className="text-sm font-bold text-gray-500">{form.category}</p>
             </div>
           )}
-          {/* Global image catalog */}
+          {/* Product photo: choose from the shared catalog or add a new one */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Foto do Produto</label>
-            <div className="block">
-              <div className="w-full h-40 border-2 border-gray-200 rounded-xl flex flex-col items-center justify-center overflow-hidden bg-gray-50">
+            <label className="mb-2 block text-sm font-bold text-gray-700">Foto do produto</label>
+            <div className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white flex items-center justify-center">
                 {form.image_url ? (
-                  <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                  <img src={form.image_url} alt={`Imagem de ${form.name || "produto"}`} className="h-full w-full object-cover" />
                 ) : (
-                  <>
-                    <ImageIcon size={24} className="text-gray-300 mb-2" />
-                    <span className="px-4 text-center text-sm font-bold text-gray-400">Escolha uma imagem do catálogo global abaixo</span>
-                  </>
+                  <ImageIcon size={24} className="text-gray-400" />
                 )}
               </div>
+              <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+                <p className="text-sm font-bold text-gray-800">{form.image_url ? "Imagem selecionada" : "Nenhuma imagem selecionada"}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setShowImagePicker(open => !open)} className="min-h-10 rounded-lg border border-[#7A4A35] bg-white px-3 text-sm font-bold text-[#3D1A0A] hover:bg-[#FFF8E8]">
+                    {showImagePicker ? "Fechar galeria" : "Escolher imagem"}
+                  </button>
+                  <label className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#FF6B00] px-3 text-sm font-black text-white hover:bg-[#e56000]">
+                    <Upload size={16}/>{uploading ? "Enviando..." : "Enviar nova imagem"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={handleImageUpload} className="hidden"/>
+                  </label>
+                </div>
+              </div>
             </div>
-            <p className="mt-2 text-xs font-bold leading-5 text-gray-500">
-              Todas as imagens do catálogo SandExpress aparecem abaixo. Role a galeria e toque em uma miniatura para selecionar.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-              <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input type="search" value={imageSearch} onChange={event => setImageSearch(event.target.value)} placeholder="Buscar por nome, categoria ou ingrediente" className="min-h-11 w-full rounded-xl border-2 border-gray-200 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#FF6B00]"/></div>
-              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-4 text-sm font-black text-white hover:bg-[#e56000]"><Upload size={17}/>{uploading ? "Convertendo..." : "Enviar imagem"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={handleImageUpload} className="hidden"/></label>
-            </div>
-            {defaultImages.length > 0 && (
+            {showImagePicker && <>
+              <p className="mt-2 text-xs font-bold leading-5 text-gray-600">Escolha uma imagem já compartilhada no catálogo ou envie outra. As novas imagens também ficam disponíveis na galeria global.</p>
+              <div className="relative mt-3"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/><input type="search" value={imageSearch} onChange={event => setImageSearch(event.target.value)} placeholder="Buscar imagem por produto ou categoria" className="min-h-11 w-full rounded-xl border-2 border-gray-200 pl-10 pr-3 text-sm font-bold text-gray-900 outline-none focus:border-[#FF6B00]"/></div>
+              {defaultImages.length > 0 && (
               <div className="mt-3">
-                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-500">Referências do catálogo global</p>
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-600">Imagens do catálogo global</p>
                 <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-orange-100 bg-[#FFF8E8] p-2 sm:grid-cols-4">
                   {visibleDefaultImages.map((image) => (
                     <button
@@ -4265,12 +4390,13 @@ function ProductModal({
                 </div>
                 {visibleDefaultImages.length === 0 && <p className="mt-2 rounded-xl bg-gray-50 p-3 text-sm font-bold text-gray-600">Nenhuma imagem corresponde à busca.</p>}
               </div>
-            )}
-            {defaultImages.length === 0 && (
+              )}
+              {defaultImages.length === 0 && (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
-                Nenhuma imagem encontrada ainda. Tente uma categoria como bebidas, petiscos, pastéis, porções de peixe, batata ou calabresa.
+                Carregando imagens globais ou nenhuma imagem cadastrada. Você também pode enviar uma nova imagem acima.
               </p>
-            )}
+              )}
+            </>}
           </div>
 
           {/* Name */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Vendor } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { kioskLogoForCustomer } from "@/lib/kiosk-logo";
 
 interface CustomerKioskViewProps {
   vendorId: string;
@@ -53,12 +54,16 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
       <div className="max-w-2xl mx-auto">
         {/* Header com logo e nome */}
         <div className="text-white mb-8 text-center">
-          {vendor.logo_url && (
+          {kioskLogoForCustomer(vendor.logo_url) ? (
             <img
-              src={vendor.logo_url}
+              src={kioskLogoForCustomer(vendor.logo_url) || undefined}
               alt={vendor.name}
               className="w-24 h-24 mx-auto mb-4 rounded-lg shadow-lg"
             />
+          ) : (
+            <div aria-hidden="true" className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-white/80 text-4xl font-black text-[#3D1A0A]">
+              {vendor.name.slice(0, 1).toLocaleUpperCase()}
+            </div>
           )}
           <h1 className="text-4xl font-bold">{vendor.name}</h1>
           <p className="text-lg opacity-90 mt-2">Mesa/Guarda-sol #{umbrellaNumber}</p>
@@ -87,10 +92,6 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
           </button>
         </div>
 
-        {/* Footer */}
-        <div className="text-white text-center mt-12 opacity-75">
-          <p className="text-sm">Powered by SandExpress</p>
-        </div>
       </div>
     </div>
   );
