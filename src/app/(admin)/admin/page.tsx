@@ -612,6 +612,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const removeDuplicateCatalogImages = async () => {
+    if (!confirm("Manter a primeira imagem de cada nome e excluir as duplicadas?")) return;
+    setCatalogSaving(true);
+    try {
+      const response = await fetch("/api/admin/catalog-images?duplicates=1", { method: "DELETE", credentials: "include" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível limpar duplicatas.");
+      setCatalogMessage(`${data.removed || 0} duplicata(s) removida(s) do catálogo global.`);
+      await loadCatalogImages();
+    } catch (error) {
+      setCatalogMessage(error instanceof Error ? error.message : "Erro ao limpar duplicatas.");
+    } finally { setCatalogSaving(false); }
+  };
+
   const uploadVendorLogo = async (vendor: Vendor, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1781,6 +1795,7 @@ export default function AdminDashboard() {
                     <p className="text-sm font-bold text-gray-500">{catalogImages.length} imagens carregadas</p>
                   </div>
                   <div className="flex gap-2">
+                    <button type="button" onClick={removeDuplicateCatalogImages} disabled={catalogSaving} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-black text-white hover:bg-red-800 disabled:opacity-50">Remover duplicadas</button>
                     <input
                       value={catalogSearch}
                       onChange={event => setCatalogSearch(event.target.value)}

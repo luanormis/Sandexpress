@@ -229,6 +229,29 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
+    if (searchParams.get('duplicates') === '1') {
+      const { data: allImages, error: listError } = await (supabaseAdmin.from('product_images') as any)
+        .select('id, name, storage_path, created_at')
+        .order('created_at', { ascending: true });
+      if (listError) throw listError;
+      const seen = new Set<string>();
+      const duplicateIds: string[] = [];
+      const duplicatePaths: string[] = [];
+      for (const image of allImages || []) {
+        const key = String(image.name || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
+        if (!key) continue;
+        if (seen.has(key)) {
+          duplicateIds.push(image.id);
+          if (image.storage_path) duplicatePaths.push(image.storage_path);
+        } else seen.add(key);
+      }
+      if (duplicateIds.length) {
+        const { error: deleteError } = await (supabaseAdmin.from('product_images') as any).delete().in('id', duplicateIds);
+        if (deleteError) throw deleteError;
+        if (duplicatePaths.length) await supabaseAdmin.storage.from(CATALOG_BUCKET).remove(duplicatePaths);
+      }
+      return NextResponse.json({ ok: true, removed: duplicateIds.length });
+    }
     const id = String(searchParams.get('id') || '').trim();
     if (!id) return NextResponse.json({ error: 'id obrigatorio.' }, { status: 400 });
 
