@@ -7,7 +7,7 @@ import {
   Search, Clock, Trash2, Pencil, X, Upload, ImageIcon,
   Eye, EyeOff, LogOut, Phone, TrendingUp, Award, Star, CalendarCheck,
   Palette, Menu, PackageCheck, Banknote, Smartphone, CreditCard,
-  Volume2, CircleCheck, DollarSign, Printer,
+  Volume2, CircleCheck, DollarSign, Printer, MoreHorizontal,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatBrazilianMoneyInput, maskBrazilianMoneyInput, parseBrazilianMoneyInput } from "@/lib/brazilian-money";
@@ -532,6 +532,7 @@ export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("orders");
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [operationsFocusMode, setOperationsFocusMode] = useState(false);
   const [summaryDetailsVisible, setSummaryDetailsVisible] = useState(false);
 
   // --- Orders State ---
@@ -2034,10 +2035,10 @@ export default function VendorDashboard() {
   if (isBeachOperations && beachAccess === false) return <main className="grid min-h-screen place-items-center bg-gray-50 p-6 text-center"><div><h1 className="text-2xl font-black">Módulo ainda não liberado</h1><p className="mt-2 text-gray-600">Solicite ao administrador a versão simplificada para barraca.</p></div></main>;
 
   return (
-    <div className="vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans" style={panelThemeStyle}>
+    <div className={cn("vendor-ops-shell min-h-app bg-white flex flex-col lg:flex-row font-sans", operationsFocusMode && "vendor-focus-mode")} style={panelThemeStyle}>
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
-      <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+      <aside className={cn("vendor-operation-sidebar fixed inset-y-0 left-0 z-40 w-64 border-r border-gray-100 bg-gray-50 flex flex-col shrink-0 transition-transform lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="p-6 border-b border-gray-200 bg-white">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -2089,6 +2090,9 @@ export default function VendorDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            <button type="button" onClick={() => setOperationsFocusMode(value => !value)} className="vendor-focus-toggle hidden min-h-10 items-center gap-2 rounded-full bg-gray-100 px-3 text-sm font-black text-gray-700 lg:inline-flex" aria-pressed={operationsFocusMode} title={operationsFocusMode ? "Mostrar todos os controles" : "Focar no atendimento"}>
+              <MoreHorizontal size={17} /> <span>{operationsFocusMode ? "Ver opções" : "Foco atendimento"}</span>
+            </button>
             <button type="button" onClick={() => { setShowAlertSettings(true); activateSoundAlerts(); }} className={cn("vendor-sound-button flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-black", soundAlertsReady ? "bg-blue-100 text-blue-800" : "animate-pulse bg-orange-100 text-[#9A3E00]")} title="Configurar som, volume e vibracao" aria-label="Configurar alertas de novos pedidos">
               <Volume2 size={16} /> <span className="hidden sm:inline">{soundAlertsReady ? "Som ativo" : "Ativar som"}</span>
             </button>
