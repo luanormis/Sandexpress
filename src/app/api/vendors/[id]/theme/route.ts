@@ -11,25 +11,7 @@ const NO_STORE_HEADERS = {
   Expires: '0',
 };
 
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-
-function normalizeColor(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return HEX_COLOR.test(trimmed) ? trimmed.toLowerCase() : null;
-}
-
-function normalizeLogoUrl(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.length > 2048) return null;
-  if (trimmed.startsWith('/') || trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
-    return trimmed;
-  }
-  return null;
-}
+const FIXED_PALETTE = { primary_color: '#fff8e8', secondary_color: '#241b16', button_color: '#ff9a3c', button_text_color: '#241b16' };
 
 function normalizeFeeRate(value: unknown) {
   const numeric = Number(value);
@@ -125,10 +107,7 @@ export async function GET(
 
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
-      primary_color: vendor.primary_color,
-      secondary_color: vendor.secondary_color,
-      button_color: (vendor as any).button_color,
-      button_text_color: (vendor as any).button_text_color,
+      ...FIXED_PALETTE,
       logo_url: vendor.logo_url,
       cash_fee_rate: Number(rates.cash?.fee_rate ?? 0),
       cash_fee_type: rates.cash?.fee_type || 'percent',
@@ -173,22 +152,8 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const primaryColor = normalizeColor(body.primary_color);
     if (body.background_only === true) {
-      if (!primaryColor) return NextResponse.json({ error: 'Informe uma cor válida.' }, { status: 400 });
-      // A background edit must not overwrite payment rates or the kiosk logo.
-      const { data: saved, error } = await supabaseAdmin.from('vendors')
-        .update({ primary_color: primaryColor, updated_at: new Date().toISOString() })
-        .eq('id', id).select('primary_color').single();
-      if (error) throw error;
-      return NextResponse.json(saved, { headers: NO_STORE_HEADERS });
-    }
-    const secondaryColor = normalizeColor(body.secondary_color);
-    const buttonColor = normalizeColor(body.button_color);
-    const buttonTextColor = normalizeColor(body.button_text_color);
-    const requestedLogoUrl = normalizeLogoUrl(body.logo_url);
-    if (!primaryColor || !secondaryColor || !buttonColor || !buttonTextColor) {
-      return NextResponse.json({ error: 'Informe cores validas no formato #RRGGBB.' }, { status: 400 });
+      return NextResponse.json(FIXED_PALETTE, { headers: NO_STORE_HEADERS });
     }
     const paymentFeeUpdate = {
       debit_card_fee_rate: normalizeFeeRate(body.debit_card_fee_rate),
@@ -223,25 +188,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Quiosque nao encontrado.' }, { status: 404 });
     }
 
-    const colorUpdate = {
-      primary_color: primaryColor,
-      secondary_color: secondaryColor,
-      button_color: buttonColor,
-      button_text_color: buttonTextColor,
-    };
-    const themeUpdate = session?.role === 'admin'
-      ? { ...colorUpdate, logo_url: requestedLogoUrl }
-      : colorUpdate;
-
-    const { error: tenantError } = await (supabaseAdmin.from('tenants') as any)
-      .update(themeUpdate)
-      .eq('id', vendor.tenant_id);
-
-    if (tenantError) throw tenantError;
-
     const { error: vendorUpdateError } = await supabaseAdmin
       .from('vendors')
-      .update({ ...themeUpdate, ...paymentFeeUpdate, updated_at: new Date().toISOString() })
+      .update({ ...paymentFeeUpdate, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (vendorUpdateError) throw vendorUpdateError;
@@ -262,22 +211,9 @@ export async function PATCH(
       .upsert(paymentRatesPayload, { onConflict: 'vendor_id,payment_method' });
     if (ratesError) throw ratesError;
 
-    const { data: savedVendor, error: savedVendorError } = await supabaseAdmin
-      .from('vendors')
-      .select('primary_color, secondary_color, button_color, button_text_color, logo_url, updated_at')
-      .eq('id', id)
-      .single();
-    if (savedVendorError || !savedVendor) throw savedVendorError || new Error('Tema salvo nao encontrado.');
-
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
-      ...themeUpdate,
-      primary_color: savedVendor.primary_color,
-      secondary_color: savedVendor.secondary_color,
-      button_color: (savedVendor as any).button_color,
-      button_text_color: (savedVendor as any).button_text_color,
-      logo_url: savedVendor.logo_url,
-      updated_at: (savedVendor as any).updated_at,
+      ...FIXED_PALETTE,
       ...paymentFeeUpdate,
       ...payoutDays,
       cash_fee_rate: paymentSettings.cash.feeRate,

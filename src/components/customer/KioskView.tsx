@@ -6,6 +6,10 @@ import { Vendor } from "@/types";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { kioskLogoForCustomer } from "@/lib/kiosk-logo";
 
+const FIXED_BACKGROUND = "#fff8e8";
+const FIXED_INK = "#241b16";
+const FIXED_ORANGE = "#ff9a3c";
+
 interface CustomerKioskViewProps {
   vendorId: string;
   umbrellaNumber: number;
@@ -52,7 +56,7 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
   return (
     <div
       className="min-h-screen p-6"
-      style={{ backgroundColor: vendor.primary_color }}
+      style={{ backgroundColor: FIXED_BACKGROUND }}
     >
       <div className="max-w-2xl mx-auto">
         {/* Header com logo e nome */}
@@ -75,7 +79,7 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
         {/* Seção de menu */}
         <div
           className="rounded-lg shadow-lg p-6 text-center"
-          style={{ backgroundColor: vendor.secondary_color || "#394E59" }}
+          style={{ backgroundColor: FIXED_INK }}
         >
           <p className="text-white text-xl font-semibold mb-4">
             Faça seu pedido escaneando o QR code
@@ -87,8 +91,8 @@ export function CustomerKioskView({ vendorId, umbrellaNumber }: CustomerKioskVie
           <button
             className="px-8 py-3 rounded-lg font-bold text-lg transition-all hover:opacity-90"
             style={{
-              backgroundColor: vendor.primary_color,
-              color: "white",
+              backgroundColor: FIXED_ORANGE,
+              color: FIXED_INK,
             }}
           >
             Abrir Menu

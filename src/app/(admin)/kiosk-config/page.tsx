@@ -5,10 +5,6 @@ import { Save } from "lucide-react";
 
 export default function KioskConfigPage() {
   const [name, setName] = useState("");
-  const [primaryColor, setPrimaryColor] = useState("#FF6B00");
-  const [secondaryColor, setSecondaryColor] = useState("#394E59");
-  const [buttonColor, setButtonColor] = useState("#FF6B00");
-  const [buttonTextColor, setButtonTextColor] = useState("#FFFFFF");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -54,10 +50,6 @@ export default function KioskConfigPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          primary_color: primaryColor,
-          secondary_color: secondaryColor,
-          button_color: buttonColor,
-          button_text_color: buttonTextColor,
           logo_url: logoUrl,
         }),
       });
@@ -78,12 +70,7 @@ export default function KioskConfigPage() {
       <div className="mx-auto max-w-2xl rounded-3xl border border-[#7a2b00] bg-[#451704]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.28)] sm:p-8">
         <h1 className="text-3xl font-bold mb-6">Configuração do Quiosque</h1>
 
-        <div
-          className="mb-6 rounded-2xl border border-white/15 p-6 text-white shadow-inner"
-          style={{
-            backgroundColor: primaryColor,
-          }}
-        >
+        <div className="mb-6 rounded-2xl border border-[#e8d8bb] bg-[#fff8e8] p-6 text-[#241b16] shadow-inner">
           <div className="flex items-center gap-4">
             {logoPreview && (
               <img
@@ -94,11 +81,7 @@ export default function KioskConfigPage() {
             )}
             <div>
               <h2 className="text-2xl font-black">{name || "Seu Quiosque"}</h2>
-              <p>Cor secundária:</p>
-              <span
-                className="ml-2 inline-block h-7 w-7 rounded-lg border border-white/30"
-                style={{ backgroundColor: secondaryColor }}
-              />
+              <p className="text-sm text-[#65574b]">Identidade visual padrão do SandExpress</p>
             </div>
           </div>
         </div>
@@ -112,7 +95,7 @@ export default function KioskConfigPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-[#7a2b00] bg-[#201411] px-4 py-3 font-bold text-[#fff8f6] outline-none placeholder:text-[#b78f7d] focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/25"
+            className="w-full rounded-xl border border-[#d5b797] bg-white px-4 py-3 font-bold text-[#241b16] outline-none placeholder:text-[#8b7a6c] focus:border-[#ff9a3c] focus:ring-2 focus:ring-[#ff9a3c]/25"
               placeholder="Ex: Quiosque Praia Central"
             />
           </div>
@@ -123,7 +106,7 @@ export default function KioskConfigPage() {
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              className="w-full rounded-xl border border-dashed border-[#7a2b00] bg-[#201411] px-4 py-3 text-sm font-bold text-[#fff8f6] file:mr-4 file:rounded-lg file:border-0 file:bg-[#ff6b00] file:px-4 file:py-2 file:font-black file:text-white"
+              className="w-full rounded-xl border border-dashed border-[#d5b797] bg-white px-4 py-3 text-sm font-bold text-[#241b16] file:mr-4 file:rounded-lg file:border-0 file:bg-[#ff9a3c] file:px-4 file:py-2 file:font-black file:text-[#241b16]"
             />
             {logoPreview && (
               <img
@@ -149,8 +132,7 @@ export default function KioskConfigPage() {
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl py-3 font-black shadow-[0_14px_30px_rgba(255,107,0,0.28)] transition hover:brightness-110 disabled:opacity-50"
-            style={{ backgroundColor: buttonColor, color: buttonTextColor }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff9a3c] py-3 font-black text-[#241b16] shadow-[0_14px_30px_rgba(255,154,60,0.28)] transition hover:brightness-105 disabled:opacity-50"
           >
             <Save size={20} />
             {isLoading ? "Salvando..." : "Salvar Configurações"}

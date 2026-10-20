@@ -91,8 +91,6 @@ export async function POST(
     const file = formData.get('file') as File | null;
     const imageId = String(formData.get('image_id') || '').trim();
     const storagePath = String(formData.get('storage_path') || '').trim();
-    const requestedBackground = String(formData.get('primary_color') || '').trim();
-    const primaryColor = /^#[0-9a-fA-F]{6}$/.test(requestedBackground) ? requestedBackground : null;
     if (!file && !imageId && !storagePath) return NextResponse.json({ error: 'Escolha uma imagem global ou envie uma logo.' }, { status: 400 });
 
     if (file) {
@@ -151,7 +149,6 @@ export async function POST(
     const themeUpdate = {
       logo_url: logoUrl,
       updated_at: new Date().toISOString(),
-      ...(primaryColor ? { primary_color: primaryColor } : {}),
     };
 
     const { error: vendorUpdateError } = await supabaseAdmin
@@ -162,7 +159,7 @@ export async function POST(
     if (vendorUpdateError) throw vendorUpdateError;
 
     const { error: tenantError } = await (supabaseAdmin.from('tenants') as any)
-      .update({ logo_url: logoUrl, ...(primaryColor ? { primary_color: primaryColor } : {}) })
+      .update({ logo_url: logoUrl })
       .eq('id', vendor.tenant_id);
 
     if (tenantError) throw tenantError;
@@ -176,7 +173,7 @@ export async function POST(
     return NextResponse.json({
       tenant_id: vendor.tenant_id,
       logo_url: logoUrl,
-      primary_color: primaryColor,
+      primary_color: '#fff8e8',
     });
   } catch (err) {
     console.error('Vendor logo upload error:', err);

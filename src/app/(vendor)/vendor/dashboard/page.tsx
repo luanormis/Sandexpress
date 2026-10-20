@@ -316,62 +316,6 @@ const DEFAULT_THEME: KioskTheme = {
   pix_api_enabled: false,
 };
 
-async function deriveLogoBackground(source: File | string): Promise<string> {
-  const fallback = "#f4eedd";
-  try {
-    const blob = typeof source === "string" ? await (await fetch(source)).blob() : source;
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = 36;
-    canvas.height = 36;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return fallback;
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    const colors = new Map<number, { r: number; g: number; b: number; weight: number }>();
-    for (let index = 0; index < pixels.length; index += 4) {
-      const alpha = pixels[index + 3] / 255;
-      const red = pixels[index];
-      const green = pixels[index + 1];
-      const blue = pixels[index + 2];
-      const high = Math.max(red, green, blue);
-      const low = Math.min(red, green, blue);
-      const saturation = high === 0 ? 0 : (high - low) / high;
-      if (alpha < 0.4 || saturation < 0.22 || high < 35 || high > 245) continue;
-      let hue = 0;
-      if (high === red) hue = 60 * (((green - blue) / (high - low)) % 6);
-      else if (high === green) hue = 60 * ((blue - red) / (high - low) + 2);
-      else hue = 60 * ((red - green) / (high - low) + 4);
-      const bin = Math.round(((hue + 360) % 360) / 18);
-      const weight = alpha * saturation;
-      const current = colors.get(bin) || { r: 0, g: 0, b: 0, weight: 0 };
-      current.r += red * weight;
-      current.g += green * weight;
-      current.b += blue * weight;
-      current.weight += weight;
-      colors.set(bin, current);
-    }
-    const accent = [...colors.values()].sort((a, b) => b.weight - a.weight)[0];
-    if (!accent?.weight) return fallback;
-    const mix = (base: number, color: number) => Math.round(base * 0.88 + (color / accent.weight) * 0.12);
-    return `#${[mix(244, accent.r), mix(238, accent.g), mix(221, accent.b)].map(value => value.toString(16).padStart(2, "0")).join("")}`;
-  } catch {
-    return fallback;
-  }
-}
-
-const BRAND_PALETTE = [
-  { name: "Primary / Laranja", value: "#ff6b00" },
-  { name: "Marrom escuro", value: "#201411" },
-  { name: "Card marrom", value: "#451704" },
-  { name: "Marrom profundo", value: "#301107" },
-  { name: "Texto creme", value: "#fff8f6" },
-  { name: "Texto suave", value: "#f4d6c8" },
-  { name: "Laranja suave", value: "#ff9b50" },
-  { name: "Borda laranja", value: "#7a2b00" },
-];
-
 const PAYMENT_METHOD_OPTIONS = [
   { id: "cash", label: "Dinheiro", Icon: Banknote },
   { id: "pix", label: "Pix", Icon: Smartphone },
@@ -1013,22 +957,25 @@ export default function VendorDashboard() {
     setThemeSaving(true);
     setThemeMessage("");
     try {
+      const paymentFields = new Set([
+        "debit_card_fee_rate", "credit_card_fee_rate", "pix_fee_rate",
+        ...PAYMENT_SETTINGS.flatMap(({ feeField, typeField, fixedField, daysField, activeField, apiField }) => [feeField, typeField, fixedField, daysField, activeField, apiField]),
+      ]);
+      const paymentPayload = Object.fromEntries(Object.entries(themeForm).filter(([field]) => paymentFields.has(field)));
       const res = await fetch(`/api/vendors/${vendorId}/theme`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(activeTab === "theme" ? { background_only: true, primary_color: themeForm.primary_color } : themeForm),
+        body: JSON.stringify(paymentPayload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setThemeMessage(data.error || "Não foi possível salvar a personalização.");
+        setThemeMessage(data.error || "Não foi possível salvar as formas de pagamento.");
         return;
       }
       setThemeForm(prev => buildThemeForm({ ...prev, ...data }));
-      setThemeMessage(activeTab === "payments"
-        ? "Formas de pagamento salvas para este quiosque."
-        : "Personalização salva. O login do cliente e os QRs já usam essas cores.");
+      setThemeMessage("Formas de pagamento salvas para este quiosque.");
     } catch {
-      setThemeMessage("Erro de rede ao salvar personalização.");
+      setThemeMessage("Erro de rede ao salvar as formas de pagamento.");
     } finally {
       setThemeSaving(false);
     }
@@ -1043,7 +990,7 @@ export default function VendorDashboard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Não foi possível salvar a logo.");
       setThemeForm(current => ({ ...current, logo_url: data.logo_url, primary_color: data.primary_color || current.primary_color }));
-      setLogoMessage("Logo atualizada. O fundo dos pedidos foi ajustado para combinar com as cores dela.");
+      setLogoMessage("Logo atualizada; ela já aparece para os clientes.");
     } catch (error) {
       setLogoMessage(error instanceof Error ? error.message : "Erro ao salvar a logo.");
     } finally {
@@ -1057,7 +1004,6 @@ export default function VendorDashboard() {
     if (!file || !vendorId) return;
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("primary_color", await deriveLogoBackground(file));
     await applyKioskLogo(formData);
   };
 
@@ -1065,7 +1011,6 @@ export default function VendorDashboard() {
     const formData = new FormData();
     if (image.storage_path) formData.append("storage_path", image.storage_path);
     else formData.append("image_id", image.id);
-    formData.append("primary_color", await deriveLogoBackground(image.image_url));
     await applyKioskLogo(formData);
   };
 
@@ -2648,83 +2593,6 @@ export default function VendorDashboard() {
               </div>
             </div>
           )}
-
-          {/* ========== ABA: PERSONALIZACAO ========== */}
-          {activeTab === "theme" && (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <form onSubmit={saveTheme} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <div className="mb-6">
-                  <h3 className="text-lg font-black text-gray-900">Identidade do quiosque</h3>
-                  <p className="text-sm font-semibold text-gray-500">Escolha somente o fundo da experiência do cliente.</p>
-                </div>
-
-                <label className="block space-y-3">
-                  <span className="font-bold">Cor de fundo</span>
-                  <input type="color" aria-label="Cor de fundo" value={validBackground(themeForm.primary_color)} onChange={event => setThemeForm(prev => ({ ...prev, primary_color: event.target.value }))} className="h-12 w-24" />
-                  <p className="text-sm">O texto sobre o fundo escolhido ajusta o contraste automaticamente. Cartões claros e botões laranja mantêm letras escuras.</p>
-                </label>
-                <button type="button" className="mt-4 rounded-xl border px-4 py-3 font-bold" onClick={() => setThemeForm(prev => ({ ...prev, primary_color: CREAM }))}>Usar creme padrão</button>
-
-                <div className="mt-5 rounded-2xl border border-dashed border-[#85736C] bg-[#fff8f6] p-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#85736C] bg-white shadow-sm">
-                      {themeForm.logo_url ? (
-                        <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-3" />
-                      ) : (
-                        <Upload className="text-[#3D1A0A]" size={30} />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <span className="text-sm font-black text-gray-700">Logo do quiosque</span>
-                      <p className="rounded-xl border border-[#EFD5CA] bg-white px-4 py-3 text-sm font-bold leading-5 text-[#3D1A0A]">
-                        Envie ou escolha a logo na aba Equipe. O fundo dos pedidos usa uma tonalidade suave da própria marca.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {themeMessage && (
-                  <p className="mt-5 rounded-xl bg-[#fff8f6] p-3 text-sm font-bold text-[#3D1A0A]">{themeMessage}</p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={themeSaving}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white shadow-sm disabled:opacity-60"
-                  style={{ backgroundColor: ORANGE, color: INK }}
-                >
-                  <Palette size={18} /> {themeSaving ? "Salvando..." : "Salvar personalização"}
-                </button>
-              </form>
-
-              <aside className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div className="theme-background p-6" style={{ backgroundColor: validBackground(themeForm.primary_color), "--preview-ink": contrastText(themeForm.primary_color) } as React.CSSProperties}>
-                  <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-md">
-                    {themeForm.logo_url ? (
-                      <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain p-2" />
-                    ) : (
-                      <Utensils className="text-gray-800" size={34} />
-                    )}
-                  </div>
-                  <h4 className="mt-5 text-2xl font-black">Preview cliente</h4>
-                  <p className="text-sm font-semibold text-white/80">Prévia do fundo com contraste automático.</p>
-                </div>
-                <div className="space-y-4 bg-[#fff8f6] p-6">
-                  <div className="rounded-xl border border-[#85736C] bg-white p-4">
-                    <p className="text-xs font-black uppercase" style={{ color: INK }}>Total da conta</p>
-                    <p className="text-3xl font-black" style={{ color: INK }}>{formatCurrency(0)}</p>
-                  </div>
-                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: ORANGE, color: INK }}>
-                    Abrir comanda
-                  </button>
-                  <button className="w-full rounded-xl py-3 text-sm font-black" style={{ backgroundColor: ORANGE, color: INK }}>
-                    Fechar conta
-                  </button>
-                </div>
-              </aside>
-            </div>
-          )}
-
           {/* ========== ABA: PAGAMENTOS ========== */}
           {activeTab === "payments" && (
             <form onSubmit={saveTheme} className="space-y-6">
@@ -3375,14 +3243,13 @@ export default function VendorDashboard() {
                     {themeForm.logo_url ? <img src={themeForm.logo_url} alt="Logo do quiosque" className="h-full w-full object-contain" /> : <Utensils className="text-[#6f5546]" size={34} />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-black text-[#3D1A0A]">Logo e cores do quiosque</h3>
-                    <p className="mt-1 text-sm font-semibold text-gray-600">A logo do quiosque aparecerá para os clientes. O fundo dos pedidos acompanha uma cor suave extraída da imagem.</p>
+                    <h3 className="text-lg font-black text-[#3D1A0A]">Logo do quiosque</h3>
+                    <p className="mt-1 text-sm font-semibold text-gray-600">A logo do quiosque aparecerá para os clientes. As telas mantêm a paleta padrão do SandExpress.</p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <button type="button" disabled={logoUploading} onClick={() => logoUploadInputRef.current?.click()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#FF6B00] px-4 font-black text-white disabled:opacity-60">
                         <Upload size={17} /> {logoUploading ? "Salvando..." : "Enviar logo"}
                       </button>
                       <input ref={logoUploadInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleKioskLogoUpload} className="hidden" />
-                      <span className="inline-flex items-center gap-2 text-sm font-bold text-gray-700"><span className="h-6 w-6 rounded-md border border-gray-300" style={{ backgroundColor: themeForm.primary_color }} /> Fundo atual</span>
                     </div>
                   </div>
                 </div>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { kioskLogoForCustomer } from '@/lib/kiosk-logo';
 
+const FIXED_CUSTOMER_PALETTE = { primary_color: '#fff8e8', secondary_color: '#241b16', button_color: '#ff9a3c', button_text_color: '#241b16' };
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -33,10 +35,7 @@ export async function GET(
     return NextResponse.json({
       id: vendor.id,
       name: vendor.name,
-      primary_color: vendor.primary_color,
-      secondary_color: vendor.secondary_color,
-      button_color: (vendor as any).button_color,
-      button_text_color: (vendor as any).button_text_color,
+      ...FIXED_CUSTOMER_PALETTE,
       logo_url: kioskLogoForCustomer(vendor.logo_url) || (/vera/i.test(vendor.name || '') ? '/logos/vera-quiosque.webp' : null),
       updated_at: (vendor as any).updated_at,
     }, { headers: NO_STORE_HEADERS });

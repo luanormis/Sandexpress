@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
-import { PlatformThemeRuntime } from "@/components/PlatformThemeRuntime";
 import "./globals.css";
 import "./readable-app.css";
 
@@ -32,7 +31,6 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className="antialiased">
         <ServiceWorkerRegister />
-        <PlatformThemeRuntime />
         {children}
       </body>
     </html>
