@@ -1943,17 +1943,17 @@ input[type="number"] {
 /* Beach-map state colors are operational signals and must ignore kiosk themes. */
 .vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="free"] {
   background-color: #dcfce7 !important;
-  border-color: #5bbf7a !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 .vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="occupied"] {
   background-color: #fecaca !important;
-  border-color: #f87171 !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 .vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="account"] {
   background-color: #fef08a !important;
-  border-color: #eab308 !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 .vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="free"]:hover { background-color: #bbf7d0 !important; }
@@ -2408,19 +2408,19 @@ input[type="number"] {
 
 .vendor-ops-shell .vendor-umbrella-tile.is-free {
   background: #eaf8ef !important;
-  border-color: #62b77a !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 
 .vendor-ops-shell .vendor-umbrella-tile.is-occupied {
   background: #fecaca !important;
-  border-color: #f87171 !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 
 .vendor-ops-shell .vendor-umbrella-tile.is-closing {
   background: #fef08a !important;
-  border-color: #eab308 !important;
+  border-color: #ff9a3c !important;
   color: #111111 !important;
 }
 
