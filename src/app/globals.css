@@ -1940,6 +1940,27 @@ input[type="number"] {
     0 0.45rem 0.9rem rgba(61, 26, 10, 0.08);
 }
 
+/* Beach-map state colors are operational signals and must ignore kiosk themes. */
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="free"] {
+  background-color: #dcfce7 !important;
+  border-color: #5bbf7a !important;
+  color: #111111 !important;
+}
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="occupied"] {
+  background-color: #fecaca !important;
+  border-color: #f87171 !important;
+  color: #111111 !important;
+}
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="account"] {
+  background-color: #fef08a !important;
+  border-color: #eab308 !important;
+  color: #111111 !important;
+}
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="free"]:hover { background-color: #bbf7d0 !important; }
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="occupied"]:hover { background-color: #fca5a5 !important; }
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile[data-beach-state="account"]:hover { background-color: #fde047 !important; }
+.vendor-ops-shell main .vendor-beach-map button.vendor-umbrella-tile.is-service { box-shadow: 0 0 0 4px #ef4444 !important; }
+
 /* Order cards use a light surface, so every label inside them needs dark contrast. */
 .vendor-ops-shell .vendor-order-card {
   background-color: #fff8f3 !important;

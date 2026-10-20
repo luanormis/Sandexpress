@@ -2083,11 +2083,9 @@ export default function VendorDashboard() {
                   "relative min-h-[6.25rem] overflow-hidden rounded-xl border text-sm font-black transition-all sm:aspect-square sm:min-h-0",
                   "vendor-umbrella-tile",
                   !umbrella.active && "is-inactive border-gray-200 bg-gray-100 text-gray-300",
-                  umbrella.active && !occupied && "is-free border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
-                  umbrella.active && occupied && !closing && "is-occupied border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
-                  umbrella.active && closing && "is-closing border-orange-300 bg-orange-500 text-white hover:bg-orange-600",
-                  umbrella.active && serviceRequest && "is-service animate-pulse border-red-500 bg-red-600 text-white shadow-lg ring-4 ring-red-200"
+                  umbrella.active && serviceRequest && "is-service animate-pulse shadow-lg ring-4 ring-red-200"
                 )}
+                data-beach-state={umbrella.active ? closing ? "account" : occupied ? "occupied" : "free" : "inactive"}
                 title={serviceRequest
                   ? `${serviceRequest.label} - guarda-sol ${umbrella.number}`
                   : order ? `${order.customer} - ${formatCurrency(order.total)}`
