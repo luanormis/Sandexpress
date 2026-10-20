@@ -2388,19 +2388,19 @@ input[type="number"] {
 .vendor-ops-shell .vendor-umbrella-tile.is-free {
   background: #eaf8ef !important;
   border-color: #62b77a !important;
-  color: #135f2e !important;
+  color: #111111 !important;
 }
 
 .vendor-ops-shell .vendor-umbrella-tile.is-occupied {
-  background: #fff1f1 !important;
-  border-color: #e57373 !important;
-  color: #8f1d1d !important;
+  background: #fecaca !important;
+  border-color: #f87171 !important;
+  color: #111111 !important;
 }
 
 .vendor-ops-shell .vendor-umbrella-tile.is-closing {
-  background: #fff4d6 !important;
-  border-color: #f2a93b !important;
-  color: #7a3d00 !important;
+  background: #fef08a !important;
+  border-color: #eab308 !important;
+  color: #111111 !important;
 }
 
 .vendor-ops-shell .vendor-umbrella-tile.is-service {
