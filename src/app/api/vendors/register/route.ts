@@ -15,7 +15,7 @@ function safeText(value: unknown, maxLength = 120) {
 
 /**
  * POST /api/vendors/register
- * Cria um tenant isolado e o vendor com cardápio vazio para produção.
+ * Cria um tenant isolado e prepara o cardápio padrão editável.
  * Os guarda-sóis são criados depois pelo próprio quiosque no painel.
  */
 export async function POST(req: NextRequest) {

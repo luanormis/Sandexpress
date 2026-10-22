@@ -211,6 +211,7 @@ export default function AdminDashboard() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [defaultMenuSyncing, setDefaultMenuSyncing] = useState(false);
   const [vendorUmbrellaLimit, setVendorUmbrellaLimit] = useState("100");
   const [selectedVendorFeatures, setSelectedVendorFeatures] = useState<Record<string, boolean>>({});
   const [vendorThemeDraft, setVendorThemeDraft] = useState({ primary_color: "#fff8e8", secondary_color: "#451704", button_color: "#ff6b00", button_text_color: "#ffffff" });
@@ -682,6 +683,33 @@ export default function AdminDashboard() {
     } catch (error) {
       setVendorThemeMessage(error instanceof Error ? error.message : "Erro ao salvar identidade visual.");
     } finally { setVendorThemeSaving(false); }
+  };
+
+  const addMissingDefaultMenuItems = async () => {
+    if (!selectedVendor) return;
+    setDefaultMenuSyncing(true);
+    try {
+      const response = await fetch('/api/admin/default-menu', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: selectedVendor.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Não foi possível conferir o cardápio.');
+      const changes = [
+        data.inserted ? `${data.inserted} item(ns) incluído(s)` : '',
+        data.refreshed ? `${data.refreshed} preço(s) padrão corrigido(s)` : '',
+        data.deactivated ? `${data.deactivated} item(ns) antigo(s) sem correspondência desativado(s)` : '',
+      ].filter(Boolean).join('; ');
+      alert(changes
+        ? `Cardápio conferido: ${changes}. ${data.itemCount} itens compõem o padrão.`
+        : `Cardápio conferido: os ${data.itemCount} itens do padrão já estão cadastrados.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao conferir o cardápio.');
+    } finally {
+      setDefaultMenuSyncing(false);
+    }
   };
 
   const savePlanSettings = async (e: React.FormEvent) => {
@@ -2297,6 +2325,13 @@ export default function AdminDashboard() {
               <button onClick={() => setSelectedVendor(null)} className="text-gray-400 hover:text-white"><X size={24} /></button>
             </div>
             <div className="p-6 space-y-4">
+              <section className="rounded-xl border border-gray-700 bg-gray-700/30 p-4">
+                <h4 className="font-black">Cardápio padrão</h4>
+                <p className="mt-1 text-sm text-gray-300">Confere o padrão, inclui itens ausentes, corrige os preços zerados do modelo e preserva imagens próprias e valores que já foram editados.</p>
+                <button type="button" onClick={addMissingDefaultMenuItems} disabled={defaultMenuSyncing} className="mt-3 min-h-11 rounded-lg bg-orange-500 px-4 font-black text-white hover:bg-orange-600 disabled:opacity-50">
+                  {defaultMenuSyncing ? 'Conferindo cardápio…' : 'Conferir e incluir itens faltantes'}
+                </button>
+              </section>
               {false && <section className="rounded-2xl border border-orange-300/40 bg-orange-500/10 p-4">
                 <div className="flex items-start gap-3"><Palette className="mt-1 text-orange-300" size={21}/><div><h4 className="font-black text-orange-100">Identidade visual do quiosque</h4><p className="mt-1 text-xs font-bold leading-5 text-orange-200/80">Estas cores afetam o cardápio, os botões e as telas internas deste cliente. A tela institucional de login do SandExpress permanece igual.</p></div></div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
