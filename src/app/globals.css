@@ -2735,3 +2735,29 @@ html body .admin-ops-shell main .vendor-beach-map :where(h1, h2, h3) {
 .vendor-operation-sidebar[data-open="true"]{transform:translateX(0)!important;pointer-events:auto!important}
 .vendor-sidebar-backdrop{appearance:none!important;border:0!important;padding:0!important;cursor:pointer!important;z-index:90!important}
 .vendor-operation-sidebar .vendor-sidebar-close{display:inline-flex!important;min-width:2.75rem!important;min-height:2.75rem!important;align-items:center!important;justify-content:center!important;position:relative!important;z-index:2!important;cursor:pointer!important;color:#2a1a12!important}
+
+/* Paleta do cardapio do cliente (areia, laranja tropical e bordo). */
+@theme {
+  --color-areia: #F9F5EA;
+  --color-areia-50: #FFFDF9;
+  --color-areia-100: #FBF7ED;
+  --color-areia-200: #F4EEDD;
+  --color-areia-300: #E9DEC7;
+  --color-borda: #E8DEC9;
+  --color-tinta: #2A1A12;
+  --color-tinta-suave: #715E52;
+  --color-tropical: #FF6700;
+  --color-tropical-light: #FF8533;
+  --color-tropical-dark: #D95300;
+  --color-bordo: #800A1D;
+  --color-bordo-light: #9E1229;
+  --color-bordo-dark: #580412;
+}
+
+.sx-menu { font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+.sx-no-scrollbar::-webkit-scrollbar { display: none; }
+.sx-no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+@keyframes sx-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sx-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sx-sheet { animation: sx-sheet-up .32s cubic-bezier(.16, 1, .3, 1); }
+.sx-backdrop { animation: sx-fade-in .25s ease-out; }

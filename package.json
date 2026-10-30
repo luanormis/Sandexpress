@@ -11,6 +11,7 @@
     "check:env": "node scripts/check-supabase-env.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@supabase/supabase-js": "^2.102.1",
     "@types/qrcode": "^1.5.6",
     "clsx": "^2.1.1",
